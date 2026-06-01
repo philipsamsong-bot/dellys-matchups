@@ -1,0 +1,187 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import DashboardChrome from "@/app/components/DashboardChrome";
+
+export default function MessagesPage() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadMessages() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        window.location.href = "/auth/login";
+        return;
+      }
+
+      setCurrentUser(user);
+
+      const { data: messages, error } = await supabase
+        .from("messages")
+        .select("*")
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        alert(error.message);
+        setLoading(false);
+        return;
+      }
+
+      const conversationMap = new Map();
+
+      for (const message of messages || []) {
+        const otherUserId =
+          message.sender_id === user.id ? message.receiver_id : message.sender_id;
+
+        if (!conversationMap.has(otherUserId)) {
+          conversationMap.set(otherUserId, {
+            userId: otherUserId,
+            lastMessage: message.content,
+            createdAt: message.created_at,
+            unread:
+              message.receiver_id === user.id && message.is_read === false,
+          });
+        }
+      }
+
+      const userIds = Array.from(conversationMap.keys());
+
+      if (userIds.length === 0) {
+        setConversations([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .in("id", userIds);
+
+      if (profilesError) {
+        alert(profilesError.message);
+        setLoading(false);
+        return;
+      }
+
+      const finalConversations = userIds.map((id) => ({
+        ...conversationMap.get(id),
+        profile: profiles.find((profile) => profile.id === id),
+      }));
+
+      setConversations(finalConversations);
+      setLoading(false);
+    }
+
+    loadMessages();
+  }, []);
+
+  function formatDate(date) {
+    return new Date(date).toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  if (loading) {
+    return (
+      <>
+        <DashboardChrome />
+
+        <main className="flex min-h-screen items-center justify-center bg-[#b30018] text-white">
+          <p className="text-xl font-bold">Loading messages...</p>
+        </main>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <DashboardChrome />
+
+      <main className="min-h-screen bg-[#b30018] px-6 pb-20 pt-36 text-white">
+        <div className="mx-auto max-w-5xl">
+          <p className="text-sm font-black uppercase tracking-[0.45em] text-red-100">
+            Messages
+          </p>
+
+          <h1 className="font-display mt-5 text-6xl font-bold leading-none md:text-7xl">
+            Your Conversations
+          </h1>
+
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-white/75">
+            Continue meaningful conversations with your Delly’s Matchups
+            connections.
+          </p>
+
+          {conversations.length === 0 ? (
+            <div className="mt-14 rounded-[3rem] bg-[#c1121f] p-12 text-center shadow-2xl">
+              <h2 className="font-display text-5xl font-bold">
+                No Messages Yet
+              </h2>
+
+              <p className="mx-auto mt-5 max-w-2xl text-white/75">
+                Browse matchups and connect with members to begin a conversation.
+              </p>
+
+              <a
+                href="/browse"
+                className="mt-10 inline-block rounded-full bg-white px-10 py-5 font-black text-[#b30018] transition hover:scale-105"
+              >
+                Browse Matchups
+              </a>
+            </div>
+          ) : (
+            <div className="mt-14 space-y-5">
+              {conversations.map((conversation) => (
+                <a
+                  key={conversation.userId}
+                  href={`/chat/${conversation.userId}`}
+                  className="flex items-center gap-5 rounded-[2rem] bg-[#c1121f] p-5 shadow-2xl transition hover:-translate-y-1"
+                >
+                  {conversation.profile?.avatar_url ? (
+                    <img
+                      src={conversation.profile.avatar_url}
+                      alt={conversation.profile.full_name || "Member"}
+                      className="h-20 w-20 rounded-full object-cover object-top"
+                    />
+                  ) : (
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/10 text-xl font-bold">
+                      ?
+                    </div>
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-4">
+                      <h2 className="truncate text-2xl font-black">
+                        {conversation.profile?.full_name || "Member"}
+                      </h2>
+
+                      <p className="shrink-0 text-sm text-white/60">
+                        {formatDate(conversation.createdAt)}
+                      </p>
+                    </div>
+
+                    <p className="mt-2 truncate text-white/70">
+                      {conversation.lastMessage}
+                    </p>
+                  </div>
+
+                  {conversation.unread && (
+                    <span className="h-4 w-4 rounded-full bg-white" />
+                  )}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    </>
+  );
+}
