@@ -10,6 +10,7 @@ export function SiteNav() {
   const [counsellingOpen, setCounsellingOpen] = useState(false);
   const [blogOpen, setBlogOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -317,7 +318,12 @@ export function SiteNav() {
 
           <a href="/contact">Contact Us</a>
         </div>
-
+        <button
+  onClick={() => setMobileOpen(!mobileOpen)}
+  className="text-3xl text-white lg:hidden"
+>
+  ☰
+</button>
         <div className="hidden gap-4 lg:flex">
           {user ? (
             <a
@@ -345,6 +351,22 @@ export function SiteNav() {
           )}
         </div>
       </div>
+      {mobileOpen && (
+  <div className="bg-[#950014] px-6 pb-6 lg:hidden">
+    <div className="flex flex-col gap-4 text-white">
+      <a href="/">Home</a>
+      <a href="/about/platform">About</a>
+      <a href="/about/academy">Academy</a>
+      <a href="/shop/books">Shop</a>
+      <a href="/counselling">Counselling</a>
+      <a href="/#matchups">Matchups</a>
+      <a href="/blog/articles">Blog</a>
+      <a href="/contact">Contact Us</a>
+      <a href="/auth/login">Sign In</a>
+      <a href="/auth/signup">Join Free</a>
+    </div>
+  </div>
+)}
     </nav>
   );
 }
