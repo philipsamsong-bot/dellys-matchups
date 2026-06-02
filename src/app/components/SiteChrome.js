@@ -27,7 +27,7 @@ export function SiteNav() {
 
   return (
     <nav className="fixed left-0 top-0 z-50 w-full border-b border-white/10 bg-[#950014]/95 text-white backdrop-blur-xl">
-      <div className="mx-auto flex h-28 max-w-7xl items-center justify-between px-4 sm:px-6">
+      <div className="mx-auto flex h-28 max-w-7xl items-center justify-between px-6">
         <a href="/" className="flex shrink-0 items-center">
           <img
             src="/dellys-logo.png"
