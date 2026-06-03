@@ -355,18 +355,92 @@ export function SiteNav() {
   <div className="bg-[#950014] px-6 pb-6 lg:hidden">
     <div className="flex flex-col gap-4 text-white">
       <a href="/">Home</a>
-      <a href="/about/platform">About</a>
-      <a href="/about/academy">Academy</a>
-      <a href="/shop/books">Shop</a>
-      <a href="/counselling">Counselling</a>
+
+      <details>
+        <summary className="cursor-pointer font-bold">About</summary>
+        <div className="mt-3 flex flex-col gap-3 pl-4 text-white/80">
+          <a href="/about/platform">The Platform</a>
+          <a href="/about/founder">The Founder</a>
+          <a href="/about/academy">Academy</a>
+        </div>
+      </details>
+
+      <details>
+        <summary className="cursor-pointer font-bold">Academy</summary>
+        <div className="mt-3 flex flex-col gap-3 pl-4 text-white/80">
+          <a href="/about/academy/module-1">Module 1: Counselling 101</a>
+          <a href="/about/academy/module-2">Module 2: Counselling 102</a>
+          <a href="/about/academy/module-3">Module 3: Counselling 103</a>
+          <a href="/about/academy/module-4">Module 4: Leadership & Influence</a>
+          <a href="/about/academy/module-5">Module 5: Healing & Restoration</a>
+          <a href="/about/academy/module-6">Module 6: Master Classes</a>
+          <a href="/about/academy/module-7">Module 7: Virginity 101</a>
+        </div>
+      </details>
+
+      <details>
+        <summary className="cursor-pointer font-bold">Shop</summary>
+        <div className="mt-3 flex flex-col gap-3 pl-4 text-white/80">
+          <a href="/shop/books">Books</a>
+          <a href="/shop/merch">Merch</a>
+          <a href="/shop/audio">Audio Messages</a>
+          <a href="/shop/ebooks">eBooks / Kindle</a>
+        </div>
+      </details>
+
+      <details>
+        <summary className="cursor-pointer font-bold">Counselling</summary>
+        <div className="mt-3 flex flex-col gap-3 pl-4 text-white/80">
+          <a href="/counselling">Counselling Overview</a>
+          <a href="/counselling/premarital">Premarital Counselling</a>
+          <a href="/counselling/marital">Marital Counselling</a>
+          <a href="/counselling/purpose">Purpose Discovery</a>
+          <a href="/counselling/healing">Emotional Healing</a>
+          <a href="/counselling/coaching">Mentorship & Coaching</a>
+        </div>
+      </details>
+
       <a href="/#matchups">Matchups</a>
-      <a href="/blog/articles">Blog</a>
+
+      <details>
+        <summary className="cursor-pointer font-bold">Blog</summary>
+        <div className="mt-3 flex flex-col gap-3 pl-4 text-white/80">
+          <a href="/blog/exceptional-cases">Exceptional Cases</a>
+          <a href="/newsletter">Newsletter</a>
+          <a href="/blog/articles">Articles</a>
+          <a href="/gallery">Gallery</a>
+        </div>
+      </details>
+
+      <details>
+        <summary className="cursor-pointer font-bold">Support</summary>
+        <div className="mt-3 flex flex-col gap-3 pl-4 text-white/80">
+          <a href="/support/donate">Onetime Donations</a>
+          <a href="/support/partner">Become a Partner</a>
+          <a href="/support/testimonial">Submit Testimonial</a>
+        </div>
+      </details>
+
       <a href="/contact">Contact Us</a>
-      <a href="/auth/login">Sign In</a>
-      <a href="/auth/signup">Join Free</a>
+
+      {user ? (
+        <a href="/dashboard" className="rounded-full bg-white px-6 py-3 text-center font-bold text-[#b30018]">
+          Dashboard
+        </a>
+      ) : (
+        <>
+          <a href="/auth/login" className="rounded-full border border-white/20 px-6 py-3 text-center font-bold">
+            Sign In
+          </a>
+          <a href="/auth/signup" className="rounded-full bg-white px-6 py-3 text-center font-bold text-[#b30018]">
+            Join Free
+          </a>
+        </>
+      )}
     </div>
   </div>
 )}
+
     </nav>
   );
 }
