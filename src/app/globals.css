@@ -23,30 +23,3 @@ body {
   font-family: "Cormorant Garamond", serif;
 }
 
-html,
-body {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-img,
-video,
-iframe,
-svg {
-  max-width: 100%;
-  height: auto;
-}
-
-@media (max-width: 640px) {
-  .grid,
-  .flex {
-    min-width: 0;
-  }
-}
