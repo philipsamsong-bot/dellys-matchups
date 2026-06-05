@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
 
 const PAYPAL_API_BASE =
-  process.env.PAYPAL_API_BASE || "https://api-m.sandbox.paypal.com";
+  process.env.PAYPAL_API_BASE || "https://api-m.paypal.com";
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
 
 const PAYPAL_PLAN_IDS = {
-  premium: "P-9TB41656290136044NIQKOFA",
-  vip: "P-3NP285394S872522CNIQLBBY",
+  premium: process.env.PAYPAL_PREMIUM_PLAN_ID,
+  vip: process.env.PAYPAL_VIP_PLAN_ID,
 };
-console.log("Premium Plan:", process.env.PAYPAL_PREMIUM_PLAN_ID);
-console.log("VIP Plan:", process.env.PAYPAL_VIP_PLAN_ID);
-console.log("API Base:", process.env.PAYPAL_API_BASE);
-console.log("Selected Plan:", plan);
-console.log("Plan ID:", planId);
 
 async function getPayPalAccessToken() {
   if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
@@ -47,6 +42,10 @@ export async function POST(request) {
   try {
     const { plan, userId, email } = await request.json();
     const planId = PAYPAL_PLAN_IDS[plan];
+
+    console.log("Selected Plan:", plan);
+    console.log("Plan ID:", planId);
+    console.log("API Base:", PAYPAL_API_BASE);
 
     if (!planId || !userId) {
       return NextResponse.json(
