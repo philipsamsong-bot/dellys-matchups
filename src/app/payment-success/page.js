@@ -28,16 +28,13 @@ function PaymentSuccessContent() {
         }
 
         const sessionResponse = await fetch(
-          `/api/stripe/session?session_id=${sessionId}`
+          `/api/paypal/session?session_id=${sessionId}`
         );
 
         const sessionData = await sessionResponse.json();
 
         const plan =
-          sessionData.plan ===
-          process.env.NEXT_PUBLIC_STRIPE_VIP_PRICE_ID
-            ? "vip"
-            : "premium";
+          searchParams.get("plan") || "premium";
 
         await supabase
           .from("profiles")

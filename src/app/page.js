@@ -124,7 +124,7 @@ export default function Home() {
       return;
     }
 
-    const response = await fetch("/api/stripe/checkout", {
+    const response = await fetch("/api/paypal/checkout", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

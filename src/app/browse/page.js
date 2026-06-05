@@ -121,7 +121,7 @@ export default function BrowsePage() {
                 type="button"
                 onClick={() => {
                   setUpgradeModalOpen(false);
-                  window.location.href = "/pricing";
+                  window.location.href = "/matchups";
                 }}
                 className="mt-7 w-full rounded-2xl bg-white py-4 font-bold text-[#b30018] transition hover:scale-[1.02]"
               >

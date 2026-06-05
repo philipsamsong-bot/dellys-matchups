@@ -227,7 +227,7 @@ export default function DashboardPage() {
 
   {!hasFullAccess && (
     <a
-      href="/pricing"
+      href="/matchups"
       className="mt-6 inline-block rounded-full bg-white px-6 py-3 font-black text-[#b30018]"
     >
       Upgrade Now
