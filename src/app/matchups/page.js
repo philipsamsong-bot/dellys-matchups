@@ -5,15 +5,17 @@ import { supabase } from "@/lib/supabase";
 export default function MatchupsPage() {
   async function handleCheckout(plan) {
     try {
-      alert(`Clicked ${plan}`);
-  
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (!user) {
+        window.location.href = "/auth/login";
+        return;
+      }
   
-      console.log("User:", user);
-  
-      const response = await fetch("/api/paypal/checkout", {
+      const response = await fetch("/api/paypal/subsriptions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -25,18 +27,18 @@ export default function MatchupsPage() {
         }),
       });
   
-      console.log("Status:", response.status);
-  
       const data = await response.json();
-  
-      console.log("Response:", data);
+      if (!response.ok){
+        alert (data.error || "Unable to start subscription.");
+        return
+      }
   
       if (data.url) {
         window.location.href = data.url;
         return;
       }
   
-      alert(JSON.stringify(data));
+      alert("No PayPal approval URL returned.");
     } catch (error) {
       console.error(error);
       alert(error.message);

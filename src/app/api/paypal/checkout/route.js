@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 
-const PAYPAL_API_BASE =
-  process.env.PAYPAL_API_BASE || "https://api-m.paypal.com";
-
+const PAYPAL_API_BASE = process.env.PAYPAL_API_BASE || "https://api-m.sandbox.paypal.com";
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
 
@@ -32,7 +30,7 @@ async function getPayPalAccessToken() {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error_description || "Unable to authenticate PayPal.");
+    throw new Error(data.error_description || data.message || "Unable to authenticate PayPal.");
   }
 
   return data.access_token;
@@ -42,10 +40,6 @@ export async function POST(request) {
   try {
     const { plan, userId, email } = await request.json();
     const planId = PAYPAL_PLAN_IDS[plan];
-
-    console.log("Selected Plan:", plan);
-    console.log("Plan ID:", planId);
-    console.log("API Base:", PAYPAL_API_BASE);
 
     if (!planId || !userId) {
       return NextResponse.json(
@@ -66,11 +60,7 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         plan_id: planId,
-        custom_id: JSON.stringify({
-          userId,
-          plan,
-          email,
-        }),
+        custom_id: JSON.stringify({ userId, plan, email }),
         application_context: {
           brand_name: "Delly's Matchups",
           user_action: "SUBSCRIBE_NOW",
@@ -84,7 +74,7 @@ export async function POST(request) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: data.message || "Unable to create PayPal subscription." },
+        { error: data.message || data.error_description || "Unable to create PayPal subscription." },
         { status: 500 }
       );
     }
