@@ -1,87 +1,120 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 
-function PaymentSuccessContent() {
+export default function PaymentSuccessPage() {
   const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(true);
+  const plan = searchParams.get("plan") || "premium";
+  const subscriptionId = searchParams.get("subscription_id");
+  const planName = plan === "vip" ? "VIP Elite" : "Premium";
+
+  const [status, setStatus] = useState("verifying");
+  const [message, setMessage] = useState("Verifying your membership upgrade...");
 
   useEffect(() => {
-    async function activateSubscription() {
+    async function verifySubscription() {
+      if (!subscriptionId) {
+        setStatus("warning");
+        setMessage("Payment completed, but subscription ID was not found.");
+        return;
+      }
+
       try {
-        const sessionId = searchParams.get("session_id");
+        const response = await fetch("/api/paypal/verify-subscription", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ subscriptionId }),
+        });
 
-        if (!sessionId) {
-          setLoading(false);
+        const data = await response.json();
+
+        if (!response.ok) {
+          setStatus("warning");
+          setMessage(data.error || "Payment succeeded, but upgrade verification is pending.");
           return;
         }
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          setLoading(false);
-          return;
-        }
-
-        const sessionResponse = await fetch(
-          `/api/paypal/session?session_id=${sessionId}`
-        );
-
-        const sessionData = await sessionResponse.json();
-
-        const plan =
-          searchParams.get("plan") || "premium";
-
-        await supabase
-          .from("profiles")
-          .update({
-            subscription_status: "active",
-            subscription_plan: plan,
-          })
-          .eq("id", user.id);
-
-        setLoading(false);
+        setStatus("success");
+        setMessage(`Your ${data.plan === "vip" ? "VIP Elite" : "Premium"} membership is now active.`);
       } catch (error) {
-        console.log(error);
-        setLoading(false);
+        setStatus("warning");
+        setMessage(error.message || "Payment succeeded, but verification failed.");
       }
     }
 
-    activateSubscription();
-  }, [searchParams]);
+    verifySubscription();
+  }, [subscriptionId]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#080304] px-6 text-white">
-      <div className="max-w-xl rounded-3xl border border-green-500/30 bg-white/5 p-10 text-center">
-        <h1 className="text-4xl font-black text-green-400">
-          Payment Successful 🎉
-        </h1>
+    <>
+      <SiteNav />
 
-        <p className="mt-4 text-white/70">
-          {loading
-            ? "Activating your membership..."
-            : "Your membership is now active."}
-        </p>
+      <main className="min-h-screen bg-[#b30018] px-6 pb-24 pt-44 text-white">
+        <div className="mx-auto max-w-5xl rounded-[3rem] border border-white/10 bg-black/25 p-10 text-center shadow-2xl backdrop-blur-xl md:p-16">
+          <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-white text-6xl shadow-2xl">
+            {plan === "vip" ? "👑" : "✨"}
+          </div>
 
-        <a
-          href="/dashboard"
-          className="mt-8 inline-block rounded-2xl bg-red-700 px-6 py-4 font-bold hover:bg-red-800"
-        >
-          Go to Dashboard
-        </a>
-      </div>
-    </main>
-  );
-}
+          <p className="mt-8 font-black uppercase tracking-[0.35em] text-red-100">
+            Payment Successful
+          </p>
 
-export default function PaymentSuccessPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <PaymentSuccessContent />
-    </Suspense>
+          <h1 className="font-display mt-5 text-6xl font-bold leading-none md:text-8xl">
+            Welcome to {planName}
+          </h1>
+
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-white/75">
+            {message}
+          </p>
+
+          <div className="mt-10 rounded-2xl bg-white/10 p-5 font-black">
+            {status === "verifying" && "⏳ Verifying upgrade..."}
+            {status === "success" && "✅ Membership upgraded"}
+            {status === "warning" && "⚠️ Upgrade pending"}
+          </div>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl bg-white/10 p-6">
+              <p className="text-3xl">💬</p>
+              <p className="mt-3 font-black">Messaging</p>
+            </div>
+
+            <div className="rounded-2xl bg-white/10 p-6">
+              <p className="text-3xl">❤️</p>
+              <p className="mt-3 font-black">Likes Visibility</p>
+            </div>
+
+            <div className="rounded-2xl bg-white/10 p-6">
+              <p className="text-3xl">{plan === "vip" ? "👑" : "⭐"}</p>
+              <p className="mt-3 font-black">
+                {plan === "vip" ? "VIP Priority" : "Premium Access"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+            <a
+              href="/dashboard"
+              className="rounded-full bg-white px-8 py-4 font-black text-[#b30018] transition hover:scale-105"
+            >
+              Go to Dashboard
+            </a>
+
+            <a
+              href="/membership"
+              className="rounded-full border border-white/20 bg-white/10 px-8 py-4 font-black text-white transition hover:bg-white/20"
+            >
+              View Membership
+            </a>
+          </div>
+        </div>
+      </main>
+
+      <SiteFooter />
+    </>
   );
 }

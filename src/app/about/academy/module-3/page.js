@@ -63,7 +63,7 @@ export default function ModuleThreePage() {
 
               <div className="mt-12 flex flex-wrap gap-5">
                 <a
-                  href="/auth/signup"
+                  href="/academy/checkout?course=module-3"
                   className="rounded-full bg-white px-10 py-5 text-lg font-black text-[#b30018] transition hover:scale-105"
                 >
                   Pay & Enroll
@@ -219,7 +219,7 @@ export default function ModuleThreePage() {
 
             <div className="mt-12 flex flex-wrap justify-center gap-5">
               <a
-                href="/auth/signup"
+                href="/academy/checkout?course=module-3"
                 className="rounded-full bg-white px-10 py-5 text-lg font-black text-[#b30018] transition hover:scale-105"
               >
                 Pay & Enroll

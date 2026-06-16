@@ -8,20 +8,66 @@ function getPriceNumber(price) {
   return Number(String(price).replace("$", "")) || 0;
 }
 
+function normalizeCartItems(items) {
+  const groupedItems = new Map();
+
+  items.forEach((item) => {
+    const key = item.id || item.slug || item.title;
+    const existingItem = groupedItems.get(key);
+
+    if (existingItem) {
+      groupedItems.set(key, {
+        ...existingItem,
+        quantity: (existingItem.quantity || 1) + (item.quantity || 1),
+      });
+      return;
+    }
+
+    groupedItems.set(key, {
+      ...item,
+      quantity: item.quantity || 1,
+    });
+  });
+
+  return Array.from(groupedItems.values());
+}
+
 export default function CartPage() {
   const [cart, setCart] = useState([]);
 
   useEffect(() => {
     const savedCart = JSON.parse(localStorage.getItem("dm-cart") || "[]");
-    setCart(savedCart);
+    const normalizedCart = normalizeCartItems(savedCart);
+
+    setCart(normalizedCart);
+    localStorage.setItem("dm-cart", JSON.stringify(normalizedCart));
   }, []);
 
-  const total = cart.reduce((sum, item) => sum + getPriceNumber(item.price), 0);
+  const itemCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
+
+  const total = cart.reduce((sum, item) => {
+    return sum + getPriceNumber(item.price) * (item.quantity || 1);
+  }, 0);
 
   function updateCart(nextCart) {
     setCart(nextCart);
     localStorage.setItem("dm-cart", JSON.stringify(nextCart));
     window.dispatchEvent(new Event("cartUpdated"));
+  }
+
+  function updateQuantity(indexToUpdate, quantityChange) {
+    const nextCart = cart
+      .map((item, index) => {
+        if (index !== indexToUpdate) return item;
+
+        return {
+          ...item,
+          quantity: Math.max(1, (item.quantity || 1) + quantityChange),
+        };
+      })
+      .filter((item) => item.quantity > 0);
+
+    updateCart(nextCart);
   }
 
   function removeItem(indexToRemove) {
@@ -92,40 +138,73 @@ export default function CartPage() {
           ) : (
             <div className="mt-16 grid gap-10 lg:grid-cols-[1.4fr_0.7fr]">
               <div className="space-y-6">
-                {cart.map((item, index) => (
-                  <div
-                    key={`${item.title}-${index}`}
-                    className="flex flex-col gap-6 rounded-[2.5rem] bg-[#c1121f] p-6 shadow-2xl md:flex-row md:items-center"
-                  >
-                    <img
-                      src={item.image}
-                      alt={item.title}
-                      className="h-36 w-full rounded-[2rem] bg-white object-cover md:w-36"
-                    />
+                {cart.map((item, index) => {
+                  const quantity = item.quantity || 1;
+                  const itemTotal = getPriceNumber(item.price) * quantity;
 
-                    <div className="flex-1">
-                      <span className="rounded-full bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#b30018]">
-                        {item.type || "product"}
-                      </span>
-
-                      <h2 className="mt-5 text-3xl font-black">
-                        {item.title}
-                      </h2>
-
-                      <p className="mt-3 text-2xl font-black text-red-100">
-                        {item.price}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => removeItem(index)}
-                      className="rounded-full border border-white/20 px-6 py-3 font-bold transition hover:bg-white hover:text-[#b30018]"
+                  return (
+                    <div
+                      key={`${item.id || item.slug || item.title}-${index}`}
+                      className="flex flex-col gap-6 rounded-[2.5rem] bg-[#c1121f] p-6 shadow-2xl md:flex-row md:items-center"
                     >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="h-36 w-full rounded-[2rem] bg-white object-cover md:w-36"
+                      />
+
+                      <div className="flex-1">
+                        <span className="rounded-full bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#b30018]">
+                          {item.type || "product"}
+                        </span>
+
+                        <h2 className="mt-5 text-3xl font-black">
+                          {item.title}
+                        </h2>
+
+                        <p className="mt-3 text-xl font-black text-red-100">
+                          {item.price} each
+                        </p>
+
+                        <p className="mt-2 text-2xl font-black">
+                          Subtotal: ${itemTotal.toFixed(2)}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-4 md:items-end">
+                        <div className="flex items-center overflow-hidden rounded-full border border-white/20">
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(index, -1)}
+                            className="px-5 py-3 font-black transition hover:bg-white hover:text-[#b30018]"
+                          >
+                            -
+                          </button>
+
+                          <span className="min-w-14 px-5 py-3 text-center font-black">
+                            {quantity}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(index, 1)}
+                            className="px-5 py-3 font-black transition hover:bg-white hover:text-[#b30018]"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          className="rounded-full border border-white/20 px-6 py-3 font-bold transition hover:bg-white hover:text-[#b30018]"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <aside className="h-fit rounded-[3rem] bg-[#c1121f] p-8 shadow-2xl">
@@ -140,7 +219,7 @@ export default function CartPage() {
                 <div className="mt-10 space-y-5 border-b border-white/15 pb-8">
                   <div className="flex justify-between">
                     <span className="text-white/75">Items</span>
-                    <span className="font-black">{cart.length}</span>
+                    <span className="font-black">{itemCount}</span>
                   </div>
 
                   <div className="flex justify-between">
@@ -151,11 +230,13 @@ export default function CartPage() {
 
                 <div className="mt-8 flex items-center justify-between">
                   <span className="text-xl font-black">Total</span>
-                  <span className="text-5xl font-black">${total}</span>
+                  <span className="text-5xl font-black">
+                    ${total.toFixed(2)}
+                  </span>
                 </div>
 
                 <a
-                  href="/checkout"
+                  href="/shop/checkout"
                   className="mt-10 block rounded-full bg-white py-5 text-center text-lg font-black text-[#b30018] transition hover:scale-105"
                 >
                   Proceed To Checkout

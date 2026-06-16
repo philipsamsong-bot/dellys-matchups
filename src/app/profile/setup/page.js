@@ -8,20 +8,31 @@ import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 const emptyForm = {
   age: "",
   gender: "",
+  country: "",
   city: "",
-  bio: "",
-  interests: "",
+  phone: "",
+  occupation: "",
+  faith_background: "",
   relationship_goal: "",
+  interests: "",
+  bio: "",
 };
+
+const relationshipGoals = [
+  "Intentional relationship",
+  "Courtship leading to marriage",
+  "Marriage preparation",
+  "Friendship first",
+  "Healing before relationship",
+  "Counselling and mentorship",
+];
 
 export default function ProfileSetupPage() {
   const [user, setUser] = useState(null);
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [avatarUrl, setAvatarUrl] =useState("");
-  const [previewUrl, setPreviewUrl] =useState("");
-  const [saveMessage, setSaveMessage] = useState("");
-
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
@@ -51,14 +62,17 @@ export default function ProfileSetupPage() {
 
       if (profile) {
         setAvatarUrl(profile.avatar_url || "");
-
         setForm({
           age: profile.age || "",
           gender: profile.gender || "",
+          country: profile.country || "",
           city: profile.city || "",
-          bio: profile.bio || "",
-          interests: profile.interests || "",
+          phone: profile.phone || "",
+          occupation: profile.occupation || "",
+          faith_background: profile.faith_background || "",
           relationship_goal: profile.relationship_goal || "",
+          interests: profile.interests || "",
+          bio: profile.bio || "",
         });
       }
     }
@@ -105,10 +119,11 @@ export default function ProfileSetupPage() {
     return Boolean(
       updates.age &&
         updates.gender &&
+        updates.country &&
         updates.city &&
+        updates.relationship_goal &&
         updates.bio &&
-        updates.interests &&
-        updates.relationship_goal
+        updates.interests
     );
   }
 
@@ -123,23 +138,27 @@ export default function ProfileSetupPage() {
     setLoading(true);
 
     try {
-      const avatarUrl = await uploadPhoto();
+      const uploadedAvatarUrl = await uploadPhoto();
 
       const updates = {
         age: form.age ? Number(form.age) : null,
         gender: form.gender,
+        country: form.country,
         city: form.city,
-        bio: form.bio,
-        interests: form.interests,
+        phone: form.phone,
+        occupation: form.occupation,
+        faith_background: form.faith_background,
         relationship_goal: form.relationship_goal,
+        interests: form.interests,
+        bio: form.bio,
         updated_at: new Date().toISOString(),
       };
 
       updates.is_complete = isProfileComplete(updates);
 
-      if (avatarUrl) {
-        updates.avatar_url = avatarUrl;
-        setAvatarUrl(avatarUrl);
+      if (uploadedAvatarUrl) {
+        updates.avatar_url = uploadedAvatarUrl;
+        setAvatarUrl(uploadedAvatarUrl);
       }
 
       const { error } = await supabase.from("profiles").upsert({
@@ -161,18 +180,22 @@ export default function ProfileSetupPage() {
       setLoading(false);
     }
   }
+
+  const completionFields = [
+    form.age,
+    form.gender,
+    form.country,
+    form.city,
+    form.relationship_goal,
+    form.interests,
+    form.bio,
+    previewUrl || avatarUrl,
+  ];
+
   const completionPercentage = Math.round(
-    [
-      form.age,
-      form.gender,
-      form.city,
-      form.bio,
-      form.interests,
-      form.relationship_goal,
-      previewUrl || avatarUrl,
-    ].filter(Boolean).length / 7 * 100
+    (completionFields.filter(Boolean).length / completionFields.length) * 100
   );
-  
+
   return (
     <>
       <SiteNav />
@@ -194,37 +217,24 @@ export default function ProfileSetupPage() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-white/80">
-              Save anytime and update whenever you like. Your progress is kept
-              safely, even if your profile is not complete yet.
+              Help us understand your relationship journey so Delly&apos;s
+              Matchups can support intentional, meaningful connections.
             </p>
           </motion.div>
 
           <div className="mx-auto mt-10 max-w-3xl">
-  <div className="mb-3 flex items-center justify-between text-sm font-bold text-white">
-    <span>Profile Completion</span>
-    <span>{completionPercentage}%</span>
-  </div>
+            <div className="mb-3 flex items-center justify-between text-sm font-bold text-white">
+              <span>Profile Completion</span>
+              <span>{completionPercentage}%</span>
+            </div>
 
-  <div className="h-3 overflow-hidden rounded-full bg-white/20">
-    <div
-      className="h-full rounded-full bg-white"
-      style={{ width: `${completionPercentage}%` }}
-    />
-  </div>
-</div>
-<div className="mx-auto mt-10 max-w-3xl">
-  <div className="mb-3 flex items-center justify-between text-sm font-bold text-white">
-    <span>Profile Completion</span>
-    <span>{completionPercentage}%</span>
-  </div>
-
-  <div className="h-3 overflow-hidden rounded-full bg-white/20">
-    <div
-      className="h-full rounded-full bg-white transition-all duration-500"
-      style={{ width: `${completionPercentage}%` }}
-    />
-  </div>
-</div>
+            <div className="h-3 overflow-hidden rounded-full bg-white/20">
+              <div
+                className="h-full rounded-full bg-white transition-all duration-500"
+                style={{ width: `${completionPercentage}%` }}
+              />
+            </div>
+          </div>
 
           <motion.form
             onSubmit={handleSubmit}
@@ -241,11 +251,11 @@ export default function ProfileSetupPage() {
               {(previewUrl || avatarUrl) && (
                 <div className="mt-6 flex justify-center">
                   <img
-                  src={previewUrl || avatarUrl}
-                  alt="Profile"
-                  className="h-40 w-40 rounded-full border-4 border-white object-cover shadow-xl"
+                    src={previewUrl || avatarUrl}
+                    alt="Profile"
+                    className="h-40 w-40 rounded-full border-4 border-white object-cover shadow-xl"
                   />
-                  </div>
+                </div>
               )}
 
               <input
@@ -254,13 +264,12 @@ export default function ProfileSetupPage() {
                 className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-white outline-none file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-5 file:py-2 file:font-bold file:text-[#b30018]"
                 onChange={(event) => {
                   const selectedFile = event.target.files?.[0] || null;
-                  
                   setPhoto(selectedFile);
+
                   if (selectedFile) {
                     setPreviewUrl(URL.createObjectURL(selectedFile));
                   }
                 }}
-            
               />
             </div>
 
@@ -274,6 +283,7 @@ export default function ProfileSetupPage() {
                   type="number"
                   name="age"
                   placeholder="Age"
+                  min="18"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.age}
                   onChange={handleChange}
@@ -301,10 +311,37 @@ export default function ProfileSetupPage() {
 
                 <input
                   type="text"
+                  name="country"
+                  placeholder="Country"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                  value={form.country}
+                  onChange={handleChange}
+                />
+
+                <input
+                  type="text"
                   name="city"
                   placeholder="City"
-                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60 md:col-span-2"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.city}
+                  onChange={handleChange}
+                />
+
+                <input
+                  type="tel"
+                  name="phone"
+                  placeholder="Phone number"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                  value={form.phone}
+                  onChange={handleChange}
+                />
+
+                <input
+                  type="text"
+                  name="occupation"
+                  placeholder="Occupation"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                  value={form.occupation}
                   onChange={handleChange}
                 />
               </div>
@@ -312,25 +349,36 @@ export default function ProfileSetupPage() {
 
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
               <h2 className="font-display text-4xl font-bold">
-                About You
-              </h2>
-
-              <textarea
-                name="bio"
-                placeholder="Tell us a little about yourself..."
-                rows="5"
-                className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-5 text-white outline-none placeholder:text-white/60"
-                value={form.bio}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">
-                Interests & Relationship Goals
+                Faith & Relationship Journey
               </h2>
 
               <div className="mt-6 grid gap-6">
+                <input
+                  type="text"
+                  name="faith_background"
+                  placeholder="Faith background e.g. Christian, church community, ministry"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                  value={form.faith_background}
+                  onChange={handleChange}
+                />
+
+                <select
+                  name="relationship_goal"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
+                  value={form.relationship_goal}
+                  onChange={handleChange}
+                >
+                  <option value="" className="text-black">
+                    Select relationship goal
+                  </option>
+
+                  {relationshipGoals.map((goal) => (
+                    <option key={goal} value={goal} className="text-black">
+                      {goal}
+                    </option>
+                  ))}
+                </select>
+
                 <input
                   type="text"
                   name="interests"
@@ -339,16 +387,20 @@ export default function ProfileSetupPage() {
                   value={form.interests}
                   onChange={handleChange}
                 />
-
-                <input
-                  type="text"
-                  name="relationship_goal"
-                  placeholder="Relationship goal"
-                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.relationship_goal}
-                  onChange={handleChange}
-                />
               </div>
+            </div>
+
+            <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
+              <h2 className="font-display text-4xl font-bold">About You</h2>
+
+              <textarea
+                name="bio"
+                placeholder="Tell us about yourself, your values, and what you are prayerfully looking for..."
+                rows="6"
+                className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-5 text-white outline-none placeholder:text-white/60"
+                value={form.bio}
+                onChange={handleChange}
+              />
             </div>
 
             <button

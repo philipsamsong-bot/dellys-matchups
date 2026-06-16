@@ -1,9 +1,9 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { supabase } from "@/lib/supabase";
 import { SiteNav } from "@/app/components/SiteChrome";
-import {useState} from "react";
 
 const testimonials = [
   {
@@ -71,7 +71,53 @@ const plans = [
     ],
   },
 ];
+function AdvertiseTicker() {
+  return (
+    <section className="relative z-20 overflow-hidden border-y border-white/10 bg-black/35 py-2 backdrop-blur-xl">
+      <div className="ticker-track">
+        {[...Array(4)].map((_, index) => (
+          <div
+            key={index}
+            className="flex items-center gap-8 whitespace-nowrap px-8 text-sm font-black uppercase tracking-[0.25em]"
+          >
+            <span className="text-yellow-300">★ Advertise With Us</span>
+            <span className="text-white/85">Promote Your Brand</span>
+            <span className="text-white/85">Reach Africa & The Diaspora</span>
+            <span className="text-white/85">Sponsor Events</span>
+            <a
+              href="/support/partner"
+              className="rounded-full bg-yellow-300 px-5 py-2 text-xs font-black text-[#7a0010]"
+            >
+              Start Today
+            </a>
+          </div>
+        ))}
+      </div>
 
+      <style jsx>{`
+        .ticker-track {
+          display: flex;
+          width: max-content;
+          animation: tickerScroll 24s linear infinite;
+        }
+
+        .ticker-track:hover {
+          animation-play-state: paused;
+        }
+
+        @keyframes tickerScroll {
+          from {
+            transform: translateX(0);
+          }
+
+          to {
+            transform: translateX(-25%);
+          }
+        }
+      `}</style>
+    </section>
+  );
+}
 const petals = Array.from({ length: 28 }, (_, index) => ({
   id: index,
   left: `${(index * 11) % 100}%`,
@@ -88,17 +134,8 @@ function Petals() {
           key={petal.id}
           className="absolute"
           style={{ left: petal.left }}
-          initial={{
-            y: -100,
-            rotate: 0,
-            opacity: 0,
-            scale: petal.scale,
-          }}
-          animate={{
-            y: 1400,
-            rotate: 720,
-            opacity: [0, 0.9, 0],
-          }}
+          initial={{ y: -100, rotate: 0, opacity: 0, scale: petal.scale }}
+          animate={{ y: 1400, rotate: 720, opacity: [0, 0.9, 0] }}
           transition={{
             duration: petal.duration,
             repeat: Infinity,
@@ -107,8 +144,8 @@ function Petals() {
           }}
         >
           <div className="relative h-6 w-6">
-            <div className="absolute h-6 w-4 rotate-45 rounded-t-full rounded-b-full bg-red-200/70 blur-[1px]" />
-            <div className="absolute left-2 h-6 w-4 -rotate-45 rounded-t-full rounded-b-full bg-red-300/70 blur-[1px]" />
+            <div className="absolute h-6 w-4 rotate-45 rounded-b-full rounded-t-full bg-red-200/70 blur-[1px]" />
+            <div className="absolute left-2 h-6 w-4 -rotate-45 rounded-b-full rounded-t-full bg-red-300/70 blur-[1px]" />
           </div>
         </motion.div>
       ))}
@@ -117,21 +154,32 @@ function Petals() {
 }
 
 export default function Home() {
-  const [newsletterSuccess, setNewsletterSuccess]=useState(false);
+  const [newsletterSuccess, setNewsletterSuccess] = useState(false);
+
   async function handleCheckout(plan) {
     if (plan === "free") {
       window.location.href = "/auth/signup";
       return;
     }
 
-    const response = await fetch("/api/paypal/checkout", {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    const response = await fetch("/api/paypal/subscription", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         plan,
-        userId: "guest",
+        userId: user.id,
+        email: user.email,
       }),
     });
 
@@ -165,29 +213,46 @@ export default function Home() {
         }
       `}</style>
 
+      
+      <SiteNav />
       <Petals />
 
-      <SiteNav />
 
-      <section className="relative px-6 pt-44">
+<div className="relative z-30 mt-32 mb-4  w-full overflow-hidden border-y border-yellow-300/30 bg-black/50 py-3 text-white">
+  <motion.div
+    className="flex w-max whitespace-nowrap"
+    animate={{ x: [0, -2000] }}
+    transition={{
+      repeat: Infinity,
+      duration: 21,
+      ease: "linear",
+    }}
+  >
+    {[1, 2].map((item) => (
+      <div
+        key={item}
+        className="flex items-center gap-12 pr-12 text-sm font-black uppercase tracking-[0.3em]"
+      >
+        <span className="text-yellow-300">★ Advertise With Us</span>
+        <span>Promote Your Brand</span>
+        <span>Reach Africa & The Diaspora</span>
+        <span>Sponsor Events</span>
+        <span>Partner With Delly&apos;s Matchups</span>
+      </div>
+    ))}
+  </motion.div>
+</div>
+
+<section className="relative px-6 pt-24">
+
+      
         <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-2">
           <motion.div
             initial={{ x: -70, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.8 }}
           >
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 1,
-                repeat: Infinity,
-                repeatType: "reverse",
-              }}
-              className="mb-6 inline-flex rounded-full border border-white/10 bg-white/10 px-6 py-3 font-bold uppercase tracking-[0.25em] text-white backdrop-blur-xl"
-            >
-              Advertise With Us
-            </motion.div>
+           
 
             <h1 className="font-display text-7xl font-bold leading-[0.9] tracking-tight lg:text-9xl">
               Find your
@@ -223,12 +288,10 @@ export default function Home() {
                 <p className="text-3xl font-black text-white">1M+</p>
                 Community Reach
               </div>
-
               <div>
                 <p className="text-3xl font-black text-white">Global</p>
                 Faith-Based Platform
               </div>
-
               <div>
                 <p className="text-3xl font-black text-white">1000+</p>
                 Matchups & Testimonies
@@ -273,7 +336,6 @@ export default function Home() {
                   <p className="font-display text-3xl font-bold text-white">
                     Delly Singah
                   </p>
-
                   <p className="mt-2 text-sm font-bold uppercase tracking-[0.3em] text-red-200">
                     Founder & CEO of Delly’s Matchups
                   </p>
@@ -372,13 +434,19 @@ export default function Home() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <button className="rounded-full bg-[#b30018] px-8 py-4 font-black text-white transition hover:scale-105">
+              <a
+                href="/shop/books"
+                className="rounded-full bg-[#b30018] px-8 py-4 font-black text-white transition hover:scale-105"
+              >
                 Grab A Copy
-              </button>
+              </a>
 
-              <button className="rounded-full border border-[#b30018]/20 px-8 py-4 font-black text-[#b30018]">
+              <a
+                href="/shop/books"
+                className="rounded-full border border-[#b30018]/20 px-8 py-4 font-black text-[#b30018]"
+              >
                 Learn More
-              </button>
+              </a>
             </div>
 
             <div className="mt-10 grid gap-5 sm:grid-cols-3">
@@ -388,9 +456,7 @@ export default function Home() {
                 ["Purpose", "Building godly and meaningful unions."],
               ].map(([title, text]) => (
                 <div key={title} className="rounded-2xl bg-red-50 p-5">
-                  <p className="text-3xl font-black text-[#b30018]">
-                    {title}
-                  </p>
+                  <p className="text-3xl font-black text-[#b30018]">{title}</p>
                   <p className="mt-2 text-sm text-black/60">{text}</p>
                 </div>
               ))}
@@ -436,10 +502,10 @@ export default function Home() {
               transition={{ delay: index * 0.12 }}
               className={`flex min-h-[800px] flex-col overflow-hidden rounded-[2.5rem] border shadow-2xl ${
                 plan.name === "VIP"
-                  ? "border-red-300/30 bg-gradient-to-br from-[#7a0012] via-[#b30018] to-[#4a0008] text-white"
+                  ? "border-yellow-300/60 bg-gradient-to-br from-[#4a0008] via-[#b30018] to-[#d4af37] text-white"
                   : plan.featured
-                    ? "border-white/30 bg-white text-[#b30018]"
-                    : "border-red-200/20 bg-gradient-to-br from-[#d81432] via-[#b30018] to-[#860010] text-white"
+                  ? "border-white/30 bg-white text-[#b30018]"
+                  : "border-red-200/20 bg-gradient-to-br from-[#d81432] via-[#b30018] to-[#860010] text-white"
               }`}
             >
               {plan.image && (
@@ -459,6 +525,18 @@ export default function Home() {
                   {plan.price}
                   <span className="text-lg"> / month</span>
                 </p>
+
+                {plan.name === "VIP" && (
+                  <div className="mt-5 inline-flex w-fit rounded-full bg-yellow-300 px-5 py-2 text-sm font-black uppercase tracking-[0.2em] text-black">
+                    👑 VIP Elite
+                  </div>
+                )}
+
+                {plan.name === "Premium" && (
+                  <div className="mt-5 inline-flex w-fit rounded-full bg-[#b30018] px-5 py-2 text-sm font-black uppercase tracking-[0.2em] text-white">
+                    ✨ Most Popular
+                  </div>
+                )}
 
                 <p className="mt-8 text-sm font-black uppercase tracking-[0.25em] opacity-70">
                   Included
@@ -487,30 +565,33 @@ export default function Home() {
                 <div className="flex-1" />
 
                 <button
-                  type="button"
-                  onClick={() =>
-                    handleCheckout(
-                      plan.name === "Premium"
-                        ? "premium"
-                        : plan.name === "VIP"
-                          ? "vip"
-                          : "free"
-                    )
-                  }
-                  className={`mt-10 block rounded-2xl py-4 text-center font-black transition hover:scale-105 ${
-                    plan.name === "VIP"
-                      ? "bg-white text-[#b30018]"
-                      : plan.featured
-                        ? "bg-[#b30018] text-white"
-                        : "bg-white text-[#b30018]"
-                  }`}
-                >
-                  {plan.name === "Free"
-                    ? "Free Plan"
-                    : plan.name === "Premium"
-                      ? "Upgrade to Premium"
-                      : "Become VIP"}
-                </button>
+  type="button"
+  onClick={() => {
+    if (plan.name === "Free") {
+      window.location.href = "/auth/signup";
+      return;
+    }
+
+    window.location.href =
+      plan.name === "Premium"
+        ? "/matchups/checkout?plan=premium"
+        : "/matchups/checkout?plan=vip";
+  }}
+  className={`mt-10 block rounded-2xl py-4 text-center font-black transition hover:scale-105 ${
+    plan.name === "VIP"
+      ? "bg-yellow-300 text-black"
+      : plan.featured
+      ? "bg-[#b30018] text-white"
+      : "bg-white text-[#b30018]"
+  }`}
+>
+  {plan.name === "Free"
+    ? "Free Plan"
+    : plan.name === "Premium"
+    ? "Upgrade to Premium"
+    : "Become VIP"}
+</button>
+
               </div>
             </motion.div>
           ))}
@@ -551,72 +632,91 @@ export default function Home() {
         </div>
       </section>
 
-      const [newsletterSuccess, setNewsletterSuccess] = useState(false);
+      <section id="newsletter" className="mx-auto max-w-5xl px-6 py-24">
+        <div className="relative overflow-hidden rounded-[3rem] bg-white p-12 text-black shadow-2xl">
+          <div className="absolute right-0 top-0 h-60 w-60 rounded-full bg-red-100 blur-3xl" />
 
-<section id="newsletter" className="mx-auto max-w-5xl px-6 py-24">
-  <div className="relative overflow-hidden rounded-[3rem] bg-white p-12 text-black shadow-2xl">
-    <div className="absolute right-0 top-0 h-60 w-60 rounded-full bg-red-100 blur-3xl" />
+          <div className="relative z-10 text-center">
+            <p className="font-bold uppercase tracking-[0.3em] text-red-700">
+              Stay Connected
+            </p>
 
-    <div className="relative z-10 text-center">
-      <p className="font-bold uppercase tracking-[0.3em] text-red-700">
-        Stay Connected
-      </p>
+            <h2 className="font-display mt-4 text-6xl font-bold">
+              Join Our Newsletter
+            </h2>
 
-      <h2 className="font-display mt-4 text-6xl font-bold">
-        Join Our Newsletter
-      </h2>
+            <p className="mx-auto mt-6 max-w-2xl text-lg text-black/70">
+              Receive relationship wisdom, mentorship updates, events,
+              counselling resources and exclusive content from Delly’s Matchups.
+            </p>
 
-      <p className="mx-auto mt-6 max-w-2xl text-lg text-black/70">
-        Receive relationship wisdom, mentorship updates, events,
-        counselling resources and exclusive content from Delly’s Matchups.
-      </p>
-
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-
-          const email = event.target.email.value;
-
-          const { error } = await supabase
-            .from("newsletter_subscribers")
-            .insert([{ email }]);
-
-          if (error) {
-            alert(error.message);
-            return;
+            <form
+       onSubmit={async (event) => {
+        event.preventDefault();
+      
+        const formElement = event.currentTarget;
+        const email = formElement.email.value.trim().toLowerCase();
+      
+        const oldMessage = document.getElementById("newsletter-message");
+        if (oldMessage) oldMessage.remove();
+      
+        const { error } = await supabase
+          .from("newsletter_subscribers")
+          .insert([{ email }]);
+      
+        const message = document.createElement("div");
+        message.id = "newsletter-message";
+        message.className =
+          "mt-6 rounded-2xl px-6 py-4 text-center font-bold";
+      
+        if (error) {
+          if (error.message.includes("newsletter_subscribers_email_key")) {
+            message.className += " bg-yellow-100 text-yellow-700";
+            message.innerText = "You are already subscribed to our newsletter.";
+          } else {
+            message.className += " bg-red-100 text-red-700";
+            message.innerText = "Unable to subscribe. Please try again.";
           }
+      
+          formElement.appendChild(message);
+          return;
+        }
+      
+        message.className += " bg-green-100 text-green-700";
+        message.innerText =
+          "✓ Successfully subscribed to the Delly's Matchups newsletter.";
+      
+        formElement.appendChild(message);
+        formElement.reset();
+      }}
+      
+        
+              className="mt-10 flex flex-col gap-4 md:flex-row"
+            >
+              <input
+                type="email"
+                name="email"
+                placeholder="Enter your email address"
+                className="h-16 flex-1 rounded-full border border-black/10 px-6 outline-none"
+                required
+              />
 
-          setNewsletterSuccess(true);
+              <button
+                type="submit"
+                className="rounded-full bg-[#b30018] px-10 font-black text-white transition hover:scale-105"
+              >
+                Subscribe
+              </button>
+            </form>
 
-          event.target.reset();
-        }}
-        className="mt-10 flex flex-col gap-4 md:flex-row"
-      >
-        <input
-          type="email"
-          name="email"
-          placeholder="Enter your email address"
-          className="h-16 flex-1 rounded-full border border-black/10 px-6 outline-none"
-          required
-        />
-
-        <button
-          type="submit"
-          className="rounded-full bg-[#b30018] px-10 font-black text-white transition hover:scale-105"
-        >
-          Subscribe
-        </button>
-      </form>
-
-      {newsletterSuccess && (
-        <div className="mt-6 rounded-full bg-green-100 px-6 py-4 text-center font-bold text-green-700">
-          Successfully subscribed to the DMs newsletter.
+            {newsletterSuccess && (
+              <div className="mt-6 rounded-full bg-green-100 px-6 py-4 text-center font-bold text-green-700">
+                Successfully subscribed to the DMs newsletter.
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </div>
-  </div>
-</section>
-
+      </section>
 
       <section id="gallery" className="mx-auto max-w-7xl px-6 py-24">
         <div className="text-center">
@@ -671,10 +771,10 @@ export default function Home() {
                 Home
               </a>
               <a className="block hover:text-white" href="/about/platform">
-                About Platform
+                The Platform
               </a>
               <a className="block hover:text-white" href="/about/founder">
-                About Founder
+                The Founder
               </a>
               <a className="block hover:text-white" href="/about/academy">
                 The Academy
@@ -698,42 +798,56 @@ export default function Home() {
               <a className="block hover:text-white" href="/counselling/healing">
                 Emotional Healing
               </a>
-              <a
-                className="block hover:text-white"
-                href="/counselling/coaching"
-              >
+              <a className="block hover:text-white" href="/counselling/coaching">
                 Mentorship & Coaching
               </a>
             </div>
           </div>
 
           <div>
-            <h3 className="text-2xl font-black">Social Media</h3>
+            <h3 className="text-2xl font-black">Company Information</h3>
 
             <div className="mt-6 space-y-4 text-white/70">
-            <div className="mt-6 space-y-4 text-white/70">
-              <a className="block hover:text-white" href="https://wa.me/237676257187" target="_blank" rel="nooopener noreferrer">WhatsApp</a>
-              <a className="block hover:text-white" href="https://www.facebook.com/dellysmatchupsre" target="_blank" rel="noopener noreferrer">Facebook</a>
-              <a className="block hover:text-white" href="https://www.instagram.com/dellysmatchups" target="_blank" rel="noopener noreferrer">Instagram</a>
-              <a className="block hover:text-white" href="mailto:infodellysmatchups@gmail.com">Mail Us</a>
-            </div>
-              <a className="block hover:text-white" href="#">
-                TikTok
+              <p>DELLY&apos;S MATCHUPS LTD</p>
+              <p>Registered in England &amp; Wales</p>
+              <p>Company No: 17251701</p>
+              <a
+                className="block hover:text-white"
+                href="https://wa.me/237676257187"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                WhatsApp
               </a>
-              <a className="block hover:text-white" href="#">
-                YouTube
+              <a
+                className="block hover:text-white"
+                href="https://www.facebook.com/dellysmatchupsre"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Facebook
               </a>
-            </div>
-
-            <div className="mt-8">
-              <p className="font-bold text-white">support@dellysmatchups.com</p>
-              <p className="mt-2 text-white/60">United Kingdom</p>
+              <a
+                className="block hover:text-white"
+                href="https://www.instagram.com/dellysmatchups"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Instagram
+              </a>
+              <a
+                className="block hover:text-white"
+                href="mailto:infodellysmatchups@gmail.com"
+              >
+                Mail Us
+              </a>
             </div>
           </div>
         </div>
 
         <div className="mt-16 border-t border-white/10 pt-8 text-center text-sm text-white/50">
-          © 2026 Delly’s Matchups. All rights reserved.
+          © 2026 DELLY&apos;S MATCHUPS LTD. Company No. 17251701. Registered in
+          England &amp; Wales. All rights reserved.
         </div>
       </footer>
     </main>

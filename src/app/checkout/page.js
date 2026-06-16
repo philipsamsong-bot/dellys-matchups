@@ -3,12 +3,22 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
+import { supabase } from "@/lib/supabase";
+
+const mobileMoney = {
+  name: "Victorine Ncham",
+  number: "+237 676 25 71 87",
+  whatsapp: "https://wa.me/237676257187",
+};
 
 export default function CheckoutPage() {
   const paypalRef = useRef(null);
+  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 
   const [cart, setCart] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("PayPal / Card");
+
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -18,8 +28,6 @@ export default function CheckoutPage() {
     country: "",
     note: "",
   });
-
-  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 
   useEffect(() => {
     const savedCart = JSON.parse(localStorage.getItem("dm-cart") || "[]");
@@ -83,10 +91,47 @@ export default function CheckoutPage() {
     return data;
   }
 
-  useEffect(() => {
-    if (!paypalClientId || !paypalRef.current || cart.length === 0) return;
+  async function savePaymentRecord(paymentData) {
+    const itemNames = cart.map((item) => item.title).join(", ");
 
-    paypalRef.current.innerHTML = "";
+    const { error } = await supabase.from("payments").insert({
+      customer_name: form.fullName,
+      customer_email: form.email,
+      purpose: "shop",
+      item_name: itemNames || "Shop Order",
+      amount: Number(total.toFixed(2)),
+      currency: "USD",
+      payment_method: paymentData.method,
+      status: paymentData.status,
+      provider_reference: paymentData.paypalOrderId || null,
+      notes: `Phone: ${form.phone}
+Address: ${form.address}
+City: ${form.city}
+Country: ${form.country}
+Order Note: ${form.note || "N/A"}`,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  function clearCartAndRedirect(path) {
+    localStorage.setItem("shopCustomerName", form.fullName.split(" ")[0]);
+    localStorage.removeItem("dm-cart");
+    window.dispatchEvent(new Event("cartUpdated"));
+    window.location.href = path;
+  }
+
+  useEffect(() => {
+    if (
+      paymentMethod !== "PayPal / Card" ||
+      !paypalClientId ||
+      !paypalRef.current ||
+      cart.length === 0
+    ) {
+      return;
+    }
 
     function renderButtons() {
       if (!window.paypal || !paypalRef.current) return;
@@ -125,29 +170,27 @@ export default function CheckoutPage() {
               try {
                 setIsSubmitting(true);
 
-                await saveOrder({
-                  method: "paypal",
+                const paidAmount =
+                  details.purchase_units?.[0]?.amount?.value ||
+                  total.toFixed(2);
+
+                const paymentData = {
+                  method: "PayPal / Card",
                   status: "paid",
                   paypalOrderId: data.orderID,
                   paypalPayerId: data.payerID,
-                  paidAmount:
-                    details.purchase_units?.[0]?.amount?.value ||
-                    total.toFixed(2),
+                  paidAmount,
                   paidAt: new Date().toISOString(),
-                });
-                
-                localStorage.setItem(
-                  "shopCustomerName",
-                  form.fullName.split("")[0]
-                );
+                };
 
-                localStorage.removeItem("dm-cart");
-                window.dispatchEvent(new Event("cartUpdated"));
-                
-                const firstName =
-                form.fullName.trim().split(" ")[0];
-                
-                window.location.href = `/shop/payment-success?name=${encodeURIComponent(firstName)}`;
+                await saveOrder(paymentData);
+                await savePaymentRecord(paymentData);
+
+                const firstName = form.fullName.trim().split(" ")[0];
+
+                clearCartAndRedirect(
+                  `/shop/payment-success?name=${encodeURIComponent(firstName)}`
+                );
               } catch (error) {
                 alert(error.message);
               } finally {
@@ -180,26 +223,27 @@ export default function CheckoutPage() {
     script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD`;
     script.async = true;
     script.onload = renderButtons;
-
     document.body.appendChild(script);
-  }, [paypalClientId, cart, total, form]);
+  }, [paypalClientId, cart, total, form, paymentMethod]);
 
-  async function handleMomoSubmit() {
+  async function handleManualPaymentSubmit() {
     if (!validateOrder()) return;
 
     try {
       setIsSubmitting(true);
 
-      await saveOrder({
-        method: "mtn_momo",
-        status: "pending_verification",
-        momoNumber: "+237 676 25 71 87",
+      const paymentData = {
+        method: paymentMethod,
+        status: "pending_confirmation",
+        momoName: paymentMethod === "Mobile Money" ? mobileMoney.name : null,
+        momoNumber: paymentMethod === "Mobile Money" ? mobileMoney.number : null,
         submittedAt: new Date().toISOString(),
-      });
+      };
 
-      localStorage.removeItem("dm-cart");
-      window.dispatchEvent(new Event("cartUpdated"));
-      window.location.href = "/shop/payment-pending";
+      await saveOrder(paymentData);
+      await savePaymentRecord(paymentData);
+
+      clearCartAndRedirect("/shop/payment-pending");
     } catch (error) {
       alert(error.message);
     } finally {
@@ -366,44 +410,119 @@ export default function CheckoutPage() {
                     </div>
                   </div>
 
-                  <div className="mt-8 rounded-[2rem] bg-white p-5">
-                    {!paypalClientId ? (
-                      <p className="font-bold text-[#b30018]">
-                        Missing PayPal Client ID. Add
-                        NEXT_PUBLIC_PAYPAL_CLIENT_ID to .env.local.
-                      </p>
-                    ) : (
-                      <div ref={paypalRef} />
-                    )}
-                  </div>
+                  <div className="mt-8">
+                    <label className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+                      Payment Method
+                    </label>
 
-                  <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-                    <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
-                      MTN Mobile Money
-                    </p>
-
-                    <p className="mt-4 text-white/80">
-                      Pay manually using:
-                    </p>
-
-                    <p className="mt-3 text-3xl font-black">
-                      +237 676 25 71 87
-                    </p>
-
-                    <p className="mt-4 text-sm leading-7 text-white/70">
-                      After payment, send your transaction ID or screenshot to
-                      our WhatsApp number for verification.
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={handleMomoSubmit}
-                      disabled={isSubmitting}
-                      className="mt-6 w-full rounded-full bg-white py-5 text-lg font-black text-[#b30018] transition hover:scale-105 disabled:opacity-60"
+                    <select
+                      value={paymentMethod}
+                      onChange={(event) => setPaymentMethod(event.target.value)}
+                      className="mt-4 h-16 w-full rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
                     >
-                      I Paid With MTN MoMo
-                    </button>
+                      <option className="text-black">PayPal / Card</option>
+                      <option className="text-black">Mobile Money</option>
+                      <option className="text-black">Bank Transfer</option>
+                    </select>
                   </div>
+
+                  {paymentMethod === "PayPal / Card" && (
+                    <div className="mt-8 rounded-[2rem] bg-white p-5">
+                      {!paypalClientId ? (
+                        <p className="font-bold text-[#b30018]">
+                          Missing PayPal Client ID. Add
+                          NEXT_PUBLIC_PAYPAL_CLIENT_ID to .env.local.
+                        </p>
+                      ) : (
+                        <div ref={paypalRef} />
+                      )}
+                    </div>
+                  )}
+
+                  {paymentMethod === "Mobile Money" && (
+                    <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
+                      <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+                        MTN Mobile Money
+                      </p>
+
+                      <p className="mt-4 text-white/80">
+                        Pay manually using:
+                      </p>
+
+                      <div className="mt-5 rounded-2xl bg-black/20 p-5">
+                        <p className="text-white/70">Account Name</p>
+                        <p className="mt-1 text-2xl font-black">
+                          {mobileMoney.name}
+                        </p>
+
+                        <p className="mt-5 text-white/70">
+                          Mobile Money Number
+                        </p>
+                        <p className="mt-1 text-3xl font-black">
+                          {mobileMoney.number}
+                        </p>
+                      </div>
+
+                      <p className="mt-4 text-sm leading-7 text-white/70">
+                        After payment, send your transaction ID or screenshot to
+                        our WhatsApp number for verification.
+                      </p>
+
+                      <div className="mt-6 flex flex-col gap-4">
+                        <a
+                          href={mobileMoney.whatsapp}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018]"
+                        >
+                          Send MoMo Proof
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={handleManualPaymentSubmit}
+                          disabled={isSubmitting}
+                          className="w-full rounded-full bg-white/20 py-5 text-lg font-black text-white transition hover:bg-white/30 disabled:opacity-60"
+                        >
+                          {isSubmitting ? "Submitting..." : "I Paid With MTN MoMo"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {paymentMethod === "Bank Transfer" && (
+                    <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
+                      <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+                        Bank Transfer
+                      </p>
+
+                      <p className="mt-4 text-sm leading-7 text-white/70">
+                        Make your transfer using the official bank details
+                        provided by Delly&apos;s Matchups, then send proof on
+                        WhatsApp for verification.
+                      </p>
+
+                      <div className="mt-6 flex flex-col gap-4">
+                        <a
+                          href={mobileMoney.whatsapp}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018]"
+                        >
+                          Send Bank Proof
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={handleManualPaymentSubmit}
+                          disabled={isSubmitting}
+                          className="w-full rounded-full bg-white/20 py-5 text-lg font-black text-white transition hover:bg-white/30 disabled:opacity-60"
+                        >
+                          {isSubmitting ? "Submitting..." : "I Have Paid"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <a
                     href="/cart"

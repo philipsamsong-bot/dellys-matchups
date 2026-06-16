@@ -1,4 +1,5 @@
 // src/app/counselling/payment/page.js
+
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -13,6 +14,12 @@ const prices = {
   international_couple: "200.00",
 };
 
+const mobileMoney = {
+  name: "Victorine Ncham",
+  number: "+237 676 25 71 87",
+  whatsapp: "https://wa.me/237676257187",
+};
+
 function CounsellingPaymentContent() {
   const searchParams = useSearchParams();
   const paypalRef = useRef(null);
@@ -21,12 +28,19 @@ function CounsellingPaymentContent() {
   const [sessionType, setSessionType] = useState(
     searchParams.get("type") || "individual"
   );
+  const [paymentMethod, setPaymentMethod] = useState("PayPal / Card");
   const [paid, setPaid] = useState(false);
 
   const amount = prices[sessionType] || prices.individual;
 
   useEffect(() => {
-    if (!paypalClientId || !paypalRef.current) return;
+    if (
+      paymentMethod !== "PayPal / Card" ||
+      !paypalClientId ||
+      !paypalRef.current
+    ) {
+      return;
+    }
 
     function renderButtons() {
       if (!window.paypal || !paypalRef.current) return;
@@ -71,6 +85,7 @@ function CounsellingPaymentContent() {
                 .from("counselling_bookings")
                 .update({
                   payment_status: "paid",
+                  payment_method: "PayPal / Card",
                   paypal_order_id: data.orderID,
                   paid_amount: paidAmount,
                   paid_at: new Date().toISOString(),
@@ -93,6 +108,19 @@ function CounsellingPaymentContent() {
                 return;
               }
 
+              await supabase.from("payments").insert({
+                customer_name: booking.full_name,
+                customer_email: booking.email,
+                purpose: "counselling",
+                item_name: `Counselling - ${sessionType}`,
+                amount: Number(paidAmount),
+                currency: "USD",
+                payment_method: "PayPal / Card",
+                status: "paid",
+                provider_reference: data.orderID,
+                notes: `Booking ID: ${bookingId}`,
+              });
+
               const emailResponse = await fetch("/api/send-booking-email", {
                 method: "POST",
                 headers: {
@@ -111,13 +139,13 @@ function CounsellingPaymentContent() {
 
               if (!emailResponse.ok) {
                 alert(
-                  emailResult.error ||
-                    "Payment succeeded, but email failed."
+                  emailResult.error || "Payment succeeded, but email failed."
                 );
                 return;
               }
 
               setPaid(true);
+
               localStorage.setItem(
                 "clientName",
                 booking.full_name?.split(" ")[0] || "Friend"
@@ -152,7 +180,62 @@ function CounsellingPaymentContent() {
     script.async = true;
     script.onload = renderButtons;
     document.body.appendChild(script);
-  }, [paypalClientId, sessionType, amount, searchParams]);
+  }, [paypalClientId, sessionType, amount, searchParams, paymentMethod]);
+
+  async function handleManualPaymentSubmit() {
+    const bookingId = searchParams.get("booking");
+
+    if (!bookingId) {
+      alert("Booking ID is missing.");
+      return;
+    }
+
+    const { data: booking, error: bookingError } = await supabase
+      .from("counselling_bookings")
+      .select("*")
+      .eq("id", bookingId)
+      .single();
+
+    if (bookingError) {
+      alert(bookingError.message);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from("counselling_bookings")
+      .update({
+        payment_status: "pending_confirmation",
+        payment_method: paymentMethod,
+        paid_amount: amount,
+      })
+      .eq("id", bookingId);
+
+    if (updateError) {
+      alert(updateError.message);
+      return;
+    }
+
+    const { error: paymentError } = await supabase.from("payments").insert({
+      customer_name: booking.full_name,
+      customer_email: booking.email,
+      purpose: "counselling",
+      item_name: `Counselling - ${sessionType}`,
+      amount: Number(amount),
+      currency: "USD",
+      payment_method: paymentMethod,
+      status: "pending_confirmation",
+      notes: `Booking ID: ${bookingId}. Client selected ${paymentMethod}.`,
+    });
+
+    if (paymentError) {
+      alert(paymentError.message);
+      return;
+    }
+
+    alert(
+      "Your payment choice has been submitted. Please send proof on WhatsApp for confirmation."
+    );
+  }
 
   return (
     <>
@@ -203,40 +286,115 @@ function CounsellingPaymentContent() {
             <p className="mt-2 text-6xl font-black">${amount}</p>
           </div>
 
-          <div className="mt-10 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-            <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
-              MTN Mobile Money Option
-            </p>
+          <div className="mt-10">
+            <label className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+              Choose Payment Method
+            </label>
 
-            <p className="mt-4 text-lg leading-8 text-white/80">
-              You may also pay through MTN Mobile Money using:
-            </p>
-
-            <p className="mt-4 text-3xl font-black">+237 676 25 71 87</p>
-
-            <p className="mt-4 text-white/70">
-              After payment, contact us on WhatsApp with your transaction ID for
-              manual confirmation.
-            </p>
-
-            <a
-              href="https://wa.me/237676257187"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-6 inline-block rounded-full bg-white px-8 py-4 font-black text-[#b30018] transition hover:scale-105"
+            <select
+              value={paymentMethod}
+              onChange={(event) => setPaymentMethod(event.target.value)}
+              className="mt-4 h-16 w-full rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
             >
-              Send MTN MoMo Proof
-            </a>
+              <option className="text-black">PayPal / Card</option>
+              <option className="text-black">Mobile Money</option>
+              <option className="text-black">Bank Transfer</option>
+            </select>
           </div>
 
-          {!paypalClientId ? (
-            <div className="mt-10 rounded-2xl bg-white p-6 font-bold text-[#b30018]">
-              Missing PayPal Client ID. Add NEXT_PUBLIC_PAYPAL_CLIENT_ID to
-              .env.local.
+          {paymentMethod === "PayPal / Card" && (
+            <>
+              {!paypalClientId ? (
+                <div className="mt-10 rounded-2xl bg-white p-6 font-bold text-[#b30018]">
+                  Missing PayPal Client ID. Add NEXT_PUBLIC_PAYPAL_CLIENT_ID to
+                  .env.local.
+                </div>
+              ) : (
+                <div className="mt-10 rounded-[2rem] bg-white p-6">
+                  <div ref={paypalRef} />
+                </div>
+              )}
+            </>
+          )}
+
+          {paymentMethod === "Mobile Money" && (
+            <div className="mt-10 rounded-[2rem] border border-white/15 bg-white/10 p-6">
+              <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+                MTN Mobile Money
+              </p>
+
+              <p className="mt-4 text-lg leading-8 text-white/80">
+                Send your payment using the Mobile Money details below.
+              </p>
+
+              <div className="mt-5 rounded-2xl bg-black/20 p-5">
+                <p className="text-white/70">Account Name</p>
+                <p className="mt-1 text-2xl font-black">
+                  {mobileMoney.name}
+                </p>
+
+                <p className="mt-5 text-white/70">Mobile Money Number</p>
+                <p className="mt-1 text-3xl font-black">
+                  {mobileMoney.number}
+                </p>
+              </div>
+
+              <p className="mt-5 text-white/70">
+                After payment, send your transaction ID or screenshot on
+                WhatsApp for manual confirmation.
+              </p>
+
+              <div className="mt-6 flex flex-col gap-4 sm:flex-row">
+                <a
+                  href={mobileMoney.whatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
+                >
+                  Send MoMo Proof
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleManualPaymentSubmit}
+                  className="rounded-full border border-white/20 bg-white/10 px-8 py-4 font-black text-white transition hover:bg-white/20"
+                >
+                  I Have Paid
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="mt-10 rounded-[2rem] bg-white p-6">
-              <div ref={paypalRef} />
+          )}
+
+          {paymentMethod === "Bank Transfer" && (
+            <div className="mt-10 rounded-[2rem] border border-white/15 bg-white/10 p-6">
+              <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+                Bank Transfer
+              </p>
+
+              <p className="mt-4 text-lg leading-8 text-white/80">
+                Bank transfer details will be provided by Delly&apos;s Matchups.
+                After payment, send your transaction proof on WhatsApp for
+                confirmation.
+              </p>
+
+              <div className="mt-6 flex flex-col gap-4 sm:flex-row">
+                <a
+                  href={mobileMoney.whatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
+                >
+                  Send Bank Proof
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleManualPaymentSubmit}
+                  className="rounded-full border border-white/20 bg-white/10 px-8 py-4 font-black text-white transition hover:bg-white/20"
+                >
+                  I Have Paid
+                </button>
+              </div>
             </div>
           )}
 

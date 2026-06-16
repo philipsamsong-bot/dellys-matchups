@@ -12,6 +12,8 @@ function getCompletionPercentage(profile) {
     profile.avatar_url,
     profile.age,
     profile.gender,
+    profile.marital_status,
+    profile.country,
     profile.city,
     profile.bio,
     profile.interests,
@@ -22,7 +24,7 @@ function getCompletionPercentage(profile) {
 }
 
 function getPlan(profile) {
-  return profile?.membership_plan || profile?.subscription || "free";
+  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
 }
 
 function hasPremiumAccess(profile) {
@@ -30,11 +32,46 @@ function hasPremiumAccess(profile) {
   return plan === "premium" || plan === "vip";
 }
 
+function isVip(profile) {
+  return getPlan(profile) === "vip";
+}
+
+function isMarried(profile) {
+  return profile?.marital_status === "Married";
+}
+
+function PlanBadge({ profile }) {
+  const plan = getPlan(profile);
+
+  if (plan === "vip") {
+    return (
+      <div className="inline-flex rounded-full bg-gradient-to-r from-yellow-200 via-white to-yellow-400 px-6 py-3 text-sm font-black uppercase tracking-[0.25em] text-[#7a0010] shadow-2xl">
+        👑 VIP Member
+      </div>
+    );
+  }
+
+  if (plan === "premium") {
+    return (
+      <div className="inline-flex rounded-full bg-white px-6 py-3 text-sm font-black uppercase tracking-[0.25em] text-[#b30018] shadow-xl">
+        ✨ Premium Member
+      </div>
+    );
+  }
+
+  return (
+    <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-6 py-3 text-sm font-black uppercase tracking-[0.25em] text-white">
+      Free Member
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [profile, setProfile] = useState(null);
   const [likesCount, setLikesCount] = useState(0);
   const [messagesCount, setMessagesCount] = useState(0);
   const [suggestedProfiles, setSuggestedProfiles] = useState([]);
+  const [academyCount, setAcademyCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,16 +102,24 @@ export default function DashboardPage() {
         .eq("receiver_id", user.id)
         .eq("is_read", false);
 
-        const {data: suggestedData} =await supabase
+        const{ count: academyTotal } = await supabase
+        .from("academy_enrollments")
+        .select("*", {count: "exact" , head: true})
+        .eq("user_email", user.email)
+        .eq("status", "active");
+
+      const { data: suggestedData } = await supabase
         .from("profiles")
         .select("*")
         .neq("id", user.id)
         .eq("is_visible", true)
+        .eq("matchups_eligible", true)
         .limit(3);
 
       setProfile(profileData);
       setLikesCount(likesTotal || 0);
       setMessagesCount(unreadTotal || 0);
+      setAcademyCount(academyTotal || 0);
       setSuggestedProfiles(suggestedData || []);
       setLoading(false);
     }
@@ -97,8 +142,9 @@ export default function DashboardPage() {
 
   const plan = getPlan(profile);
   const premiumAccess = hasPremiumAccess(profile);
+  const vipAccess = isVip(profile);
+  const married = isMarried(profile);
   const completionPercentage = getCompletionPercentage(profile);
-  const hasFullAccess = profile?.membership_plan === "premium" || profile?.membership_plan === "vip";
 
   return (
     <>
@@ -122,8 +168,8 @@ export default function DashboardPage() {
               </h1>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-white/80">
-                Continue your luxury matchmaking journey and discover meaningful
-                intentional connections.
+                Continue your Delly&apos;s Matchups journey through intentional
+                relationships, counselling, mentorship, and growth.
               </p>
             </div>
 
@@ -135,18 +181,57 @@ export default function DashboardPage() {
             </button>
           </motion.div>
 
+          {married && (
+            <section className="mt-10 rounded-[2rem] border border-yellow-200/40 bg-yellow-100 p-6 text-black shadow-2xl">
+              <p className="font-black uppercase tracking-[0.25em] text-[#7a0010]">
+                Matchups Restricted
+              </p>
+              <p className="mt-3 leading-7">
+                Married users are not eligible to create or use Matchups
+                profiles. You may still access The Academy, counselling, shop,
+                articles, and other Delly&apos;s Matchups resources.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-4">
+                <a
+                  href="/about/academy"
+                  className="rounded-full bg-[#b30018] px-6 py-3 font-black text-white"
+                >
+                  Visit The Academy
+                </a>
+                <a
+                  href="/counselling"
+                  className="rounded-full border border-[#b30018]/30 px-6 py-3 font-black text-[#b30018]"
+                >
+                  Book Counselling
+                </a>
+              </div>
+            </section>
+          )}
+
           <section className="mt-14 grid gap-8 lg:grid-cols-[1fr_1.3fr]">
             <motion.div
               initial={{ opacity: 0, y: 35 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.7 }}
-              className="rounded-[3rem] bg-[#c1121f] p-8 text-center shadow-2xl"
+              className={`rounded-[3rem] p-8 text-center shadow-2xl ${
+                vipAccess
+                  ? "border border-yellow-200/60 bg-gradient-to-br from-[#4a0008] via-[#9b0016] to-[#d4af37]"
+                  : premiumAccess
+                  ? "border border-white/30 bg-gradient-to-br from-[#850010] via-[#c1121f] to-[#ff385c]"
+                  : "bg-[#c1121f]"
+              }`}
             >
               {profile?.avatar_url ? (
                 <img
                   src={profile.avatar_url}
                   alt="Profile"
-                  className="mx-auto h-48 w-48 rounded-full border-4 border-white object-cover object-top shadow-2xl"
+                  className={`mx-auto h-48 w-48 rounded-full object-cover object-top shadow-2xl ${
+                    vipAccess
+                      ? "border-4 border-yellow-200"
+                      : premiumAccess
+                      ? "border-4 border-white"
+                      : "border-4 border-white/70"
+                  }`}
                 />
               ) : (
                 <div className="mx-auto flex h-48 w-48 items-center justify-center rounded-full bg-white/10 text-lg font-bold">
@@ -158,12 +243,13 @@ export default function DashboardPage() {
                 {profile?.full_name || "My Profile"}
               </h2>
 
-              <p className="mt-3 text-white/70">
-                {profile?.city || "City not added"}
+              <p className="mt-3 text-white/75">
+                {[profile?.city, profile?.country].filter(Boolean).join(", ") ||
+                  "Location not added"}
               </p>
 
-              <div className="mt-6 inline-flex rounded-full bg-white px-6 py-3 text-sm font-black uppercase tracking-[0.2em] text-[#b30018]">
-                {plan} Member
+              <div className="mt-6">
+                <PlanBadge profile={profile} />
               </div>
 
               <div className="mt-8 text-left">
@@ -180,69 +266,69 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-8 rounded-[2rem] border border-white/10 bg-black/10 p-6">
-  <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
-    Your Plan
-  </p>
+              <div className="mt-8 rounded-[2rem] border border-white/10 bg-black/15 p-6 text-left">
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+                  Your Plan
+                </p>
 
-  <h3 className="mt-4 text-2xl font-black uppercase">
-    {profile?.membership_plan || "Free"}
-  </h3>
+                <h3 className="mt-4 text-2xl font-black uppercase">
+                  {plan}
+                </h3>
 
-  <div className="mt-6 space-y-3 text-white/90">
-    <p>✓ Browse Members</p>
-    <p>✓ Like Profiles</p>
-    <p>✓ Receive Notifications</p>
+                <div className="mt-6 space-y-3 text-white/90">
+                  <p>✓ Create Profile</p>
+                  <p>✓ Basic Profile Visibility</p>
+                  <p>✓ Browse Members</p>
+                  <p>✓ Like Profiles</p>
 
-    <p className={hasFullAccess ? "text-green-300" : "text-white/50"}>
-      {hasFullAccess ? "✓" : "🔒"} Direct Messaging
-    </p>
+                  <p className={premiumAccess ? "text-green-300" : "text-white/50"}>
+                    {premiumAccess ? "✓" : "🔒"} Direct Messaging
+                  </p>
 
-    <p className={hasFullAccess ? "text-green-300" : "text-white/50"}>
-      {hasFullAccess ? "✓" : "🔒"} See Who Liked You
-    </p>
+                  <p className={premiumAccess ? "text-green-300" : "text-white/50"}>
+                    {premiumAccess ? "✓" : "🔒"} See Who Liked You
+                  </p>
 
-    <p className={hasFullAccess ? "text-green-300" : "text-white/50"}>
-      {hasFullAccess ? "✓" : "🔒"} View Full Profiles
-    </p>
+                  <p className={premiumAccess ? "text-green-300" : "text-white/50"}>
+                    {premiumAccess ? "✓" : "🔒"} View Full Profiles
+                  </p>
 
-    <p className={hasFullAccess ? "text-green-300" : "text-white/50"}>
-      {hasFullAccess ? "✓" : "🔒"} Upload More Photos
-    </p>
+                  <p className={vipAccess ? "text-yellow-300" : "text-white/50"}>
+                    {vipAccess ? "✓" : "🔒"} VIP Badge & Priority Placement
+                  </p>
 
-    <p className={hasFullAccess ? "text-green-300" : "text-white/50"}>
-      {hasFullAccess ? "✓" : "🔒"} Connect With Members
-    </p>
+                  <p className={vipAccess ? "text-yellow-300" : "text-white/50"}>
+                    {vipAccess ? "✓" : "🔒"} Private VIP Support
+                  </p>
+                </div>
 
-    <p
-      className={
-        profile?.membership_plan === "vip"
-          ? "text-yellow-300"
-          : "text-white/50"
-      }
-    >
-      {profile?.membership_plan === "vip" ? "✓" : "🔒"} VIP Access
-    </p>
-  </div>
+                {!premiumAccess && !married && (
+                  <a
+                    href="/membership"
+                    className="mt-6 inline-block rounded-full bg-white px-6 py-3 font-black text-[#b30018]"
+                  >
+                    Upgrade Now
+                  </a>
+                )}
 
-  {!hasFullAccess && (
-    <a
-      href="/matchups"
-      className="mt-6 inline-block rounded-full bg-white px-6 py-3 font-black text-[#b30018]"
-    >
-      Upgrade Now
-    </a>
-  )}
- 
+                {premiumAccess && !vipAccess && !married && (
+                  <a
+                    href="/membership"
+                    className="mt-6 inline-block rounded-full bg-yellow-200 px-6 py-3 font-black text-[#7a0010]"
+                  >
+                    Upgrade to VIP
+                  </a>
+                )}
+              </div>
 
-</div>
-
-              <a
-                href="/profile/setup"
-                className="mt-8 inline-flex rounded-full bg-white px-8 py-4 font-black text-[#b30018] transition hover:scale-105"
-              >
-                Edit Profile
-              </a>
+              {!married && (
+                <a
+                  href="/profile/setup"
+                  className="mt-8 inline-flex rounded-full bg-white px-8 py-4 font-black text-[#b30018] transition hover:scale-105"
+                >
+                  Edit Profile
+                </a>
+              )}
             </motion.div>
 
             <motion.div
@@ -258,11 +344,12 @@ export default function DashboardPage() {
               <div className="mt-8 grid gap-6 md:grid-cols-2">
                 <Info label="Age" value={profile?.age || "Not Added"} />
                 <Info label="Gender" value={profile?.gender || "Not Added"} />
+                <Info label="Marital Status" value={profile?.marital_status || "Not Added"} />
+                <Info label="Country" value={profile?.country || "Not Added"} />
                 <Info label="City" value={profile?.city || "Not Added"} />
-                <Info
-                  label="Interests"
-                  value={profile?.interests || "Not Added"}
-                />
+                <Info label="Occupation" value={profile?.occupation || "Not Added"} />
+                <Info label="Faith Background" value={profile?.faith_background || "Not Added"} />
+                <Info label="Interests" value={profile?.interests || "Not Added"} />
               </div>
 
               <div className="mt-8">
@@ -281,22 +368,21 @@ export default function DashboardPage() {
                 <p className="mt-3 text-lg leading-8 text-white/75">
                   {profile?.relationship_goal || "No relationship goal added."}
                 </p>
-                <div className="mt-12">
-  <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
-    Profile Gallery
-  </p>
+              </div>
 
-  <div className="relative mt-6 overflow-hidden rounded-[2rem] border border-white/10 bg-black/10">
-    <img
-      src={profile?.avatar_url || "/placeholder-profile.jpg"}
-      alt="Profile"
-      className="h-[70vh] w-full object-cover object-top transition duration-700 hover:scale-105"
-    />
+              <div className="mt-12">
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+                  Profile Gallery
+                </p>
 
-    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-  </div>
-</div>
-
+                <div className="relative mt-6 overflow-hidden rounded-[2rem] border border-white/10 bg-black/10">
+                  <img
+                    src={profile?.avatar_url || "/placeholder-profile.jpg"}
+                    alt="Profile"
+                    className="h-[70vh] w-full object-cover object-top transition duration-700 hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                </div>
               </div>
             </motion.div>
           </section>
@@ -304,30 +390,55 @@ export default function DashboardPage() {
           <section className="mt-14 grid gap-6 md:grid-cols-3">
             <DashboardStat
               title="Likes"
-              value={likesCount}
+              value={premiumAccess ? likesCount : "Locked"}
               text={
                 premiumAccess
                   ? "People interested in your profile."
-                  : "Upgrade to see who liked you."
+                  : "Upgrade to Premium or VIP to see who liked you."
               }
+              isText={!premiumAccess}
             />
 
             <DashboardStat
               title="Messages"
-              value={messagesCount}
+              value={premiumAccess ? messagesCount : "Locked"}
               text={
                 premiumAccess
                   ? "Unread conversations waiting for you."
-                  : "Upgrade to unlock messaging."
+                  : "Upgrade to Premium or VIP to unlock messaging."
               }
+              isText={!premiumAccess}
             />
 
             <DashboardStat
               title="Subscription"
               value={plan}
-              text="Access premium matchmaking experiences and exclusive features."
+              text="Manage your Matchups membership and access level."
               isText
             />
+            {academyCount > 0 && (
+  <section className="mt-14 rounded-[3rem] border border-yellow-300/40 bg-black/25 p-8 shadow-2xl md:p-12">
+    <p className="text-sm font-black uppercase tracking-[0.45em] text-yellow-300">
+      Academy Access
+    </p>
+
+    <h2 className="font-display mt-4 text-5xl font-bold">
+      My Academy 🎓
+    </h2>
+
+    <p className="mt-5 max-w-3xl text-lg leading-8 text-white/75">
+      You have {academyCount} unlocked academy course
+      {academyCount > 1 ? "s" : ""}. Continue learning from your student area.
+    </p>
+
+    <a
+      href="/dashboard/my-academy"
+      className="mt-8 inline-flex rounded-full bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 px-8 py-4 font-black text-black transition hover:scale-105"
+    >
+      Continue Learning
+    </a>
+  </section>
+)}
           </section>
 
           <section className="mt-14 rounded-[3rem] bg-[#c1121f] p-8 shadow-2xl md:p-12">
@@ -338,16 +449,17 @@ export default function DashboardPage() {
                 </p>
 
                 <h2 className="font-display mt-4 text-5xl font-bold">
-                  {premiumAccess
+                  {vipAccess
+                    ? "VIP experience unlocked."
+                    : premiumAccess
                     ? "Premium features unlocked."
                     : "Upgrade to unlock full access."}
                 </h2>
 
                 <p className="mt-5 max-w-3xl text-lg leading-8 text-white/75">
-                  Free members can create a profile, upload one photo, browse,
-                  like profiles, and receive notifications. Premium members
-                  unlock messaging, full profiles, likes visibility, and more
-                  photos.
+                  Free members get basic access. Premium members unlock messaging,
+                  likes visibility, and fuller profiles. VIP members receive a
+                  luxury badge, priority placement, and the highest Matchups visibility.
                 </p>
               </div>
 
@@ -355,29 +467,48 @@ export default function DashboardPage() {
                 href="/membership"
                 className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
               >
-                Upgrade Plan
+                Membership
               </a>
             </div>
           </section>
 
-          <section className="mt-14">
-            <div className="flex items-end justify-between">
+          {!married && (
+            <section className="mt-14">
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.45em] text-red-100">
                   Quick Actions
                 </p>
 
                 <h2 className="font-display mt-4 text-5xl font-bold">
-                  Continue Your Journey
+                  Continue Your Matchups Journey
                 </h2>
               </div>
+
+              <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                <QuickAction href="/browse" title="Browse Matchups" />
+                <QuickAction href="/likes" title="Who Liked Me" locked={!premiumAccess} />
+                <QuickAction href="/messages" title="Messages" locked={!premiumAccess} />
+                <QuickAction href="/profile/setup" title="Edit Profile" />
+              </div>
+            </section>
+          )}
+
+          <section className="mt-14">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.45em] text-red-100">
+                Resources
+              </p>
+
+              <h2 className="font-display mt-4 text-5xl font-bold">
+                Grow Beyond Matchups
+              </h2>
             </div>
 
             <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-              <QuickAction href="/browse" title="Browse Matchups" />
-              <QuickAction href="/likes" title="Who Liked Me" />
-              <QuickAction href="/messages" title="Messages" />
-              <QuickAction href="/profile/setup" title="Edit Profile" />
+              <QuickAction href="/about/academy" title="The Academy" />
+              <QuickAction href="/counselling" title="Counselling" />
+              <QuickAction href="/shop/books" title="Books" />
+              <QuickAction href="/articles" title="Articles" />
             </div>
           </section>
 
@@ -392,32 +523,15 @@ export default function DashboardPage() {
               </h2>
 
               <div className="mt-8 flex flex-wrap gap-5">
-                <a
-                  href="/admin/counselling-bookings"
-                  className="rounded-full bg-[#b30018] px-8 py-4 font-black text-white transition hover:scale-105"
-                >
-                  Counselling Admin
-                </a>
-
-                <a
-                  href="/admin/shop-orders"
-                  className="rounded-full bg-[#b30018] px-8 py-4 font-black text-white transition hover:scale-105"
-                >
-                  Shop Admin
-                </a>
-                 
-                 <a
-                 href="/admin/articles"
-                 className="rounded-full bg-[#b30018] px-8 py-4 font-black text-white transition hover:scale-105"
-                 >
-                  Articles Admin
-                 </a>
-                <a
-                  href="/admin/contact-messages"
-                  className="rounded-full bg-[#b30018] px-8 py-4 font-black text-white transition hover:scale-105"
-                >
-                  Contact Messages
-                </a>
+                <AdminLink href="/admin/articles" title="Articles Admin" />
+                <AdminLink href="/admin/exceptional-cases" title="Exceptional Cases" />
+                <AdminLink href="/admin/counselling-bookings" title="Counselling Admin" />
+                <AdminLink href="/admin/shop-orders" title="Shop Orders" />
+                <AdminLink href="/admin/contact-messages" title="Contact Messages" />
+                <AdminLink href="/admin/gallery" title="Gallery"/>
+                <AdminLink href="/admin/testimonials" title="Testimonials" />
+                <AdminLink href="/admin/users" title="Users" />
+                <AdminLink href="/admin/payments" title="Payments" />
               </div>
             </section>
           )}
@@ -445,11 +559,7 @@ function DashboardStat({ title, value, text, isText = false }) {
         {title}
       </p>
 
-      <h2
-        className={`mt-5 font-black ${
-          isText ? "text-4xl uppercase" : "text-6xl"
-        }`}
-      >
+      <h2 className={`mt-5 font-black ${isText ? "text-4xl uppercase" : "text-6xl"}`}>
         {value}
       </h2>
 
@@ -458,11 +568,26 @@ function DashboardStat({ title, value, text, isText = false }) {
   );
 }
 
-function QuickAction({ href, title }) {
+function QuickAction({ href, title, locked = false }) {
+  return (
+    <a
+      href={locked ? "/membership" : href}
+      className={`rounded-[2rem] border border-white/15 p-8 text-center font-black transition hover:scale-[1.02] ${
+        locked
+          ? "bg-black/20 text-white/60"
+          : "bg-white/10 hover:bg-white hover:text-[#b30018]"
+      }`}
+    >
+      {locked ? `🔒 ${title}` : title}
+    </a>
+  );
+}
+
+function AdminLink({ href, title }) {
   return (
     <a
       href={href}
-      className="rounded-[2rem] border border-white/15 bg-white/10 p-8 text-center font-black transition hover:scale-[1.02] hover:bg-white hover:text-[#b30018]"
+      className="rounded-full bg-[#b30018] px-8 py-4 font-black text-white transition hover:scale-105"
     >
       {title}
     </a>
