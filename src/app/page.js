@@ -195,7 +195,7 @@ export default function Home() {
         </motion.div>
       </div>
 
-      <section className="relative -mt-10 px-6 pt-0">
+      <section className="relative -mt-4 px-6 pt-20 md:-mt-10 md:pt-0">
         <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-2">
           <motion.div
             initial={{ x: -70, opacity: 0 }}
