@@ -103,88 +103,91 @@ export default function ContactPage() {
               </p>
 
               <div className="mt-12 space-y-6">
-  <a
-    href="mailto:infodellysmatchups@gmail.com"
-    className="flex items-center gap-5 rounded-[2rem] bg-white p-6 text-[#b30018] shadow-2xl transition hover:scale-[1.02]"
-  >
-    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#b30018] text-2xl text-white">
-      <FaEnvelope />
-    </div>
 
-    <div>
-      <p className="text-sm font-black uppercase tracking-[0.3em]">
-        Email
-      </p>
+<a
+  href="mailto:infodellysmatchups@gmail.com"
+  className="flex items-center gap-5 rounded-[2rem] bg-white p-6 text-[#b30018] shadow-2xl"
+>
+  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#b30018] text-2xl text-white">
+    <FaEnvelope />
+  </div>
 
-      <p className="mt-1 text-lg font-bold">
-        infodellysmatchups@gmail.com
-      </p>
-    </div>
-  </a>
+  <div className="min-w-0">
+    <p className="text-xs font-black uppercase tracking-[0.35em]">
+      Email
+    </p>
 
-  <a
-    href="https://wa.me/237676257187"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="flex items-center gap-5 rounded-[2rem] bg-[#25D366] p-6 text-white shadow-2xl transition hover:scale-[1.02]"
-  >
-    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl text-[#25D366]">
-      <FaWhatsapp />
-    </div>
+    <p className="mt-1 break-all text-base font-bold md:text-lg">
+      infodellysmatchups@gmail.com
+    </p>
+  </div>
+</a>
 
-    <div>
-      <p className="text-sm font-black uppercase tracking-[0.3em]">
-        WhatsApp
-      </p>
+<a
+  href="https://wa.me/237676257187"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="flex items-center gap-5 rounded-[2rem] bg-[#25D366] p-6 text-white shadow-2xl"
+>
+  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-2xl text-[#25D366]">
+    <FaWhatsapp />
+  </div>
 
-      <p className="mt-1 text-lg font-bold">
-        +237 676 257 187
-      </p>
-    </div>
-  </a>
+  <div>
+    <p className="text-xs font-black uppercase tracking-[0.35em]">
+      WhatsApp
+    </p>
 
-  <a
-    href="https://facebook.com/dellysmatchupsre"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="flex items-center gap-5 rounded-[2rem] bg-[#1877F2] p-6 text-white shadow-2xl transition hover:scale-[1.02]"
-  >
-    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl text-[#1877F2]">
-      <FaFacebookF />
-    </div>
+    <p className="mt-1 text-base font-bold md:text-lg">
+      +237 676 257 187
+    </p>
+  </div>
+</a>
 
-    <div>
-      <p className="text-sm font-black uppercase tracking-[0.3em]">
-        Facebook
-      </p>
+<a
+  href="https://facebook.com/dellysmatchupsre"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="flex items-center gap-5 rounded-[2rem] bg-[#1877F2] p-6 text-white shadow-2xl"
+>
+  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-2xl text-[#1877F2]">
+    <FaFacebookF />
+  </div>
 
-      <p className="mt-1 text-lg font-bold">
-        facebook.com/dellysmatchupsre
-      </p>
-    </div>
-  </a>
+  <div>
+    <p className="text-xs font-black uppercase tracking-[0.35em]">
+      Facebook
+    </p>
 
-  <a
-    href="https://instagram.com/dellysmatchups"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="flex items-center gap-5 rounded-[2rem] bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 p-6 text-white shadow-2xl transition hover:scale-[1.02]"
-  >
-    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl text-pink-600">
-      <FaInstagram />
-    </div>
+    <p className="mt-1 text-base font-bold">
+      @dellysmatchupsre
+    </p>
+  </div>
+</a>
 
-    <div>
-      <p className="text-sm font-black uppercase tracking-[0.3em]">
-        Instagram
-      </p>
+<a
+  href="https://instagram.com/dellysmatchups"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="flex items-center gap-5 rounded-[2rem] bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 p-6 text-white shadow-2xl"
+>
+  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-2xl text-pink-600">
+    <FaInstagram />
+  </div>
 
-      <p className="mt-1 text-lg font-bold">
-        instagram.com/dellysmatchups
-      </p>
-    </div>
-  </a>
+  <div>
+    <p className="text-xs font-black uppercase tracking-[0.35em]">
+      Instagram
+    </p>
+
+    <p className="mt-1 text-base font-bold">
+      @dellysmatchups
+    </p>
+  </div>
+</a>
+
 </div>
+
 
             </motion.div>
 

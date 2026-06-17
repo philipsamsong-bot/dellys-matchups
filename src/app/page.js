@@ -71,53 +71,7 @@ const plans = [
     ],
   },
 ];
-function AdvertiseTicker() {
-  return (
-    <section className="relative z-20 overflow-hidden border-y border-white/10 bg-black/35 py-2 backdrop-blur-xl">
-      <div className="ticker-track">
-        {[...Array(4)].map((_, index) => (
-          <div
-            key={index}
-            className="flex items-center gap-8 whitespace-nowrap px-8 text-sm font-black uppercase tracking-[0.25em]"
-          >
-            <span className="text-yellow-300">★ Advertise With Us</span>
-            <span className="text-white/85">Promote Your Brand</span>
-            <span className="text-white/85">Reach Africa & The Diaspora</span>
-            <span className="text-white/85">Sponsor Events</span>
-            <a
-              href="/support/partner"
-              className="rounded-full bg-yellow-300 px-5 py-2 text-xs font-black text-[#7a0010]"
-            >
-              Start Today
-            </a>
-          </div>
-        ))}
-      </div>
 
-      <style jsx>{`
-        .ticker-track {
-          display: flex;
-          width: max-content;
-          animation: tickerScroll 24s linear infinite;
-        }
-
-        .ticker-track:hover {
-          animation-play-state: paused;
-        }
-
-        @keyframes tickerScroll {
-          from {
-            transform: translateX(0);
-          }
-
-          to {
-            transform: translateX(-25%);
-          }
-        }
-      `}</style>
-    </section>
-  );
-}
 const petals = Array.from({ length: 28 }, (_, index) => ({
   id: index,
   left: `${(index * 11) % 100}%`,
@@ -213,47 +167,41 @@ export default function Home() {
         }
       `}</style>
 
-      
       <SiteNav />
       <Petals />
 
-
-<div className="relative z-30 mt-32 mb-4  w-full overflow-hidden border-y border-yellow-300/30 bg-black/50 py-3 text-white">
-  <motion.div
-    className="flex w-max whitespace-nowrap"
-    animate={{ x: [0, -2000] }}
-    transition={{
-      repeat: Infinity,
-      duration: 21,
-      ease: "linear",
-    }}
-  >
-    {[1, 2].map((item) => (
-      <div
-        key={item}
-        className="flex items-center gap-12 pr-12 text-sm font-black uppercase tracking-[0.3em]"
-      >
-        <span className="text-yellow-300">★ Advertise With Us</span>
-        <span>Promote Your Brand</span>
-        <span>Reach Africa & The Diaspora</span>
-        <span>Sponsor Events</span>
-        <span>Partner With Delly&apos;s Matchups</span>
+      <div className="relative z-30 mt-32 mb-4 w-full overflow-hidden border-y border-yellow-300/30 bg-black/50 py-3 text-white">
+        <motion.div
+          className="flex w-max whitespace-nowrap"
+          animate={{ x: [0, -2000] }}
+          transition={{
+            repeat: Infinity,
+            duration: 21,
+            ease: "linear",
+          }}
+        >
+          {[1, 2].map((item) => (
+            <div
+              key={item}
+              className="flex items-center gap-12 pr-12 text-sm font-black uppercase tracking-[0.3em]"
+            >
+              <span className="text-yellow-300">★ Advertise With Us</span>
+              <span>Promote Your Brand</span>
+              <span>Reach Africa & The Diaspora</span>
+              <span>Sponsor Events</span>
+              <span>Partner With Delly&apos;s Matchups</span>
+            </div>
+          ))}
+        </motion.div>
       </div>
-    ))}
-  </motion.div>
-</div>
 
-<section className="relative px-6 pt-24">
-
-      
+      <section className="relative -mt-10 px-6 pt-0">
         <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-2">
           <motion.div
             initial={{ x: -70, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.8 }}
           >
-           
-
             <h1 className="font-display text-7xl font-bold leading-[0.9] tracking-tight lg:text-9xl">
               Find your
               <span className="block text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.6)]">
@@ -288,10 +236,12 @@ export default function Home() {
                 <p className="text-3xl font-black text-white">1M+</p>
                 Community Reach
               </div>
+
               <div>
                 <p className="text-3xl font-black text-white">Global</p>
                 Faith-Based Platform
               </div>
+
               <div>
                 <p className="text-3xl font-black text-white">1000+</p>
                 Matchups & Testimonies
@@ -336,6 +286,7 @@ export default function Home() {
                   <p className="font-display text-3xl font-bold text-white">
                     Delly Singah
                   </p>
+
                   <p className="mt-2 text-sm font-bold uppercase tracking-[0.3em] text-red-200">
                     Founder & CEO of Delly’s Matchups
                   </p>
@@ -345,7 +296,6 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
-
       <section className="relative mx-auto mt-24 max-w-7xl px-6">
         <motion.div
           initial={{ y: 70, opacity: 0 }}
@@ -447,19 +397,6 @@ export default function Home() {
               >
                 Learn More
               </a>
-            </div>
-
-            <div className="mt-10 grid gap-5 sm:grid-cols-3">
-              {[
-                ["Marriage", "Practical wisdom for intentional relationships."],
-                ["Healing", "Emotional growth and restoration principles."],
-                ["Purpose", "Building godly and meaningful unions."],
-              ].map(([title, text]) => (
-                <div key={title} className="rounded-2xl bg-red-50 p-5">
-                  <p className="text-3xl font-black text-[#b30018]">{title}</p>
-                  <p className="mt-2 text-sm text-black/60">{text}</p>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -565,39 +502,37 @@ export default function Home() {
                 <div className="flex-1" />
 
                 <button
-  type="button"
-  onClick={() => {
-    if (plan.name === "Free") {
-      window.location.href = "/auth/signup";
-      return;
-    }
+                  type="button"
+                  onClick={() => {
+                    if (plan.name === "Free") {
+                      window.location.href = "/auth/signup";
+                      return;
+                    }
 
-    window.location.href =
-      plan.name === "Premium"
-        ? "/matchups/checkout?plan=premium"
-        : "/matchups/checkout?plan=vip";
-  }}
-  className={`mt-10 block rounded-2xl py-4 text-center font-black transition hover:scale-105 ${
-    plan.name === "VIP"
-      ? "bg-yellow-300 text-black"
-      : plan.featured
-      ? "bg-[#b30018] text-white"
-      : "bg-white text-[#b30018]"
-  }`}
->
-  {plan.name === "Free"
-    ? "Free Plan"
-    : plan.name === "Premium"
-    ? "Upgrade to Premium"
-    : "Become VIP"}
-</button>
-
+                    window.location.href =
+                      plan.name === "Premium"
+                        ? "/matchups/checkout?plan=premium"
+                        : "/matchups/checkout?plan=vip";
+                  }}
+                  className={`mt-10 block rounded-2xl py-4 text-center font-black transition hover:scale-105 ${
+                    plan.name === "VIP"
+                      ? "bg-yellow-300 text-black"
+                      : plan.featured
+                      ? "bg-[#b30018] text-white"
+                      : "bg-white text-[#b30018]"
+                  }`}
+                >
+                  {plan.name === "Free"
+                    ? "Free Plan"
+                    : plan.name === "Premium"
+                    ? "Upgrade to Premium"
+                    : "Become VIP"}
+                </button>
               </div>
             </motion.div>
           ))}
         </div>
       </section>
-
       <section id="testimonials" className="mx-auto max-w-7xl px-6 py-24">
         <h2 className="font-display text-center text-7xl font-bold">
           Testimonials
@@ -651,46 +586,49 @@ export default function Home() {
             </p>
 
             <form
-       onSubmit={async (event) => {
-        event.preventDefault();
-      
-        const formElement = event.currentTarget;
-        const email = formElement.email.value.trim().toLowerCase();
-      
-        const oldMessage = document.getElementById("newsletter-message");
-        if (oldMessage) oldMessage.remove();
-      
-        const { error } = await supabase
-          .from("newsletter_subscribers")
-          .insert([{ email }]);
-      
-        const message = document.createElement("div");
-        message.id = "newsletter-message";
-        message.className =
-          "mt-6 rounded-2xl px-6 py-4 text-center font-bold";
-      
-        if (error) {
-          if (error.message.includes("newsletter_subscribers_email_key")) {
-            message.className += " bg-yellow-100 text-yellow-700";
-            message.innerText = "You are already subscribed to our newsletter.";
-          } else {
-            message.className += " bg-red-100 text-red-700";
-            message.innerText = "Unable to subscribe. Please try again.";
-          }
-      
-          formElement.appendChild(message);
-          return;
-        }
-      
-        message.className += " bg-green-100 text-green-700";
-        message.innerText =
-          "✓ Successfully subscribed to the Delly's Matchups newsletter.";
-      
-        formElement.appendChild(message);
-        formElement.reset();
-      }}
-      
-        
+              onSubmit={async (event) => {
+                event.preventDefault();
+
+                const formElement = event.currentTarget;
+                const email = formElement.email.value.trim().toLowerCase();
+
+                const oldMessage =
+                  document.getElementById("newsletter-message");
+
+                if (oldMessage) oldMessage.remove();
+
+                const { error } = await supabase
+                  .from("newsletter_subscribers")
+                  .insert([{ email }]);
+
+                const message = document.createElement("div");
+
+                message.id = "newsletter-message";
+                message.className =
+                  "mt-6 rounded-2xl px-6 py-4 text-center font-bold";
+
+                if (error) {
+                  if (error.message.includes("newsletter_subscribers_email_key")) {
+                    message.className += " bg-yellow-100 text-yellow-700";
+                    message.innerText =
+                      "You are already subscribed to our newsletter.";
+                  } else {
+                    message.className += " bg-red-100 text-red-700";
+                    message.innerText =
+                      "Unable to subscribe. Please try again.";
+                  }
+
+                  formElement.appendChild(message);
+                  return;
+                }
+
+                message.className += " bg-green-100 text-green-700";
+                message.innerText =
+                  "✓ Successfully subscribed to the Delly's Matchups newsletter.";
+
+                formElement.appendChild(message);
+                formElement.reset();
+              }}
               className="mt-10 flex flex-col gap-4 md:flex-row"
             >
               <input
@@ -770,12 +708,15 @@ export default function Home() {
               <a className="block hover:text-white" href="/">
                 Home
               </a>
+
               <a className="block hover:text-white" href="/about/platform">
                 The Platform
               </a>
+
               <a className="block hover:text-white" href="/about/founder">
                 The Founder
               </a>
+
               <a className="block hover:text-white" href="/about/academy">
                 The Academy
               </a>
@@ -792,12 +733,15 @@ export default function Home() {
               >
                 Premarital Counselling
               </a>
+
               <a className="block hover:text-white" href="/counselling/marital">
                 Marital Counselling
               </a>
+
               <a className="block hover:text-white" href="/counselling/healing">
                 Emotional Healing
               </a>
+
               <a className="block hover:text-white" href="/counselling/coaching">
                 Mentorship & Coaching
               </a>
@@ -811,6 +755,7 @@ export default function Home() {
               <p>DELLY&apos;S MATCHUPS LTD</p>
               <p>Registered in England &amp; Wales</p>
               <p>Company No: 17251701</p>
+
               <a
                 className="block hover:text-white"
                 href="https://wa.me/237676257187"
@@ -819,6 +764,7 @@ export default function Home() {
               >
                 WhatsApp
               </a>
+
               <a
                 className="block hover:text-white"
                 href="https://www.facebook.com/dellysmatchupsre"
@@ -827,6 +773,7 @@ export default function Home() {
               >
                 Facebook
               </a>
+
               <a
                 className="block hover:text-white"
                 href="https://www.instagram.com/dellysmatchups"
@@ -835,6 +782,7 @@ export default function Home() {
               >
                 Instagram
               </a>
+
               <a
                 className="block hover:text-white"
                 href="mailto:infodellysmatchups@gmail.com"

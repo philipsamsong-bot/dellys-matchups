@@ -39,7 +39,7 @@ export default function AboutPlatformPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-transparent" />
           </div>
 
-          <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl items-start px-6 pt-48">
+          <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl items-start px-6 pt-28">
             <motion.div
               initial={{ y: 80, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
