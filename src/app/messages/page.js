@@ -8,6 +8,7 @@ export default function MessagesPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasFullAccess, setHasFullAccess] = useState(false);
 
   useEffect(() => {
     async function loadMessages() {
@@ -21,6 +22,25 @@ export default function MessagesPage() {
       }
 
       setCurrentUser(user);
+      const { data: profile } = await supabase
+  .from("profiles")
+  .select("*")
+  .eq("id", user.id)
+  .single();
+
+const premiumAccess =
+  profile?.subscription === "premium" ||
+  profile?.subscription === "vip" ||
+  profile?.membership_plan === "premium" ||
+  profile?.membership_plan === "vip";
+
+setHasFullAccess(premiumAccess);
+
+if (!premiumAccess) {
+  setLoading(false);
+  return;
+}
+
 
       const { data: messages, error } = await supabase
         .from("messages")
@@ -120,7 +140,25 @@ export default function MessagesPage() {
             connections.
           </p>
 
-          {conversations.length === 0 ? (
+          {!hasFullAccess ? (
+  <div className="mt-14 rounded-[3rem] bg-[#c1121f] p-12 text-center shadow-2xl">
+    <h2 className="font-display text-5xl font-bold">
+      Messages • Upgrade To Unlock
+    </h2>
+
+    <p className="mx-auto mt-5 max-w-2xl text-white/75">
+      Upgrade to Premium or VIP to unlock private conversations with your matches.
+    </p>
+
+    <a
+      href="/matchups/checkout"
+      className="mt-10 inline-block rounded-full bg-white px-10 py-5 font-black text-[#b30018] transition hover:scale-105"
+    >
+      Upgrade To Unlock
+    </a>
+  </div>
+) : conversations.length === 0 ? (
+
             <div className="mt-14 rounded-[3rem] bg-[#c1121f] p-12 text-center shadow-2xl">
               <h2 className="font-display text-5xl font-bold">
                 No Messages Yet

@@ -134,7 +134,7 @@ export function SiteNav() {
             </div>
           ))}
 
-          <a href="/#matchups" className="transition hover:text-red-100">
+          <a href="/matchups" className="transition hover:text-red-100">
             Matchups
           </a>
 
@@ -207,7 +207,7 @@ export function SiteNav() {
               </details>
             ))}
 
-            <a href="/#matchups" onClick={() => setMobileOpen(false)}>
+            <a href="/matchups" onClick={() => setMobileOpen(false)}>
               Matchups
             </a>
 
@@ -365,7 +365,7 @@ export function SiteFooter() {
               <a className="block hover:text-white" href="/counselling/healing">
                 Emotional Healing
               </a>
-              <a className="block hover:text-white" href="/#matchups">
+              <a className="block hover:text-white" href="/matchups">
                 Matchups
               </a>
             </div>

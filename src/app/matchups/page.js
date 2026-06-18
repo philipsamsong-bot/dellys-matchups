@@ -1,172 +1,299 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
+import { motion } from "framer-motion";
+import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 
 export default function MatchupsPage() {
-  async function handleCheckout(plan) {
-    try {
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        window.location.href = "/auth/login";
-        return;
-      }
-  
-      const response = await fetch("/api/paypal/subsriptions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          plan,
-          userId: user?.id,
-          email: user?.email,
-        }),
-      });
-  
-      const data = await response.json();
-      if (!response.ok){
-        alert (data.error || "Unable to start subscription.");
-        return
-      }
-  
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-  
-      alert("No PayPal approval URL returned.");
-    } catch (error) {
-      console.error(error);
-      alert(error.message);
-    }
-  }
-  
-
   return (
-    <main className="min-h-screen bg-[#080304] px-6 py-14 text-white">
-      <div className="mx-auto max-w-7xl">
-        <div className="text-center">
-          <p className="text-sm font-bold uppercase tracking-[0.35em] text-red-400">
-            Membership Plans
-          </p>
+    <>
+      <SiteNav />
 
-          <h1 className="mt-4 font-serif text-6xl font-black">
-            <span className="text-white">Choose Your </span>
-            <span className="text-red-600">Experience</span>
-          </h1>
+      <main className="overflow-hidden bg-[#b30018] text-white">
 
-          <p className="mx-auto mt-6 max-w-3xl text-lg text-white/60">
-            Delly&apos;s Matchups is built for serious people seeking real
-            connections through a trusted matchmaking community.
-          </p>
-        </div>
+        {/* HERO */}
 
-        <div className="mt-16 grid gap-8 lg:grid-cols-3">
-          <div className="flex flex-col rounded-[2.5rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-white/50">
-              Free
-            </p>
+        <section className="px-6 pb-24 pt-44">
 
-            <h2 className="mt-4 text-5xl font-black">£0</h2>
+          <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-2">
 
-            <p className="mt-4 text-white/60">
-              Explore the Delly&apos;s Matchups community.
-            </p>
-
-            <ul className="mt-10 space-y-4 text-white/75">
-              <li>✔ Create account</li>
-              <li>✔ Create profile</li>
-              <li>✔ Upload 1 photo</li>
-              <li>✔ Browse profiles</li>
-              <li>✔ Like profiles</li>
-              <li>✔ Receive likes/messages notifications</li>
-              <li>❌ View full profiles</li>
-              <li>❌ See who liked you</li>
-              <li>❌ Chat/connect</li>
-            </ul>
-
-            <button className="mt-auto rounded-2xl border border-white/10 py-4 font-bold text-white/70">
-              Current Free Plan
-            </button>
-          </div>
-
-          <div className="relative flex flex-col rounded-[2.5rem] border border-red-500/40 bg-red-950/20 p-8 shadow-2xl shadow-red-900/30">
-            <div className="absolute right-6 top-6 rounded-full bg-red-600 px-4 py-2 text-sm font-black">
-              MOST POPULAR
-            </div>
-
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-red-300">
-              Premium
-            </p>
-
-            <h2 className="mt-4 text-5xl font-black">$20</h2>
-
-            <p className="mt-2 text-white/60">per month</p>
-
-            <p className="mt-4 text-white/70">
-              Full matchmaking experience with unrestricted interaction.
-            </p>
-
-            <ul className="mt-10 space-y-4 text-white/90">
-              <li>✔ Everything in Free</li>
-              <li>✔ Upload up to 5 photos</li>
-              <li>✔ View full profiles</li>
-              <li>✔ See who liked you</li>
-              <li>✔ Direct messaging</li>
-              <li>✔ Unlimited connections</li>
-              <li>✔ Priority visibility</li>
-              <li>✔ Full profile access</li>
-            </ul>
-
-            <button
-              type="button"
-              onClick={() => handleCheckout("premium")}
-              className="mt-auto rounded-2xl bg-red-700 py-4 font-bold transition hover:bg-red-800"
+            <motion.div
+              initial={{ x: -60, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 0.8 }}
             >
-              Upgrade to Premium
-            </button>
-          </div>
 
-          <div className="flex flex-col rounded-[2.5rem] border border-yellow-400/40 bg-yellow-400/10 p-8 shadow-2xl shadow-yellow-900/20">
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-yellow-300">
-              VIP
-            </p>
+              <p className="text-sm font-black uppercase tracking-[0.4em] text-red-100">
+                Delly's Matchups
+              </p>
 
-            <h2 className="mt-4 text-5xl font-black">$100</h2>
+              <h1 className="font-display mt-6 text-6xl font-bold leading-none md:text-8xl">
 
-            <p className="mt-2 text-white/60">per month</p>
+                Meaningful
 
-            <p className="mt-4 text-white/70">
-              Elite matchmaking support with premium visibility and private
-              guidance.
-            </p>
+                <span className="mt-3 block">
+                  Connections
+                </span>
 
-            <ul className="mt-10 space-y-4 text-white/90">
-              <li>✔ Everything in Premium</li>
-              <li>✔ Unlimited photo uploads</li>
-              <li>✔ VIP badge</li>
-              <li>✔ Facebook feature visibility</li>
-              <li>✔ Priority placement</li>
-              <li>✔ Private counselling</li>
-              <li>✔ Personalized matchmaking support</li>
-              <li>✔ Free copy of I do I don&apos;t</li>
-              <li>✔ VIP recognition</li>
-            </ul>
+                <span className="mt-3 block text-red-200">
+                  Start Here
+                </span>
 
-            <button
-              type="button"
-              onClick={() => handleCheckout("vip")}
-              className="mt-auto rounded-2xl bg-yellow-400 py-4 font-bold text-black transition hover:bg-yellow-300"
+              </h1>
+
+              <p className="mt-10 max-w-2xl text-xl text-white/80">
+
+                Build intentional, authentic and God-centred relationships.
+
+              </p>
+
+              <div className="mt-12 flex flex-wrap gap-5">
+
+                <a
+                  href="/auth/signup"
+                  className="rounded-full bg-white px-10 py-5 font-black text-[#b30018]"
+                >
+                  Join Free
+                </a>
+
+                <a
+                  href="/#matchups"
+                  className="rounded-full border border-white/20 px-10 py-5 font-black"
+                >
+                  Explore Plans
+                </a>
+
+              </div>
+
+            </motion.div>
+
+            <motion.div
+              initial={{ x: 60, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 0.8 }}
+              className="overflow-hidden rounded-[3rem] shadow-2xl"
             >
-              Become VIP
-            </button>
+
+              <img
+                src="/matchups-hero.png"
+                alt="Delly's Matchups"
+                className="h-[650px] w-full object-cover"
+              />
+
+            </motion.div>
+
           </div>
-        </div>
-      </div>
-    </main>
-  );
+
+        </section>
+{/* HOW MATCHUPS WORK */}
+
+<section className="px-6 py-24">
+
+<div className="mx-auto max-w-7xl">
+
+  <div className="text-center">
+
+    <p className="font-black uppercase tracking-[0.35em] text-red-100">
+      How Matchups Works
+    </p>
+
+    <h2 className="font-display mt-6 text-6xl font-bold">
+      Simple. Intentional. Authentic.
+    </h2>
+
+  </div>
+
+  <div className="mt-20 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+
+    {[
+      "Create Your Profile",
+
+      "Tell Us Your Preferences",
+
+      "Discover Compatible Matches",
+
+      "Connect Safely",
+
+      "Build Authentic Relationships",
+
+      "Grow Together",
+
+    ].map((item, index) => (
+
+      <motion.div
+        key={item}
+        initial={{ y: 50, opacity: 0 }}
+        whileInView={{ y: 0, opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ delay: index * 0.1 }}
+        className="rounded-[2.5rem] bg-white p-10 text-[#b30018] shadow-2xl"
+      >
+
+        <p className="text-5xl font-black">
+
+          0{index + 1}
+
+        </p>
+
+        <h3 className="mt-8 text-3xl font-black">
+
+          {item}
+
+        </h3>
+
+      </motion.div>
+
+    ))}
+
+  </div>
+
+</div>
+
+</section>
+
+
+
+{/* WHO IS MATCHUPS FOR */}
+
+<section className="px-6 py-24">
+
+<div className="mx-auto max-w-7xl">
+
+  <div className="text-center">
+
+    <p className="font-black uppercase tracking-[0.35em] text-red-100">
+      Who Is Matchups For?
+    </p>
+
+    <h2 className="font-display mt-6 text-6xl font-bold">
+
+      Built For Everyone
+
+    </h2>
+
+  </div>
+
+  <div className="mt-20 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+
+    {[
+      "Singles",
+
+      "Professionals",
+
+      "Christians",
+
+      "Widows & Widowers",
+
+      "Divorced Individuals",
+
+      "Africa & The Diaspora",
+
+    ].map((item) => (
+
+      <motion.div
+
+        key={item}
+
+        initial={{ y: 50, opacity: 0 }}
+
+        whileInView={{ y: 0, opacity: 1 }}
+
+        viewport={{ once: true }}
+
+        className="rounded-[2.5rem] border border-white/10 bg-white/10 p-10 text-center backdrop-blur-xl"
+
+      >
+
+        <p className="text-3xl font-black">
+
+          {item}
+
+        </p>
+
+      </motion.div>
+
+    ))}
+
+  </div>
+
+</div>
+
+</section>
+{/* FINAL CTA */}
+
+<section className="px-6 py-28">
+
+<div className="mx-auto max-w-6xl">
+
+  <motion.div
+
+    initial={{ y: 60, opacity: 0 }}
+
+    whileInView={{ y: 0, opacity: 1 }}
+
+    viewport={{ once: true }}
+
+    className="rounded-[3rem] bg-white p-12 text-center text-[#b30018] shadow-2xl md:p-20"
+
+  >
+
+    <p className="text-sm font-black uppercase tracking-[0.35em]">
+
+      Begin Your Journey
+
+    </p>
+
+    <h2 className="font-display mt-6 text-5xl font-bold leading-none md:text-7xl">
+
+      Ready To Begin?
+
+    </h2>
+
+    <p className="mx-auto mt-8 max-w-3xl text-xl leading-9 text-black/70">
+
+      Join a growing global community committed to authentic, intentional and God-centred relationships.
+
+    </p>
+
+    <div className="mt-14 flex flex-wrap justify-center gap-5">
+
+      <a
+
+        href="/auth/signup"
+
+        className="rounded-full bg-[#b30018] px-10 py-5 font-black text-white transition hover:scale-105"
+
+      >
+
+        Join Free Today
+
+      </a>
+
+      <a
+
+        href="/#matchups"
+
+        className="rounded-full border border-[#b30018]/20 px-10 py-5 font-black transition hover:bg-[#b30018] hover:text-white"
+
+      >
+
+        Explore Plans
+
+      </a>
+
+    </div>
+
+  </motion.div>
+
+</div>
+
+</section>
+
+</main>
+
+<SiteFooter />
+
+</>
+
+);
+
 }

@@ -304,7 +304,7 @@ export default function DashboardPage() {
 
                 {!premiumAccess && !married && (
                   <a
-                    href="/membership"
+                    href="/matchups/checkout"
                     className="mt-6 inline-block rounded-full bg-white px-6 py-3 font-black text-[#b30018]"
                   >
                     Upgrade Now
@@ -313,7 +313,7 @@ export default function DashboardPage() {
 
                 {premiumAccess && !vipAccess && !married && (
                   <a
-                    href="/membership"
+                    href="/matchups/checkout"
                     className="mt-6 inline-block rounded-full bg-yellow-200 px-6 py-3 font-black text-[#7a0010]"
                   >
                     Upgrade to VIP
@@ -464,10 +464,10 @@ export default function DashboardPage() {
               </div>
 
               <a
-                href="/membership"
+                href="/matchups/checkout"
                 className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
               >
-                Membership
+                Upgrade Plan
               </a>
             </div>
           </section>
@@ -569,19 +569,28 @@ function DashboardStat({ title, value, text, isText = false }) {
 }
 
 function QuickAction({ href, title, locked = false }) {
+
+  const lockedTitle =
+    title === "Who Liked Me"
+      ? "Who Liked Me • Upgrade To Find Out"
+      : title === "Messages"
+      ? "Messages • Upgrade To Unlock"
+      : title;
+
   return (
     <a
-      href={locked ? "/membership" : href}
+      href={locked ? "/matchups/checkout" : href}
       className={`rounded-[2rem] border border-white/15 p-8 text-center font-black transition hover:scale-[1.02] ${
         locked
           ? "bg-black/20 text-white/60"
           : "bg-white/10 hover:bg-white hover:text-[#b30018]"
       }`}
     >
-      {locked ? `🔒 ${title}` : title}
+      {locked ? `🔒 ${lockedTitle}` : title}
     </a>
   );
 }
+
 
 function AdminLink({ href, title }) {
   return (

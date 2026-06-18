@@ -19,7 +19,7 @@ export default function BrowsePage() {
   const [userProfile, setUserProfile] = useState(null);
   const [likedProfiles, setLikedProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  
 
   useEffect(() => {
     async function loadBrowsePage() {
@@ -101,44 +101,7 @@ export default function BrowsePage() {
       <DashboardChrome />
 
       <main className="min-h-screen bg-[#b30018] px-6 pb-24 pt-16 text-white">
-        {upgradeModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-5">
-            <div className="w-full max-w-md rounded-[2rem] border border-red-400/30 bg-[#1a0206] p-8 text-center shadow-2xl">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-700 text-4xl">
-                🔒
-              </div>
-
-              <h2 className="font-display mt-6 text-4xl font-black">
-                Premium Access
-              </h2>
-
-              <p className="mt-4 text-white/70">
-                Upgrade to unlock full profiles, messaging, and premium
-                matchmaking experiences.
-              </p>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setUpgradeModalOpen(false);
-                  window.location.href = "/matchups";
-                }}
-                className="mt-7 w-full rounded-2xl bg-white py-4 font-bold text-[#b30018] transition hover:scale-[1.02]"
-              >
-                Upgrade Now
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setUpgradeModalOpen(false)}
-                className="mt-4 w-full rounded-2xl border border-white/10 py-4 font-bold text-white/70 hover:bg-white/5"
-              >
-                Maybe Later
-              </button>
-            </div>
-          </div>
-        )}
-
+       
         <div className="mx-auto max-w-7xl">
           <motion.div
             initial={{ opacity: 0, y: 35 }}
@@ -294,10 +257,12 @@ export default function BrowsePage() {
                           <div className="mt-auto pt-8">
                             <button
                               type="button"
-                              onClick={() => setUpgradeModalOpen(true)}
+                              onClick={() => {
+                                window.location.href = "/matchups/checkout";
+                              }}
                               className="w-full rounded-2xl bg-white px-6 py-4 font-bold text-[#b30018] transition hover:scale-[1.02]"
                             >
-                              Unlock Full Profile
+                             Upgrade to View Profile
                             </button>
                           </div>
                         </>

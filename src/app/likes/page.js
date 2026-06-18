@@ -126,7 +126,7 @@ export default function LikesPage() {
               </p>
 
               <a
-                href="/pricing"
+                href="/matchups/checkout"
                 className="mt-10 inline-block rounded-full bg-white px-10 py-5 font-black text-[#b30018] transition hover:scale-105"
               >
                 Upgrade Now
