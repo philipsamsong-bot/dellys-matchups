@@ -235,12 +235,19 @@ export default function CartPage() {
                   </span>
                 </div>
 
-                <a
-                  href="/shop/checkout"
-                  className="mt-10 block rounded-full bg-white py-5 text-center text-lg font-black text-[#b30018] transition hover:scale-105"
-                >
-                  Proceed To Checkout
-                </a>
+                <button
+  type="button"
+  onClick={() => {
+    localStorage.setItem("dm-checkout-cart", JSON.stringify(cart));
+
+    window.location.href = `/shop/checkout?product=${encodeURIComponent(
+      `${itemCount} Shop Item${itemCount === 1 ? "" : "s"}`
+    )}&category=Shop&price=${total.toFixed(2)}`;
+  }}
+  className="mt-10 block w-full rounded-full bg-white py-5 text-center text-lg font-black text-[#b30018] transition hover:scale-105"
+>
+  Proceed To Checkout
+</button>
 
                 <button
                   type="button"
