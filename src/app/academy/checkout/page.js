@@ -163,7 +163,7 @@ function AcademyCheckoutContent() {
     script.async = true;
     script.onload = renderButtons;
     document.body.appendChild(script);
-  }, [paypalClientId, form.payment_method, selectedCourseKey]);
+  }, [paypalClientId, form.payment_method, selectedCourseKey,form.customer_name,form.customer_email]);
 
   async function handleProofUpload(event) {
     const file = event.target.files?.[0];
