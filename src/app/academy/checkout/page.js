@@ -33,6 +33,9 @@ const moduleOptions = Object.entries(courses).filter(
 const emptyForm = {
   customer_name: "",
   customer_email: "",
+  country: "",
+  postal_code: "",
+  phone: "",
   payment_method: "PayPal / Card",
   proof_url: "",
   notes: "",
@@ -54,6 +57,35 @@ function AcademyCheckoutContent() {
 
   const selectedCourse = courses[selectedCourseKey];
 
+  useEffect(() => {
+    async function loadUserProfile() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name,email,phone,country,postal_code")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile) return;
+
+      setForm((current) => ({
+        ...current,
+        customer_name: current.customer_name || profile.full_name || "",
+        customer_email: current.customer_email || profile.email || user.email || "",
+        country: current.country || profile.country || "",
+        postal_code: current.postal_code || profile.postal_code || "",
+        phone: current.phone || profile.phone || "",
+      }));
+    }
+
+    loadUserProfile();
+  }, []);
+
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
@@ -70,8 +102,8 @@ function AcademyCheckoutContent() {
 
   async function savePayment(status, providerReference = null) {
     const { error } = await supabase.from("payments").insert({
-      customer_name: form.customer_name,
-      customer_email: form.customer_email,
+      customer_name: form.customer_name.trim(),
+      customer_email: form.customer_email.trim().toLowerCase(),
       purpose: "academy",
       item_name: selectedCourse.title,
       amount: selectedCourse.price,
@@ -80,7 +112,12 @@ function AcademyCheckoutContent() {
       status,
       provider_reference: providerReference,
       proof_url: form.proof_url,
-      notes: `Course Key: ${selectedCourseKey}\n\n${form.notes || ""}`,
+      notes: `Course Key: ${selectedCourseKey}
+Country: ${form.country}
+Postal / ZIP Code: ${form.postal_code}
+Phone: ${form.phone}
+
+${form.notes || ""}`,
     });
 
     if (error) throw new Error(error.message);
@@ -110,7 +147,7 @@ function AcademyCheckoutContent() {
           },
           createOrder(data, actions) {
             if (!validateForm()) {
-              return Promise.reject(new Error("Academy checkout incomplete."));
+              return actions.reject();
             }
 
             return actions.order.create({
@@ -143,7 +180,7 @@ function AcademyCheckoutContent() {
             alert("Payment cancelled.");
           },
           onError(error) {
-            console.error(error);
+            console.error("PayPal payment failed:", error);
             alert("PayPal payment failed. Please try again.");
           },
         })
@@ -159,11 +196,17 @@ function AcademyCheckoutContent() {
 
     const script = document.createElement("script");
     script.id = "paypal-sdk";
-    script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD&intent=capture`;
     script.async = true;
     script.onload = renderButtons;
     document.body.appendChild(script);
-  }, [paypalClientId, form.payment_method, selectedCourseKey,form.customer_name,form.customer_email]);
+  }, [
+    paypalClientId,
+    form.payment_method,
+    selectedCourseKey,
+    form.customer_name,
+    form.customer_email,
+  ]);
 
   async function handleProofUpload(event) {
     const file = event.target.files?.[0];
@@ -198,7 +241,9 @@ function AcademyCheckoutContent() {
     try {
       setSaving(true);
       await savePayment("pending_confirmation");
-      alert("Your academy payment has been submitted for confirmation.");
+      alert(
+        "Your payment choice has been submitted. Please send proof on WhatsApp for confirmation."
+      );
       window.location.href = `/academy/payment-pending?course=${selectedCourseKey}`;
     } catch (error) {
       alert(error.message);
@@ -303,6 +348,30 @@ function AcademyCheckoutContent() {
                 placeholder="Email address"
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
               />
+
+              <input
+                name="country"
+                value={form.country}
+                onChange={handleChange}
+                placeholder="Country"
+                className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60 md:col-span-2"
+              />
+
+              <input
+                name="postal_code"
+                value={form.postal_code}
+                onChange={handleChange}
+                placeholder="Postal / ZIP Code"
+                className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+              />
+
+              <input
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                placeholder="Phone number"
+                className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+              />
             </div>
 
             <div className="mt-10">
@@ -349,79 +418,142 @@ function AcademyCheckoutContent() {
             )}
 
             {form.payment_method === "Mobile Money" && (
-              <div className="mt-8 rounded-[2rem] bg-white/10 p-6">
-                <h4 className="font-display text-3xl font-bold">
+              <div className="mt-10 rounded-[2rem] border border-white/15 bg-white/10 p-6">
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
                   MTN Mobile Money
-                </h4>
-                <p className="mt-4 font-bold">Account Name: {mobileMoney.name}</p>
-                <p className="mt-2 text-3xl font-black">{mobileMoney.number}</p>
-                <a
-                  href={mobileMoney.whatsapp}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-5 inline-flex rounded-full bg-white px-6 py-3 font-black text-[#b30018]"
-                >
-                  Send Proof On WhatsApp
-                </a>
-              </div>
-            )}
-
-            {form.payment_method === "Bank Transfer" && (
-              <div className="mt-8 rounded-[2rem] bg-white/10 p-6">
-                <h4 className="font-display text-3xl font-bold">
-                  Bank Transfer
-                </h4>
-                <p className="mt-4 text-white/75">
-                  Make your transfer using Delly&apos;s Matchups official bank
-                  details, then upload your proof below.
                 </p>
-              </div>
-            )}
 
-            {form.payment_method !== "PayPal / Card" && (
-              <>
+                <p className="mt-4 text-lg leading-8 text-white/80">
+                  Send your payment using the Mobile Money details below.
+                </p>
+
+                <div className="mt-5 rounded-2xl bg-black/20 p-5">
+                  <p className="text-white/70">Account Name</p>
+                  <p className="mt-1 text-2xl font-black">
+                    {mobileMoney.name}
+                  </p>
+
+                  <p className="mt-5 text-white/70">Mobile Money Number</p>
+                  <p className="mt-1 text-3xl font-black">
+                    {mobileMoney.number}
+                  </p>
+                </div>
+
+                <p className="mt-5 text-white/70">
+                  After payment, send your transaction ID or screenshot on
+                  WhatsApp for manual confirmation.
+                </p>
+
                 <textarea
                   name="notes"
                   value={form.notes}
                   onChange={handleChange}
                   rows="4"
                   placeholder="Optional note or transaction reference"
-                  className="mt-8 w-full rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/60"
+                  className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/60"
                 />
 
-                <div className="mt-6 rounded-[2rem] bg-white/10 p-6">
-                  <p className="font-black">Upload payment proof</p>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={handleProofUpload}
-                    className="mt-4 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
-                  />
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleProofUpload}
+                  className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
+                />
 
-                  {uploading && (
-                    <p className="mt-3 text-sm text-white/70">
-                      Uploading proof...
-                    </p>
-                  )}
+                {uploading && (
+                  <p className="mt-3 text-sm text-white/70">
+                    Uploading proof...
+                  </p>
+                )}
 
-                  {form.proof_url && (
-                    <p className="mt-3 text-sm font-bold text-white">
-                      Payment proof uploaded.
-                    </p>
-                  )}
+                {form.proof_url && (
+                  <p className="mt-3 text-sm font-bold text-white">
+                    Payment proof uploaded.
+                  </p>
+                )}
+
+                <div className="mt-6 flex flex-col gap-4 sm:flex-row">
+                  <a
+                    href={mobileMoney.whatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
+                  >
+                    Send MoMo Proof
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={handleManualSubmit}
+                    disabled={saving || uploading}
+                    className="rounded-full border border-white/20 bg-white/10 px-8 py-4 font-black text-white transition hover:bg-white/20 disabled:opacity-60"
+                  >
+                    {saving ? "Submitting..." : "I Have Paid"}
+                  </button>
                 </div>
+              </div>
+            )}
 
-                <button
-                  type="button"
-                  onClick={handleManualSubmit}
-                  disabled={saving || uploading}
-                  className="mt-8 w-full rounded-full bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 px-10 py-5 text-xl font-black text-black shadow-2xl transition hover:scale-105 disabled:opacity-60"
-                >
-                  {saving
-                    ? "Submitting..."
-                    : `Submit Enrollment — $${selectedCourse.price} USD`}
-                </button>
-              </>
+            {form.payment_method === "Bank Transfer" && (
+              <div className="mt-10 rounded-[2rem] border border-white/15 bg-white/10 p-6">
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+                  Bank Transfer
+                </p>
+
+                <p className="mt-4 text-lg leading-8 text-white/80">
+                  Bank transfer details will be provided by Delly&apos;s
+                  Matchups. After payment, send your transaction proof on
+                  WhatsApp for confirmation.
+                </p>
+
+                <textarea
+                  name="notes"
+                  value={form.notes}
+                  onChange={handleChange}
+                  rows="4"
+                  placeholder="Optional note or transaction reference"
+                  className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/60"
+                />
+
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleProofUpload}
+                  className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
+                />
+
+                {uploading && (
+                  <p className="mt-3 text-sm text-white/70">
+                    Uploading proof...
+                  </p>
+                )}
+
+                {form.proof_url && (
+                  <p className="mt-3 text-sm font-bold text-white">
+                    Payment proof uploaded.
+                  </p>
+                )}
+
+                <div className="mt-6 flex flex-col gap-4 sm:flex-row">
+                  <a
+                    href={mobileMoney.whatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
+                  >
+                    Send Bank Proof
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={handleManualSubmit}
+                    disabled={saving || uploading}
+                    className="rounded-full border border-white/20 bg-white/10 px-8 py-4 font-black text-white transition hover:bg-white/20 disabled:opacity-60"
+                  >
+                    {saving ? "Submitting..." : "I Have Paid"}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </section>

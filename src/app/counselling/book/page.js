@@ -18,12 +18,32 @@ const countries = [
   "Cameroon",
   "Nigeria",
   "Ghana",
+  "South Africa",
+  "Kenya",
+  "Uganda",
+  "Tanzania",
+  "Rwanda",
+  "Zambia",
+  "Zimbabwe",
+  "Ethiopia",
   "United Kingdom",
   "United States",
   "Canada",
   "France",
   "Germany",
-  "South Africa",
+  "Belgium",
+  "Netherlands",
+  "Italy",
+  "Spain",
+  "Ireland",
+  "Switzerland",
+  "Australia",
+  "United Arab Emirates",
+  "Qatar",
+  "Saudi Arabia",
+  "China",
+  "India",
+  "Brazil",
   "Other",
 ];
 
@@ -33,6 +53,17 @@ function countWords(value) {
   return value.trim().split(/\s+/).filter(Boolean).length;
 }
 
+function FieldLabel({ label, helper }) {
+  return (
+    <div>
+      <p className="mb-2 text-sm font-black uppercase tracking-[0.2em] text-red-100">
+        {label}
+      </p>
+      {helper && <p className="mb-3 text-sm text-white/65">{helper}</p>}
+    </div>
+  );
+}
+
 function BookingForm() {
   const searchParams = useSearchParams();
   const selectedService = searchParams.get("service") || "premarital";
@@ -40,8 +71,9 @@ function BookingForm() {
   const [form, setForm] = useState({
     fullName: "",
     email: "",
-    phone: "",
     country: "",
+    postalCode: "",
+    phone: "",
     service: services[selectedService] || "Premarital Counselling",
     relationshipStatus: "",
     preferredDate: "",
@@ -62,7 +94,7 @@ function BookingForm() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name,email,phone,country")
+        .select("full_name,email,phone,country,postal_code")
         .eq("id", user.id)
         .single();
 
@@ -72,8 +104,9 @@ function BookingForm() {
         ...current,
         fullName: current.fullName || profile.full_name || "",
         email: current.email || profile.email || user.email || "",
-        phone: current.phone || profile.phone || "",
         country: current.country || profile.country || "",
+        postalCode: current.postalCode || profile.postal_code || "",
+        phone: current.phone || profile.phone || "",
       }));
     }
 
@@ -83,9 +116,7 @@ function BookingForm() {
   function handleChange(event) {
     const { name, value, type, checked } = event.target;
 
-    if (name === "message" && countWords(value) > maxWords) {
-      return;
-    }
+    if (name === "message" && countWords(value) > maxWords) return;
 
     setForm((currentForm) => ({
       ...currentForm,
@@ -101,19 +132,15 @@ function BookingForm() {
       return;
     }
 
-    if (wordsUsed > maxWords) {
-      alert(`Please keep your message under ${maxWords} words.`);
-      return;
-    }
-
     const bookingId = crypto.randomUUID();
 
     const { error } = await supabase.from("counselling_bookings").insert({
       id: bookingId,
       full_name: form.fullName.trim(),
       email: form.email.trim().toLowerCase(),
-      phone: form.phone.trim(),
       country: form.country,
+      postal_code: form.postalCode.trim(),
+      phone: form.phone.trim(),
       service: form.service,
       relationship_status: form.relationshipStatus,
       preferred_date: form.preferredDate,
@@ -166,7 +193,7 @@ function BookingForm() {
                 value={form.fullName}
                 onChange={handleChange}
                 required
-                placeholder="Full name"
+                placeholder="Enter your full name"
                 className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
               />
 
@@ -176,16 +203,7 @@ function BookingForm() {
                 value={form.email}
                 onChange={handleChange}
                 required
-                placeholder="Email address"
-                className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-              />
-
-              <input
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                required
-                placeholder="Phone number"
+                placeholder="Enter your email address"
                 className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
               />
 
@@ -194,10 +212,10 @@ function BookingForm() {
                 value={form.country}
                 onChange={handleChange}
                 required
-                className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
+                className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none md:col-span-2"
               >
                 <option value="" className="text-black">
-                  Select country
+                  Select your country
                 </option>
                 {countries.map((country) => (
                   <option key={country} value={country} className="text-black">
@@ -205,6 +223,24 @@ function BookingForm() {
                   </option>
                 ))}
               </select>
+
+              <input
+                name="postalCode"
+                value={form.postalCode}
+                onChange={handleChange}
+                required
+                placeholder="Enter postal / ZIP code"
+                className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+              />
+
+              <input
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                required
+                placeholder="Enter phone / WhatsApp number"
+                className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+              />
 
               <select
                 name="service"
@@ -228,7 +264,7 @@ function BookingForm() {
                 className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
               >
                 <option value="" className="text-black">
-                  Relationship status
+                  Select relationship status
                 </option>
                 <option className="text-black">Single</option>
                 <option className="text-black">Dating</option>
@@ -238,31 +274,47 @@ function BookingForm() {
                 <option className="text-black">Prefer not to say</option>
               </select>
 
-              <input
-                type="date"
-                name="preferredDate"
-                value={form.preferredDate}
-                onChange={handleChange}
-                required
-                className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
-              />
+              <div>
+                <FieldLabel
+                  label="Preferred Counselling Date"
+                  helper="Select the date you would prefer for your counselling session."
+                />
+                <input
+                  type="date"
+                  name="preferredDate"
+                  value={form.preferredDate}
+                  onChange={handleChange}
+                  required
+                  className="h-16 w-full rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
+                />
+              </div>
 
-              <input
-                type="time"
-                name="preferredTime"
-                value={form.preferredTime}
-                onChange={handleChange}
-                required
-                className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
-              />
+              <div>
+                <FieldLabel
+                  label="Preferred Counselling Time"
+                  helper="Select the time you would prefer for your counselling session."
+                />
+                <input
+                  type="time"
+                  name="preferredTime"
+                  value={form.preferredTime}
+                  onChange={handleChange}
+                  required
+                  className="h-16 w-full rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
+                />
+              </div>
 
               <div className="md:col-span-2">
+                <FieldLabel
+                  label="Counselling Request"
+                  helper={`Briefly describe what you need help with. Maximum ${maxWords} words.`}
+                />
                 <textarea
                   name="message"
                   value={form.message}
                   onChange={handleChange}
                   required
-                  placeholder="Briefly describe what you need help with..."
+                  placeholder="Example: I need guidance concerning my relationship, healing, marriage, purpose, or emotional wellbeing..."
                   className="min-h-44 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-5 text-white outline-none placeholder:text-white/60"
                 />
                 <p className="mt-2 text-right text-sm text-white/70">
@@ -302,6 +354,7 @@ function BookingForm() {
               <p className="mt-8 text-center font-bold">
                 Delly&apos;s Matchups (DMs)
               </p>
+
               <p className="text-center italic">
                 Redefining Authentic Relationships
               </p>
@@ -315,6 +368,7 @@ function BookingForm() {
                 onChange={handleChange}
                 className="mt-1 h-6 w-6 shrink-0"
               />
+
               <span className="text-sm leading-7 text-white/85">
                 I confirm that I have carefully read, understood, and accepted
                 the counselling session terms and conditions of Delly&apos;s

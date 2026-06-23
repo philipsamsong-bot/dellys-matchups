@@ -40,6 +40,16 @@ function isMarried(profile) {
   return profile?.marital_status === "Married";
 }
 
+function getFirstName(profile, user) {
+  const fullName =
+    profile?.full_name ||
+    user?.user_metadata?.full_name ||
+    user?.email ||
+    "";
+
+  return fullName.trim().split(" ")[0];
+}
+
 function PlanBadge({ profile }) {
   const plan = getPlan(profile);
 
@@ -68,6 +78,7 @@ function PlanBadge({ profile }) {
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState(null);
+  const [welcomeName, setWelcomeName] = useState("");
   const [likesCount, setLikesCount] = useState(0);
   const [messagesCount, setMessagesCount] = useState(0);
   const [academyCount, setAcademyCount] = useState(0);
@@ -115,6 +126,7 @@ export default function DashboardPage() {
         .eq("status", "active");
 
       setProfile(profileData);
+      setWelcomeName(getFirstName(profileData, user));
       setLikesCount(likesTotal || 0);
       setMessagesCount(unreadTotal || 0);
       setAcademyCount(academyTotal || 0);
@@ -159,9 +171,11 @@ export default function DashboardPage() {
               <p className="text-sm font-black uppercase tracking-[0.45em] text-red-100">
                 Dashboard
               </p>
+
               <h1 className="font-display mt-5 text-6xl font-bold leading-none md:text-7xl">
-                Welcome Back
+                {welcomeName ? `Welcome back, ${welcomeName} 👋` : "Welcome Back"}
               </h1>
+
               <p className="mt-6 max-w-2xl text-lg leading-8 text-white/80">
                 Continue your Delly&apos;s Matchups journey through intentional
                 relationships, counselling, mentorship, and growth.
@@ -264,6 +278,7 @@ export default function DashboardPage() {
                 <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
                   Your Plan
                 </p>
+
                 <h3 className="mt-4 text-2xl font-black uppercase">{plan}</h3>
 
                 <div className="mt-6 space-y-3 text-white/90">
@@ -339,6 +354,7 @@ export default function DashboardPage() {
               </div>
 
               <ProfileText title="Bio" value={profile?.bio || "No bio added yet."} />
+
               <ProfileText
                 title="Relationship Goal"
                 value={profile?.relationship_goal || "No relationship goal added."}
@@ -348,7 +364,6 @@ export default function DashboardPage() {
                 <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
                   Profile Gallery
                 </p>
-
                 <div className="relative mt-6 overflow-hidden rounded-[2rem] border border-white/10 bg-black/10">
                   <img
                     src={profile?.avatar_url || "/placeholder-profile.jpg"}
@@ -397,13 +412,17 @@ export default function DashboardPage() {
               <p className="text-sm font-black uppercase tracking-[0.45em] text-yellow-300">
                 Academy Access
               </p>
+
               <h2 className="font-display mt-4 text-5xl font-bold">
                 My Academy 🎓
               </h2>
+
               <p className="mt-5 max-w-3xl text-lg leading-8 text-white/75">
                 You have {academyCount} unlocked academy course
-                {academyCount > 1 ? "s" : ""}. Continue learning from your student area.
+                {academyCount > 1 ? "s" : ""}. Continue learning from your
+                student area.
               </p>
+
               <a
                 href="/dashboard/my-academy"
                 className="mt-8 inline-flex rounded-full bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 px-8 py-4 font-black text-black transition hover:scale-105"
@@ -419,6 +438,7 @@ export default function DashboardPage() {
                 <p className="text-sm font-black uppercase tracking-[0.45em] text-red-100">
                   Membership Access
                 </p>
+
                 <h2 className="font-display mt-4 text-5xl font-bold">
                   {vipAccess
                     ? "VIP experience unlocked."
@@ -426,6 +446,7 @@ export default function DashboardPage() {
                       ? "Premium features unlocked."
                       : "Upgrade to unlock full access."}
                 </h2>
+
                 <p className="mt-5 max-w-3xl text-lg leading-8 text-white/75">
                   Free members get basic access. Premium members unlock messaging,
                   likes visibility, and fuller profiles. VIP members receive a
@@ -526,9 +547,11 @@ function DashboardStat({ title, value, text, isText = false }) {
       <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
         {title}
       </p>
+
       <h2 className={`mt-5 font-black ${isText ? "text-4xl uppercase" : "text-6xl"}`}>
         {value}
       </h2>
+
       <p className="mt-5 text-white/75">{text}</p>
     </div>
   );

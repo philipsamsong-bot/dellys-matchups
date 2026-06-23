@@ -13,6 +13,9 @@ const mobileMoney = {
 const emptyForm = {
   customer_name: "",
   customer_email: "",
+  country: "",
+  postal_code: "",
+  phone: "",
   organization: "",
   partnership_type: "Monthly Support",
   amount: "",
@@ -23,17 +26,45 @@ const emptyForm = {
 
 export default function PartnerPage() {
   const paypalRef = useRef(null);
+  const formRef = useRef(emptyForm);
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const formRef = useRef(emptyForm);
-
   useEffect(() => {
     formRef.current = form;
   }, [form]);
+
+  useEffect(() => {
+    async function loadUserProfile() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name,email,phone,country,postal_code")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile) return;
+
+      setForm((current) => ({
+        ...current,
+        customer_name: current.customer_name || profile.full_name || "",
+        customer_email: current.customer_email || profile.email || user.email || "",
+        country: current.country || profile.country || "",
+        postal_code: current.postal_code || profile.postal_code || "",
+        phone: current.phone || profile.phone || "",
+      }));
+    }
+
+    loadUserProfile();
+  }, []);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -58,8 +89,8 @@ export default function PartnerPage() {
     const currentForm = formRef.current;
 
     const { error } = await supabase.from("payments").insert({
-      customer_name: currentForm.customer_name,
-      customer_email: currentForm.customer_email,
+      customer_name: currentForm.customer_name.trim(),
+      customer_email: currentForm.customer_email.trim().toLowerCase(),
       purpose: "partner",
       item_name: currentForm.partnership_type,
       amount: Number(currentForm.amount),
@@ -68,9 +99,12 @@ export default function PartnerPage() {
       status,
       provider_reference: providerReference,
       proof_url: currentForm.proof_url,
-      notes: `Organization: ${currentForm.organization || "N/A"}\n\n${
-        currentForm.notes || ""
-      }`,
+      notes: `Organization: ${currentForm.organization || "N/A"}
+Country: ${currentForm.country}
+Postal / ZIP Code: ${currentForm.postal_code}
+Phone: ${currentForm.phone}
+
+${currentForm.notes || ""}`,
     });
 
     if (error) throw new Error(error.message);
@@ -104,9 +138,7 @@ export default function PartnerPage() {
             const currentForm = formRef.current;
 
             if (!validateForm(currentForm)) {
-              return Promise.reject(
-                new Error("Partnership payment details incomplete.")
-              );
+              return actions.reject();
             }
 
             return actions.order.create({
@@ -139,7 +171,7 @@ export default function PartnerPage() {
             alert("Payment cancelled.");
           },
           onError(error) {
-            console.error(error);
+            console.error("PayPal payment failed:", error);
             alert("PayPal payment failed. Please try again.");
           },
         })
@@ -155,7 +187,7 @@ export default function PartnerPage() {
 
     const script = document.createElement("script");
     script.id = "paypal-sdk";
-    script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD&intent=capture`;
     script.async = true;
     script.onload = renderButtons;
     document.body.appendChild(script);
@@ -188,21 +220,15 @@ export default function PartnerPage() {
     setUploading(false);
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-
+  async function handleManualSubmit() {
     if (!validateForm()) return;
 
-    if (form.payment_method === "PayPal / Card") {
-      alert("Please complete payment using the PayPal/Card button.");
-      return;
-    }
-
-    setSaving(true);
-
     try {
+      setSaving(true);
       await savePayment("pending_confirmation");
-      alert("Thank you. Your partnership support has been submitted.");
+      alert(
+        "Your payment choice has been submitted. Please send proof on WhatsApp for confirmation."
+      );
       setForm(emptyForm);
     } catch (error) {
       alert(error.message);
@@ -234,66 +260,89 @@ export default function PartnerPage() {
           </div>
 
           <div className="mt-10 grid gap-5 text-left md:grid-cols-3">
-            {[
-              "Monthly Support",
-              "Project Partnership",
-              "Corporate Partnership",
-            ].map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() =>
-                  setForm((current) => ({
-                    ...current,
-                    partnership_type: item,
-                  }))
-                }
-                className={`rounded-[2rem] p-6 text-left transition ${
-                  form.partnership_type === item
-                    ? "bg-white text-[#b30018]"
-                    : "bg-white/10 text-white hover:bg-white/20"
-                }`}
-              >
-                <h2 className="font-black">{item}</h2>
-
-                <p className="mt-3 text-sm opacity-75">
-                  {item === "Monthly Support"
-                    ? "Give consistently to support the mission."
-                    : item === "Project Partnership"
-                      ? "Support events, content, outreach, and community programs."
-                      : "Collaborate with Delly's Matchups as an organization."}
-                </p>
-              </button>
-            ))}
+            {["Monthly Support", "Project Partnership", "Corporate Partnership"].map(
+              (item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() =>
+                    setForm((current) => ({
+                      ...current,
+                      partnership_type: item,
+                    }))
+                  }
+                  className={`rounded-[2rem] p-6 text-left transition ${
+                    form.partnership_type === item
+                      ? "bg-white text-[#b30018]"
+                      : "bg-white/10 text-white hover:bg-white/20"
+                  }`}
+                >
+                  <h2 className="font-black">{item}</h2>
+                  <p className="mt-3 text-sm opacity-75">
+                    {item === "Monthly Support"
+                      ? "Give consistently to support the mission."
+                      : item === "Project Partnership"
+                        ? "Support events, content, outreach, and community programs."
+                        : "Collaborate with Delly's Matchups as an organization."}
+                  </p>
+                </button>
+              )
+            )}
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-10 grid gap-6">
-            <input
-              type="text"
-              name="customer_name"
-              value={form.customer_name}
-              onChange={handleChange}
-              placeholder="Full name"
-              className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
-            />
+          <form onSubmit={(event) => event.preventDefault()} className="mt-10 grid gap-6">
+            <div className="grid gap-5 md:grid-cols-2">
+              <input
+                type="text"
+                name="customer_name"
+                value={form.customer_name}
+                onChange={handleChange}
+                placeholder="Full name"
+                className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
+              />
 
-            <input
-              type="email"
-              name="customer_email"
-              value={form.customer_email}
-              onChange={handleChange}
-              placeholder="Email address"
-              className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
-            />
+              <input
+                type="email"
+                name="customer_email"
+                value={form.customer_email}
+                onChange={handleChange}
+                placeholder="Email address"
+                className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
+              />
 
-            <input
-              type="text"
-              name="organization"
-              value={form.organization}
-              onChange={handleChange}
-              placeholder="Organization / company optional"
-              className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
-            />
+              <input
+                name="country"
+                value={form.country}
+                onChange={handleChange}
+                placeholder="Country"
+                className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50 md:col-span-2"
+              />
+
+              <input
+                name="postal_code"
+                value={form.postal_code}
+                onChange={handleChange}
+                placeholder="Postal / ZIP Code"
+                className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
+              />
+
+              <input
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                placeholder="Phone number"
+                className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
+              />
+
+              <input
+                type="text"
+                name="organization"
+                value={form.organization}
+                onChange={handleChange}
+                placeholder="Organization / company optional"
+                className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50 md:col-span-2"
+              />
+            </div>
 
             <input
               type="number"
@@ -305,16 +354,35 @@ export default function PartnerPage() {
               className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
             />
 
-            <select
-              name="payment_method"
-              value={form.payment_method}
-              onChange={handleChange}
-              className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none"
-            >
-              <option className="text-black">PayPal / Card</option>
-              <option className="text-black">Mobile Money</option>
-              <option className="text-black">Bank Transfer</option>
-            </select>
+            <div>
+              <h3 className="font-display text-4xl font-bold">
+                Payment Method
+              </h3>
+
+              <div className="mt-6 grid gap-5 md:grid-cols-3">
+                {["PayPal / Card", "Mobile Money", "Bank Transfer"].map(
+                  (method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() =>
+                        setForm((current) => ({
+                          ...current,
+                          payment_method: method,
+                        }))
+                      }
+                      className={`rounded-2xl p-6 font-black transition hover:scale-105 ${
+                        form.payment_method === method
+                          ? "bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 text-black"
+                          : "bg-white text-[#b30018]"
+                      }`}
+                    >
+                      {method}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
 
             {form.payment_method === "PayPal / Card" && (
               <div className="rounded-[2rem] bg-white p-6 text-[#b30018]">
@@ -335,61 +403,44 @@ export default function PartnerPage() {
             )}
 
             {form.payment_method === "Mobile Money" && (
-              <div className="rounded-[2rem] bg-white/10 p-6">
-                <h2 className="font-display text-3xl font-bold">
+              <div className="rounded-[2rem] border border-white/15 bg-white/10 p-6">
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
                   MTN Mobile Money
-                </h2>
-
-                <p className="mt-4 font-bold">
-                  Account Name: {mobileMoney.name}
                 </p>
 
-                <p className="mt-2 text-3xl font-black">
-                  {mobileMoney.number}
+                <p className="mt-4 text-lg leading-8 text-white/80">
+                  Send your payment using the Mobile Money details below.
                 </p>
 
-                <a
-                  href={mobileMoney.whatsapp}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-6 inline-flex rounded-full bg-white px-8 py-4 font-black text-[#b30018]"
-                >
-                  Send Payment Proof
-                </a>
-              </div>
-            )}
+                <div className="mt-5 rounded-2xl bg-black/20 p-5">
+                  <p className="text-white/70">Account Name</p>
+                  <p className="mt-1 text-2xl font-black">{mobileMoney.name}</p>
 
-            {form.payment_method === "Bank Transfer" && (
-              <div className="rounded-[2rem] bg-white/10 p-6">
-                <h2 className="font-display text-3xl font-bold">
-                  Bank Transfer
-                </h2>
+                  <p className="mt-5 text-white/70">Mobile Money Number</p>
+                  <p className="mt-1 text-3xl font-black">
+                    {mobileMoney.number}
+                  </p>
+                </div>
 
-                <p className="mt-4 text-white/75">
-                  Make your transfer using the official bank details provided by
-                  Delly&apos;s Matchups, then upload your payment proof below.
+                <p className="mt-5 text-white/70">
+                  After payment, send your transaction ID or screenshot on
+                  WhatsApp for manual confirmation.
                 </p>
-              </div>
-            )}
 
-            <textarea
-              name="notes"
-              value={form.notes}
-              onChange={handleChange}
-              rows="5"
-              placeholder="Tell us how you would like to partner..."
-              className="rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
-            />
-
-            {form.payment_method !== "PayPal / Card" && (
-              <div className="rounded-[2rem] bg-white/10 p-6">
-                <p className="font-black">Upload payment proof</p>
+                <textarea
+                  name="notes"
+                  value={form.notes}
+                  onChange={handleChange}
+                  rows="5"
+                  placeholder="Tell us how you would like to partner, or add your transaction reference..."
+                  className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
+                />
 
                 <input
                   type="file"
                   accept="image/*,.pdf"
                   onChange={handleProofUpload}
-                  className="mt-4 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
+                  className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
                 />
 
                 {uploading && (
@@ -403,17 +454,89 @@ export default function PartnerPage() {
                     Payment proof uploaded.
                   </p>
                 )}
+
+                <div className="mt-6 flex flex-col gap-4 sm:flex-row">
+                  <a
+                    href={mobileMoney.whatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
+                  >
+                    Send MoMo Proof
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={handleManualSubmit}
+                    disabled={saving || uploading}
+                    className="rounded-full border border-white/20 bg-white/10 px-8 py-4 font-black text-white transition hover:bg-white/20 disabled:opacity-60"
+                  >
+                    {saving ? "Submitting..." : "I Have Paid"}
+                  </button>
+                </div>
               </div>
             )}
 
-            {form.payment_method !== "PayPal / Card" && (
-              <button
-                type="submit"
-                disabled={saving || uploading}
-                className="rounded-full bg-white px-8 py-4 font-black text-[#b30018] disabled:opacity-60"
-              >
-                {saving ? "Submitting..." : "Submit Partnership Support"}
-              </button>
+            {form.payment_method === "Bank Transfer" && (
+              <div className="rounded-[2rem] border border-white/15 bg-white/10 p-6">
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+                  Bank Transfer
+                </p>
+
+                <p className="mt-4 text-lg leading-8 text-white/80">
+                  Bank transfer details will be provided by Delly&apos;s
+                  Matchups. After payment, send your transaction proof on
+                  WhatsApp for confirmation.
+                </p>
+
+                <textarea
+                  name="notes"
+                  value={form.notes}
+                  onChange={handleChange}
+                  rows="5"
+                  placeholder="Tell us how you would like to partner, or add your transaction reference..."
+                  className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
+                />
+
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleProofUpload}
+                  className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
+                />
+
+                {uploading && (
+                  <p className="mt-3 text-sm text-white/70">
+                    Uploading proof...
+                  </p>
+                )}
+
+                {form.proof_url && (
+                  <p className="mt-3 text-sm font-bold text-white">
+                    Payment proof uploaded.
+                  </p>
+                )}
+
+                <div className="mt-6 flex flex-col gap-4 sm:flex-row">
+                  <a
+                    href={mobileMoney.whatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
+                  >
+                    Send Bank Proof
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={handleManualSubmit}
+                    disabled={saving || uploading}
+                    className="rounded-full border border-white/20 bg-white/10 px-8 py-4 font-black text-white transition hover:bg-white/20 disabled:opacity-60"
+                  >
+                    {saving ? "Submitting..." : "I Have Paid"}
+                  </button>
+                </div>
+              </div>
             )}
           </form>
         </section>
