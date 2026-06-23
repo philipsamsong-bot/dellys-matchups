@@ -43,6 +43,7 @@ function Petals() {
 export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -60,12 +61,18 @@ export default function SignupPage() {
 
     setLoading(true);
 
+    const siteUrl =
+      process.env.NODE_ENV === "production"
+        ? "https://www.dellysmatchups.org"
+        : "http://localhost:3000";
+
     const { error } = await supabase.auth.signUp({
-      email: form.email,
+      email: form.email.trim().toLowerCase(),
       password: form.password,
       options: {
+        emailRedirectTo: `${siteUrl}/dashboard`,
         data: {
-          full_name: form.fullName,
+          full_name: form.fullName.trim(),
         },
       },
     });
