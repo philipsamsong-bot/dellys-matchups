@@ -212,39 +212,45 @@ export default function SignupPage() {
                 </button>
               </div>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm leading-6 text-white/70">
-                <input
-                  type="checkbox"
-                  required
-                  checked={form.acceptedTerms}
-                  onChange={(event) =>
-                    setForm({ ...form, acceptedTerms: event.target.checked })
-                  }
-                  className="mt-1 h-5 w-5 accent-white"
-                />
+              <label
+  htmlFor="acceptedTerms"
+  className="relative z-30 flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm leading-6 text-white/70"
+>
+  <input
+    id="acceptedTerms"
+    type="checkbox"
+    required
+    checked={form.acceptedTerms}
+    onChange={(event) =>
+      setForm({ ...form, acceptedTerms: event.target.checked })
+    }
+    className="mt-1 h-6 w-6 shrink-0 cursor-pointer accent-white"
+  />
 
-                <span>
-                  I agree to Delly&apos;s Matchups{" "}
-                  <a
-                    href="/terms"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-white underline"
-                  >
-                    Terms and Conditions
-                  </a>{" "}
-                  and{" "}
-                  <a
-                    href="/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-white underline"
-                  >
-                    Privacy Policy
-                  </a>
-                  .
-                </span>
-              </label>
+  <span>
+    I agree to Delly&apos;s Matchups{" "}
+    <a
+      href="/terms"
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      className="font-bold text-white underline"
+    >
+      Terms and Conditions
+    </a>{" "}
+    and{" "}
+    <a
+      href="/privacy"
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      className="font-bold text-white underline"
+    >
+      Privacy Policy
+    </a>
+    .
+  </span>
+</label>
 
               <button
                 type="submit"
