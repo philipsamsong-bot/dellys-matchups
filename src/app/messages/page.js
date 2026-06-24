@@ -4,8 +4,16 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import DashboardChrome from "@/app/components/DashboardChrome";
 
+function getPlan(profile) {
+  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
+}
+
+function hasPremiumAccess(profile) {
+  const plan = getPlan(profile);
+  return plan === "premium" || plan === "vip";
+}
+
 export default function MessagesPage() {
-  const [currentUser, setCurrentUser] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasFullAccess, setHasFullAccess] = useState(false);
@@ -21,26 +29,19 @@ export default function MessagesPage() {
         return;
       }
 
-      setCurrentUser(user);
       const { data: profile } = await supabase
-  .from("profiles")
-  .select("*")
-  .eq("id", user.id)
-  .single();
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
 
-const premiumAccess =
-  profile?.subscription === "premium" ||
-  profile?.subscription === "vip" ||
-  profile?.membership_plan === "premium" ||
-  profile?.membership_plan === "vip";
+      const premiumAccess = hasPremiumAccess(profile);
+      setHasFullAccess(premiumAccess);
 
-setHasFullAccess(premiumAccess);
-
-if (!premiumAccess) {
-  setLoading(false);
-  return;
-}
-
+      if (!premiumAccess) {
+        setLoading(false);
+        return;
+      }
 
       const { data: messages, error } = await supabase
         .from("messages")
@@ -65,8 +66,7 @@ if (!premiumAccess) {
             userId: otherUserId,
             lastMessage: message.content,
             createdAt: message.created_at,
-            unread:
-              message.receiver_id === user.id && message.is_read === false,
+            unread: message.receiver_id === user.id && message.is_read === false,
           });
         }
       }
@@ -113,7 +113,6 @@ if (!premiumAccess) {
     return (
       <>
         <DashboardChrome />
-
         <main className="flex min-h-screen items-center justify-center bg-[#b30018] text-white">
           <p className="text-xl font-bold">Loading messages...</p>
         </main>
@@ -136,29 +135,38 @@ if (!premiumAccess) {
           </h1>
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-white/75">
-            Continue meaningful conversations with your Delly’s Matchups
+            Continue meaningful conversations with your Delly&apos;s Matchups
             connections.
           </p>
 
           {!hasFullAccess ? (
-  <div className="mt-14 rounded-[3rem] bg-[#c1121f] p-12 text-center shadow-2xl">
-    <h2 className="font-display text-5xl font-bold">
-      Messages • Upgrade To Unlock
-    </h2>
+            <div className="mt-14 rounded-[3rem] bg-[#c1121f] p-12 text-center shadow-2xl">
+              <h2 className="font-display text-5xl font-bold">
+                Messaging is a Premium feature
+              </h2>
 
-    <p className="mx-auto mt-5 max-w-2xl text-white/75">
-      Upgrade to Premium or VIP to unlock private conversations with your matches.
-    </p>
+              <p className="mx-auto mt-5 max-w-2xl text-white/75">
+                You can browse profiles freely. Upgrade when you are ready to
+                start private conversations.
+              </p>
 
-    <a
-      href="/matchups/checkout"
-      className="mt-10 inline-block rounded-full bg-white px-10 py-5 font-black text-[#b30018] transition hover:scale-105"
-    >
-      Upgrade To Unlock
-    </a>
-  </div>
-) : conversations.length === 0 ? (
+              <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+                <a
+                  href="/browse"
+                  className="rounded-full border border-white/20 bg-white/10 px-10 py-5 font-black text-white transition hover:bg-white/20"
+                >
+                  Browse Profiles
+                </a>
 
+                <a
+                  href="/matchups/checkout"
+                  className="rounded-full bg-white px-10 py-5 font-black text-[#b30018] transition hover:scale-105"
+                >
+                  Upgrade To Message
+                </a>
+              </div>
+            </div>
+          ) : conversations.length === 0 ? (
             <div className="mt-14 rounded-[3rem] bg-[#c1121f] p-12 text-center shadow-2xl">
               <h2 className="font-display text-5xl font-bold">
                 No Messages Yet
@@ -183,17 +191,14 @@ if (!premiumAccess) {
                   href={`/chat/${conversation.userId}`}
                   className="flex items-center gap-5 rounded-[2rem] bg-[#c1121f] p-5 shadow-2xl transition hover:-translate-y-1"
                 >
-                  {conversation.profile?.avatar_url ? (
-                    <img
-                      src={conversation.profile.avatar_url}
-                      alt={conversation.profile.full_name || "Member"}
-                      className="h-20 w-20 rounded-full object-cover object-top"
-                    />
-                  ) : (
-                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/10 text-xl font-bold">
-                      ?
-                    </div>
-                  )}
+                  <img
+                    src={
+                      conversation.profile?.avatar_url ||
+                      "/placeholder-profile.jpg"
+                    }
+                    alt={conversation.profile?.full_name || "Member"}
+                    className="h-20 w-20 rounded-full object-cover object-top"
+                  />
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-4">

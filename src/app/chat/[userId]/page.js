@@ -7,6 +7,15 @@ import DashboardChrome from "@/app/components/DashboardChrome";
 
 const emojis = ["😊", "❤️", "😂", "🙏", "🔥", "😍"];
 
+function getPlan(profile) {
+  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
+}
+
+function hasPremiumAccess(profile) {
+  const plan = getPlan(profile);
+  return plan === "premium" || plan === "vip";
+}
+
 export default function ChatPage() {
   const { userId } = useParams();
 
@@ -17,15 +26,14 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   const bottomRef = useRef(null);
 
-  const hasAccess = useMemo(() => {
-    return (
-      currentProfile?.subscription === "premium" ||
-      currentProfile?.subscription === "vip"
-    );
-  }, [currentProfile]);
+  const hasAccess = useMemo(
+    () => hasPremiumAccess(currentProfile),
+    [currentProfile]
+  );
 
   useEffect(() => {
     async function loadChat() {
@@ -46,14 +54,8 @@ export default function ChatPage() {
         .eq("id", user.id)
         .single();
 
-      setCurrentProfile(myProfile);
-
-      const canChat =
-        myProfile?.subscription === "premium" ||
-        myProfile?.subscription === "vip";
-
-      if (!canChat) {
-        window.location.href = "/browse";
+      if (!hasPremiumAccess(myProfile)) {
+        window.location.href = "/matchups/checkout";
         return;
       }
 
@@ -70,6 +72,13 @@ export default function ChatPage() {
           `and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`
         )
         .order("created_at", { ascending: true });
+
+      await supabase
+        .from("messages")
+        .update({ is_read: true })
+        .eq("receiver_id", user.id)
+        .eq("sender_id", userId)
+        .eq("is_read", false);
 
       const { data: conversationMessages } = await supabase
         .from("messages")
@@ -96,6 +105,7 @@ export default function ChatPage() {
         conversationProfiles = profiles || [];
       }
 
+      setCurrentProfile(myProfile);
       setReceiverProfile(otherProfile);
       setMessages(chatMessages || []);
       setConversations(conversationProfiles);
@@ -109,7 +119,7 @@ export default function ChatPage() {
     if (!currentUser || !userId) return;
 
     const channel = supabase
-      .channel("messages-realtime")
+      .channel(`messages-${currentUser.id}-${userId}`)
       .on(
         "postgres_changes",
         {
@@ -126,9 +136,12 @@ export default function ChatPage() {
             (newMessage.sender_id === userId &&
               newMessage.receiver_id === currentUser.id);
 
-          if (belongsToChat) {
-            setMessages((current) => [...current, newMessage]);
-          }
+          if (!belongsToChat) return;
+
+          setMessages((current) => {
+            const alreadyExists = current.some((msg) => msg.id === newMessage.id);
+            return alreadyExists ? current : [...current, newMessage];
+          });
         }
       )
       .subscribe();
@@ -145,21 +158,35 @@ export default function ChatPage() {
   async function sendMessage(event) {
     event.preventDefault();
 
-    if (!message.trim()) return;
+    if (!message.trim() || sending) return;
 
     const text = message.trim();
-
     setMessage("");
+    setSending(true);
 
-    const { error } = await supabase.from("messages").insert({
-      sender_id: currentUser.id,
-      receiver_id: userId,
-      content: text,
-    });
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({
+        sender_id: currentUser.id,
+        receiver_id: userId,
+        content: text,
+        is_read: false,
+      })
+      .select("*")
+      .single();
+
+    setSending(false);
 
     if (error) {
       alert(error.message);
+      setMessage(text);
+      return;
     }
+
+    setMessages((current) => {
+      const alreadyExists = current.some((msg) => msg.id === data.id);
+      return alreadyExists ? current : [...current, data];
+    });
   }
 
   function formatTime(date) {
@@ -173,7 +200,6 @@ export default function ChatPage() {
     return (
       <>
         <DashboardChrome />
-
         <main className="flex min-h-screen items-center justify-center bg-[#b30018] text-white">
           <p className="text-xl font-bold">Loading chat...</p>
         </main>
@@ -192,7 +218,6 @@ export default function ChatPage() {
               <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
                 Messages
               </p>
-
               <h2 className="mt-3 font-serif text-4xl font-black">Chats</h2>
             </div>
 
@@ -215,23 +240,16 @@ export default function ChatPage() {
                           : "bg-white/10 text-white hover:bg-white/15"
                       }`}
                     >
-                      {profile.avatar_url ? (
-                        <img
-                          src={profile.avatar_url}
-                          alt={profile.full_name || "Member"}
-                          className="h-14 w-14 rounded-full object-cover object-top"
-                        />
-                      ) : (
-                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10">
-                          ?
-                        </div>
-                      )}
+                      <img
+                        src={profile.avatar_url || "/placeholder-profile.jpg"}
+                        alt={profile.full_name || "Member"}
+                        className="h-14 w-14 rounded-full object-cover object-top"
+                      />
 
                       <div className="min-w-0 flex-1">
                         <h3 className="truncate font-bold">
                           {profile.full_name || "Member"}
                         </h3>
-
                         <p
                           className={`truncate text-sm ${
                             isActive ? "text-[#b30018]/70" : "text-white/60"
@@ -249,29 +267,25 @@ export default function ChatPage() {
 
           <section className="flex min-h-[calc(100vh-7rem)] flex-col">
             <div className="flex items-center justify-between border-b border-white/10 bg-[#7a0010]/50 px-5 py-4 backdrop-blur-xl">
-              <div className="flex items-center gap-4">
-                {receiverProfile?.avatar_url ? (
-                  <img
-                    src={receiverProfile.avatar_url}
-                    alt={receiverProfile.full_name || "Member"}
-                    className="h-14 w-14 rounded-full object-cover object-top"
-                  />
-                ) : (
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10">
-                    ?
-                  </div>
-                )}
+              <a
+                href={`/profile/${receiverProfile?.id}`}
+                className="flex items-center gap-4"
+              >
+                <img
+                  src={receiverProfile?.avatar_url || "/placeholder-profile.jpg"}
+                  alt={receiverProfile?.full_name || "Member"}
+                  className="h-14 w-14 rounded-full object-cover object-top"
+                />
 
                 <div>
                   <h1 className="font-serif text-2xl font-black">
                     {receiverProfile?.full_name || "Member"}
                   </h1>
-
                   <p className="text-sm text-white/60">
                     {receiverProfile?.city || "Delly's Matchups member"}
                   </p>
                 </div>
-              </div>
+              </a>
 
               <a
                 href="/browse"
@@ -286,7 +300,6 @@ export default function ChatPage() {
                 <div className="flex h-full items-center justify-center">
                   <div className="rounded-[2rem] border border-white/10 bg-white/10 p-10 text-center">
                     <p className="text-xl text-white/80">No messages yet.</p>
-
                     <p className="mt-3 text-white/50">
                       Start the conversation respectfully.
                     </p>
@@ -300,9 +313,7 @@ export default function ChatPage() {
                     return (
                       <div
                         key={chat.id}
-                        className={`flex ${
-                          isMine ? "justify-end" : "justify-start"
-                        }`}
+                        className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                       >
                         <div>
                           <div
@@ -314,7 +325,6 @@ export default function ChatPage() {
                           >
                             <p className="leading-relaxed">{chat.content}</p>
                           </div>
-
                           <p
                             className={`mt-1 text-xs text-white/45 ${
                               isMine ? "text-right" : "text-left"
@@ -360,9 +370,10 @@ export default function ChatPage() {
 
                   <button
                     type="submit"
-                    className="rounded-2xl bg-white px-8 py-4 font-black text-[#b30018] transition hover:scale-105"
+                    disabled={sending}
+                    className="rounded-2xl bg-white px-8 py-4 font-black text-[#b30018] transition hover:scale-105 disabled:opacity-60"
                   >
-                    Send
+                    {sending ? "Sending..." : "Send"}
                   </button>
                 </div>
               </form>
@@ -370,18 +381,15 @@ export default function ChatPage() {
           </section>
 
           <aside className="hidden border-l border-white/10 bg-[#7a0010]/60 p-6 xl:block">
-            <div className="rounded-[2rem] border border-white/10 bg-white/10 p-5">
-              {receiverProfile?.avatar_url ? (
-                <img
-                  src={receiverProfile.avatar_url}
-                  alt={receiverProfile.full_name || "Member"}
-                  className="h-72 w-full rounded-[1.5rem] object-cover object-top"
-                />
-              ) : (
-                <div className="flex h-72 w-full items-center justify-center rounded-[1.5rem] bg-white/10 text-white/50">
-                  No photo
-                </div>
-              )}
+            <a
+              href={`/profile/${receiverProfile?.id}`}
+              className="block rounded-[2rem] border border-white/10 bg-white/10 p-5 transition hover:bg-white/15"
+            >
+              <img
+                src={receiverProfile?.avatar_url || "/placeholder-profile.jpg"}
+                alt={receiverProfile?.full_name || "Member"}
+                className="h-72 w-full rounded-[1.5rem] object-cover object-top"
+              />
 
               <h2 className="mt-5 font-serif text-3xl font-black">
                 {receiverProfile?.full_name || "Member"}
@@ -399,24 +407,24 @@ export default function ChatPage() {
               <p className="mt-4 text-sm text-red-100">
                 {receiverProfile?.interests || "No interests added."}
               </p>
+            </a>
 
-              <div className="mt-6 grid gap-3">
-                <button
-                  type="button"
-                  onClick={() => alert("Report feature coming soon.")}
-                  className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018]"
-                >
-                  Report
-                </button>
+            <div className="mt-6 grid gap-3">
+              <button
+                type="button"
+                onClick={() => alert("Report feature coming soon.")}
+                className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018]"
+              >
+                Report
+              </button>
 
-                <button
-                  type="button"
-                  onClick={() => alert("Block feature coming soon.")}
-                  className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018]"
-                >
-                  Block
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => alert("Block feature coming soon.")}
+                className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018]"
+              >
+                Block
+              </button>
             </div>
           </aside>
         </div>

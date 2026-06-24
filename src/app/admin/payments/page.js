@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DashboardChrome from "@/app/components/DashboardChrome";
 import { supabase } from "@/lib/supabase";
 
@@ -19,8 +19,27 @@ function getBookingIdFromNotes(notes) {
   return notes.split("Booking ID:")[1]?.split(".")[0]?.trim() || null;
 }
 
+function getCourseKeyFromNotes(notes) {
+  return notes?.split("Course Key:")[1]?.split("\n")[0]?.trim() || "full-academy";
+}
+
+function getPlanKey(payment) {
+  const planFromNotes = payment.notes?.split("Plan:")[1]?.split("\n")[0]?.trim();
+
+  if (planFromNotes === "vip" || planFromNotes === "premium") {
+    return planFromNotes;
+  }
+
+  return payment.item_name?.toLowerCase().includes("vip") ? "vip" : "premium";
+}
+
+function isAdmin(profile) {
+  return profile?.role === "admin";
+}
+
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
 
@@ -29,6 +48,26 @@ export default function AdminPaymentsPage() {
   }, []);
 
   async function loadPayments() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!isAdmin(profile)) {
+      window.location.href = "/dashboard";
+      return;
+    }
+
     const { data, error } = await supabase
       .from("payments")
       .select("*")
@@ -44,91 +83,114 @@ export default function AdminPaymentsPage() {
     setLoading(false);
   }
 
+  const filteredPayments = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    if (!keyword) return payments;
+
+    return payments.filter((payment) =>
+      [
+        payment.customer_name,
+        payment.customer_email,
+        payment.purpose,
+        payment.item_name,
+        payment.payment_method,
+        payment.status,
+        payment.notes,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(keyword)
+    );
+  }, [payments, search]);
+
+  async function activateMembership(payment) {
+    const planKey = getPlanKey(payment);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        plan: planKey,
+        membership_plan: planKey,
+        subscription: planKey,
+      })
+      .eq("email", payment.customer_email);
+
+    if (error) throw new Error(error.message);
+  }
+
+  async function activateAcademy(payment) {
+    const courseKey = getCourseKeyFromNotes(payment.notes);
+
+    const { error } = await supabase.from("academy_enrollments").upsert(
+      {
+        user_email: payment.customer_email,
+        customer_name: payment.customer_name,
+        course_key: courseKey,
+        course_title: payment.item_name,
+        access_type: courseKey === "full-academy" ? "full" : "single",
+        payment_id: payment.id,
+        status: "active",
+      },
+      {
+        onConflict: "user_email,course_key",
+      }
+    );
+
+    if (error) throw new Error(error.message);
+  }
+
+  async function updateCounsellingBooking(payment, status) {
+    const bookingId = getBookingIdFromNotes(payment.notes);
+
+    if (!bookingId) return;
+
+    const { error } = await supabase
+      .from("counselling_bookings")
+      .update({
+        payment_status: status === "paid" ? "paid" : status,
+      })
+      .eq("id", bookingId);
+
+    if (error) throw new Error(error.message);
+  }
+
   async function updateStatus(payment, status) {
     setUpdatingId(payment.id);
 
-    const { error } = await supabase
-      .from("payments")
-      .update({ status })
-      .eq("id", payment.id);
+    try {
+      const { error } = await supabase
+        .from("payments")
+        .update({ status })
+        .eq("id", payment.id);
 
-    if (error) {
-      setUpdatingId(null);
-      alert(error.message);
-      return;
-    }
+      if (error) throw new Error(error.message);
 
-    if (payment.purpose === "counselling") {
-      const bookingId = getBookingIdFromNotes(payment.notes);
-
-      if (bookingId) {
-        const { error: bookingError } = await supabase
-          .from("counselling_bookings")
-          .update({
-            payment_status: status === "paid" ? "paid" : status,
-          })
-          .eq("id", bookingId);
-
-        if (bookingError) {
-          setUpdatingId(null);
-          alert(bookingError.message);
-          return;
-        }
+      if (payment.purpose === "counselling") {
+        await updateCounsellingBooking(payment, status);
       }
-    }
-    if (payment.purpose === "academy" && status === "paid") {
-        const courseKey =
-          payment.notes?.split("Course Key:")[1]?.split("\n")[0]?.trim() ||
-          "full-academy";
-      
-        const { error: enrollmentError } = await supabase
-          .from("academy_enrollments")
-          .insert({
-            user_email: payment.customer_email,
-            customer_name: payment.customer_name,
-            course_key: courseKey,
-            course_title: payment.item_name,
-            access_type: courseKey === "full-academy" ? "full" : "single",
-            payment_id: payment.id,
-            status: "active",
-          });
-      
-        if (enrollmentError) {
-          setUpdatingId(null);
-          alert(enrollmentError.message);
-          return;
-        }
+
+      if (payment.purpose === "academy" && status === "paid") {
+        await activateAcademy(payment);
       }
 
       if (payment.purpose === "membership" && status === "paid") {
-        const planKey =
-          payment.notes?.split("Plan:")[1]?.split("\n")[0]?.trim() ||
-          (payment.item_name?.toLowerCase().includes("vip") ? "vip" : "premium");
-      
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({
-            plan: planKey,
-            membership_plan: planKey,
-            subscription: planKey,
-          })
-          .eq("email", payment.customer_email);
-      
-        if (profileError) {
-          setUpdatingId(null);
-          alert(profileError.message);
-          return;
-        }
+        await activateMembership(payment);
       }
-      
-    setPayments((currentPayments) =>
-      currentPayments.map((item) =>
-        item.id === payment.id ? { ...item, status } : item
-      )
-    );
 
-    setUpdatingId(null);
-    alert(`Payment marked as ${formatStatus(status)}.`);
+      setPayments((currentPayments) =>
+        currentPayments.map((item) =>
+          item.id === payment.id ? { ...item, status } : item
+        )
+      );
+
+      alert(`Payment marked as ${formatStatus(status)}.`);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setUpdatingId(null);
+    }
   }
 
   async function deletePayment(paymentId) {
@@ -137,10 +199,7 @@ export default function AdminPaymentsPage() {
 
     setUpdatingId(paymentId);
 
-    const { error } = await supabase
-      .from("payments")
-      .delete()
-      .eq("id", paymentId);
+    const { error } = await supabase.from("payments").delete().eq("id", paymentId);
 
     if (error) {
       setUpdatingId(null);
@@ -161,23 +220,40 @@ export default function AdminPaymentsPage() {
 
       <main className="min-h-screen bg-[#b30018] px-6 py-16 text-white">
         <div className="mx-auto max-w-7xl">
-          <p className="font-black uppercase tracking-[0.35em] text-red-100">
+          <a href="/dashboard" className="font-bold text-white/70 hover:text-white">
+            ← Back to Dashboard
+          </a>
+
+          <p className="mt-8 font-black uppercase tracking-[0.35em] text-red-100">
             Admin
           </p>
 
           <h1 className="font-display mt-4 text-6xl font-bold">Payments</h1>
 
+          <p className="mt-5 max-w-3xl text-white/70">
+            Approve or reject manual payments. Approving membership payments
+            upgrades users automatically. Approving academy payments unlocks
+            academy access. Counselling payments update booking status.
+          </p>
+
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search payments by name, email, purpose, method, status or notes..."
+            className="mt-8 h-14 w-full rounded-2xl border border-white/10 bg-white/10 px-5 text-white outline-none placeholder:text-white/50"
+          />
+
           {loading ? (
             <p className="mt-10 text-xl font-black">Loading payments...</p>
-          ) : payments.length === 0 ? (
+          ) : filteredPayments.length === 0 ? (
             <div className="mt-10 rounded-[3rem] bg-black/25 p-10 text-center">
               <h2 className="font-display text-4xl font-bold">
-                No Payments Yet
+                No Payments Found
               </h2>
             </div>
           ) : (
             <section className="mt-10 grid gap-6">
-              {payments.map((payment) => (
+              {filteredPayments.map((payment) => (
                 <div
                   key={payment.id}
                   className="rounded-[2rem] bg-black/25 p-6 shadow-2xl"
@@ -193,31 +269,34 @@ export default function AdminPaymentsPage() {
                       </span>
 
                       <h2 className="font-display mt-5 text-4xl font-bold">
-                        {payment.item_name}
+                        {payment.item_name || "Payment"}
                       </h2>
 
                       <p className="mt-3 font-bold">
-                        {payment.customer_name}
+                        {payment.customer_name || "No name"}
                       </p>
 
                       <p className="text-white/60">
-                        {payment.customer_email}
+                        {payment.customer_email || "No email"}
                       </p>
 
                       <div className="mt-5 grid gap-3 text-white/80 md:grid-cols-2">
                         <p>
-                          <strong>Purpose:</strong> {payment.purpose}
+                          <strong>Purpose:</strong> {payment.purpose || "N/A"}
                         </p>
                         <p>
-                          <strong>Amount:</strong> {payment.currency}{" "}
+                          <strong>Amount:</strong> {payment.currency || "USD"}{" "}
                           {payment.amount}
                         </p>
                         <p>
-                          <strong>Method:</strong> {payment.payment_method}
+                          <strong>Method:</strong>{" "}
+                          {payment.payment_method || "N/A"}
                         </p>
                         <p>
                           <strong>Date:</strong>{" "}
-                          {new Date(payment.created_at).toLocaleString()}
+                          {payment.created_at
+                            ? new Date(payment.created_at).toLocaleString()
+                            : "N/A"}
                         </p>
                       </div>
 
@@ -277,6 +356,12 @@ export default function AdminPaymentsPage() {
                       >
                         Delete
                       </button>
+
+                      {updatingId === payment.id && (
+                        <p className="w-full text-sm text-white/60">
+                          Updating...
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

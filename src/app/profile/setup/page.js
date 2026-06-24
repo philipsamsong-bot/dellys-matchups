@@ -1,16 +1,89 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 
+const countries = [
+  "Cameroon",
+  "Nigeria",
+  "Ghana",
+  "South Africa",
+  "Kenya",
+  "Uganda",
+  "Tanzania",
+  "Rwanda",
+  "Zambia",
+  "Zimbabwe",
+  "Ethiopia",
+  "United Kingdom",
+  "United States",
+  "Canada",
+  "France",
+  "Germany",
+  "Belgium",
+  "Netherlands",
+  "Italy",
+  "Spain",
+  "Ireland",
+  "Switzerland",
+  "Australia",
+  "United Arab Emirates",
+  "Qatar",
+  "Saudi Arabia",
+  "China",
+  "India",
+  "Brazil",
+  "Other",
+];
+
+const countryDialCodes = {
+  Cameroon: "+237",
+  Nigeria: "+234",
+  Ghana: "+233",
+  "South Africa": "+27",
+  Kenya: "+254",
+  Uganda: "+256",
+  Tanzania: "+255",
+  Rwanda: "+250",
+  Zambia: "+260",
+  Zimbabwe: "+263",
+  Ethiopia: "+251",
+  "United Kingdom": "+44",
+  "United States": "+1",
+  Canada: "+1",
+  France: "+33",
+  Germany: "+49",
+  Belgium: "+32",
+  Netherlands: "+31",
+  Italy: "+39",
+  Spain: "+34",
+  Ireland: "+353",
+  Switzerland: "+41",
+  Australia: "+61",
+  "United Arab Emirates": "+971",
+  Qatar: "+974",
+  "Saudi Arabia": "+966",
+  China: "+86",
+  India: "+91",
+  Brazil: "+55",
+  Other: "",
+};
+
+const dialCodes = [...new Set(Object.values(countryDialCodes).filter(Boolean))];
+
 const emptyForm = {
+  full_name: "",
+  email: "",
   age: "",
   gender: "",
+  marital_status: "",
   country: "",
-  city: "",
+  postal_code: "",
+  phone_code: "",
   phone: "",
+  city: "",
   occupation: "",
   faith_background: "",
   relationship_goal: "",
@@ -27,7 +100,37 @@ const relationshipGoals = [
   "Counselling and mentorship",
 ];
 
-export default function ProfileSetupPage() {
+const maritalStatuses = [
+  "Single",
+  "Dating",
+  "Engaged",
+  "Separated",
+  "Divorced",
+  "Widowed",
+  "Married",
+  "Prefer not to say",
+];
+
+function splitPhoneNumber(phone) {
+  if (!phone) {
+    return { phone_code: "", phone: "" };
+  }
+
+  const matchedCode = dialCodes
+    .sort((a, b) => b.length - a.length)
+    .find((code) => phone.startsWith(code));
+
+  if (!matchedCode) {
+    return { phone_code: "", phone };
+  }
+
+  return {
+    phone_code: matchedCode,
+    phone: phone.replace(matchedCode, "").trim(),
+  };
+}
+
+function ProfileSetupPage() {
   const [user, setUser] = useState(null);
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -36,12 +139,6 @@ export default function ProfileSetupPage() {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
-    const draft = localStorage.getItem("profile-draft");
-
-    if (draft) {
-      setForm(JSON.parse(draft));
-    }
-
     async function getUser() {
       const {
         data: { user },
@@ -60,21 +157,39 @@ export default function ProfileSetupPage() {
         .eq("id", user.id)
         .single();
 
+      const metadataName = user.user_metadata?.full_name || "";
+      const profilePhone = splitPhoneNumber(profile?.phone || "");
+
       if (profile) {
         setAvatarUrl(profile.avatar_url || "");
         setForm({
+          full_name: profile.full_name || metadataName || "",
+          email: profile.email || user.email || "",
           age: profile.age || "",
           gender: profile.gender || "",
+          marital_status: profile.marital_status || "",
           country: profile.country || "",
+          postal_code: profile.postal_code || "",
+          phone_code:
+            profilePhone.phone_code ||
+            countryDialCodes[profile.country] ||
+            "",
+          phone: profilePhone.phone || "",
           city: profile.city || "",
-          phone: profile.phone || "",
           occupation: profile.occupation || "",
           faith_background: profile.faith_background || "",
           relationship_goal: profile.relationship_goal || "",
           interests: profile.interests || "",
           bio: profile.bio || "",
         });
+        return;
       }
+
+      setForm((current) => ({
+        ...current,
+        full_name: metadataName,
+        email: user.email || "",
+      }));
     }
 
     getUser();
@@ -84,8 +199,40 @@ export default function ProfileSetupPage() {
     localStorage.setItem("profile-draft", JSON.stringify(form));
   }, [form]);
 
+  const completionPercentage = useMemo(() => {
+    const completionFields = [
+      form.full_name,
+      form.email,
+      form.age,
+      form.gender,
+      form.marital_status,
+      form.country,
+      form.postal_code,
+      form.phone_code,
+      form.phone,
+      form.city,
+      form.relationship_goal,
+      form.interests,
+      form.bio,
+      previewUrl || avatarUrl,
+    ];
+
+    return Math.round(
+      (completionFields.filter(Boolean).length / completionFields.length) * 100
+    );
+  }, [form, previewUrl, avatarUrl]);
+
   function handleChange(event) {
     const { name, value } = event.target;
+
+    if (name === "country") {
+      setForm((currentForm) => ({
+        ...currentForm,
+        country: value,
+        phone_code: countryDialCodes[value] || currentForm.phone_code,
+      }));
+      return;
+    }
 
     setForm((currentForm) => ({
       ...currentForm,
@@ -104,9 +251,7 @@ export default function ProfileSetupPage() {
       .from("profile-photos")
       .upload(filePath, photo, { upsert: true });
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
     const { data } = supabase.storage
       .from("profile-photos")
@@ -117,9 +262,14 @@ export default function ProfileSetupPage() {
 
   function isProfileComplete(updates) {
     return Boolean(
-      updates.age &&
+      updates.full_name &&
+        updates.email &&
+        updates.age &&
         updates.gender &&
+        updates.marital_status &&
         updates.country &&
+        updates.postal_code &&
+        updates.phone &&
         updates.city &&
         updates.relationship_goal &&
         updates.bio &&
@@ -139,18 +289,27 @@ export default function ProfileSetupPage() {
 
     try {
       const uploadedAvatarUrl = await uploadPhoto();
+      const cleanPhone = form.phone.replace(/^0+/, "").trim();
+      const fullPhone = `${form.phone_code}${cleanPhone}`;
 
       const updates = {
+        id: user.id,
+        full_name: form.full_name.trim(),
+        email: form.email.trim().toLowerCase(),
         age: form.age ? Number(form.age) : null,
         gender: form.gender,
+        marital_status: form.marital_status,
         country: form.country,
-        city: form.city,
-        phone: form.phone,
-        occupation: form.occupation,
-        faith_background: form.faith_background,
+        postal_code: form.postal_code.trim(),
+        phone: fullPhone,
+        city: form.city.trim(),
+        occupation: form.occupation.trim(),
+        faith_background: form.faith_background.trim(),
         relationship_goal: form.relationship_goal,
-        interests: form.interests,
-        bio: form.bio,
+        interests: form.interests.trim(),
+        bio: form.bio.trim(),
+        matchups_eligible: form.marital_status !== "Married",
+        is_visible: form.marital_status !== "Married",
         updated_at: new Date().toISOString(),
       };
 
@@ -161,10 +320,7 @@ export default function ProfileSetupPage() {
         setAvatarUrl(uploadedAvatarUrl);
       }
 
-      const { error } = await supabase.from("profiles").upsert({
-        id: user.id,
-        ...updates,
-      });
+      const { error } = await supabase.from("profiles").upsert(updates);
 
       if (error) {
         alert(error.message);
@@ -180,21 +336,6 @@ export default function ProfileSetupPage() {
       setLoading(false);
     }
   }
-
-  const completionFields = [
-    form.age,
-    form.gender,
-    form.country,
-    form.city,
-    form.relationship_goal,
-    form.interests,
-    form.bio,
-    previewUrl || avatarUrl,
-  ];
-
-  const completionPercentage = Math.round(
-    (completionFields.filter(Boolean).length / completionFields.length) * 100
-  );
 
   return (
     <>
@@ -217,8 +358,8 @@ export default function ProfileSetupPage() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-white/80">
-              Help us understand your relationship journey so Delly&apos;s
-              Matchups can support intentional, meaningful connections.
+              Complete your profile so Delly&apos;s Matchups can support
+              intentional, meaningful connections.
             </p>
           </motion.div>
 
@@ -253,7 +394,7 @@ export default function ProfileSetupPage() {
                   <img
                     src={previewUrl || avatarUrl}
                     alt="Profile"
-                    className="h-40 w-40 rounded-full border-4 border-white object-cover shadow-xl"
+                    className="h-40 w-40 rounded-full border-4 border-white object-cover object-top shadow-xl"
                   />
                 </div>
               )}
@@ -265,7 +406,6 @@ export default function ProfileSetupPage() {
                 onChange={(event) => {
                   const selectedFile = event.target.files?.[0] || null;
                   setPhoto(selectedFile);
-
                   if (selectedFile) {
                     setPreviewUrl(URL.createObjectURL(selectedFile));
                   }
@@ -280,13 +420,34 @@ export default function ProfileSetupPage() {
 
               <div className="mt-6 grid gap-6 md:grid-cols-2">
                 <input
+                  type="text"
+                  name="full_name"
+                  placeholder="Enter your full name"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                  value={form.full_name}
+                  onChange={handleChange}
+                  required
+                />
+
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Enter your email address"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
+                />
+
+                <input
                   type="number"
                   name="age"
-                  placeholder="Age"
+                  placeholder="Enter your age"
                   min="18"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.age}
                   onChange={handleChange}
+                  required
                 />
 
                 <select
@@ -294,9 +455,10 @@ export default function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
                   value={form.gender}
                   onChange={handleChange}
+                  required
                 >
                   <option value="" className="text-black">
-                    Select gender
+                    Select your gender
                   </option>
                   <option value="Woman" className="text-black">
                     Woman
@@ -309,38 +471,94 @@ export default function ProfileSetupPage() {
                   </option>
                 </select>
 
-                <input
-                  type="text"
-                  name="country"
-                  placeholder="Country"
-                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.country}
+                <select
+                  name="marital_status"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
+                  value={form.marital_status}
                   onChange={handleChange}
-                />
+                  required
+                >
+                  <option value="" className="text-black">
+                    Select your relationship status
+                  </option>
+                  {maritalStatuses.map((status) => (
+                    <option key={status} value={status} className="text-black">
+                      {status}
+                    </option>
+                  ))}
+                </select>
 
                 <input
                   type="text"
                   name="city"
-                  placeholder="City"
+                  placeholder="Enter your city"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.city}
                   onChange={handleChange}
+                  required
                 />
 
-                <input
-                  type="tel"
-                  name="phone"
-                  placeholder="Phone number"
-                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.phone}
+                <select
+                  name="country"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none md:col-span-2"
+                  value={form.country}
                   onChange={handleChange}
+                  required
+                >
+                  <option value="" className="text-black">
+                    Select your country
+                  </option>
+                  {countries.map((country) => (
+                    <option key={country} value={country} className="text-black">
+                      {country}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="text"
+                  name="postal_code"
+                  placeholder="Enter postal / ZIP code"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                  value={form.postal_code}
+                  onChange={handleChange}
+                  required
                 />
+
+                <div className="flex h-16 overflow-hidden rounded-2xl border border-white/15 bg-white/10">
+                  <select
+                    name="phone_code"
+                    value={form.phone_code}
+                    onChange={handleChange}
+                    required
+                    className="w-28 bg-white/10 px-3 text-white outline-none"
+                  >
+                    <option value="" className="text-black">
+                      Code
+                    </option>
+                    {dialCodes.map((code) => (
+                      <option key={code} value={code} className="text-black">
+                        {code}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    type="tel"
+                    name="phone"
+                    placeholder="Phone / WhatsApp number"
+                    className="min-w-0 flex-1 bg-transparent px-4 text-white outline-none placeholder:text-white/60"
+                    value={form.phone}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
 
                 <input
                   type="text"
                   name="occupation"
-                  placeholder="Occupation"
-                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                  placeholder="Enter your occupation"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60 md:col-span-2"
                   value={form.occupation}
                   onChange={handleChange}
                 />
@@ -367,11 +585,11 @@ export default function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
                   value={form.relationship_goal}
                   onChange={handleChange}
+                  required
                 >
                   <option value="" className="text-black">
-                    Select relationship goal
+                    Select your relationship goal
                   </option>
-
                   {relationshipGoals.map((goal) => (
                     <option key={goal} value={goal} className="text-black">
                       {goal}
@@ -386,6 +604,7 @@ export default function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.interests}
                   onChange={handleChange}
+                  required
                 />
               </div>
             </div>
@@ -400,6 +619,7 @@ export default function ProfileSetupPage() {
                 className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-5 text-white outline-none placeholder:text-white/60"
                 value={form.bio}
                 onChange={handleChange}
+                required
               />
             </div>
 
@@ -418,3 +638,5 @@ export default function ProfileSetupPage() {
     </>
   );
 }
+
+export default ProfileSetupPage;
