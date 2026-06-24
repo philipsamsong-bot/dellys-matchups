@@ -41,6 +41,7 @@ export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
 
   useEffect(() => {
@@ -48,20 +49,36 @@ export default function AdminPaymentsPage() {
   }, []);
 
   async function loadPayments() {
+    setLoading(true);
+    setPageError("");
+
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
+
+    if (userError) {
+      setPageError(userError.message);
+      setLoading(false);
+      return;
+    }
 
     if (!user) {
       window.location.href = "/auth/login";
       return;
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
+
+    if (profileError) {
+      setPageError(profileError.message);
+      setLoading(false);
+      return;
+    }
 
     if (!isAdmin(profile)) {
       window.location.href = "/dashboard";
@@ -74,7 +91,7 @@ export default function AdminPaymentsPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      alert(error.message);
+      setPageError(error.message);
       setLoading(false);
       return;
     }
@@ -143,7 +160,6 @@ export default function AdminPaymentsPage() {
 
   async function updateCounsellingBooking(payment, status) {
     const bookingId = getBookingIdFromNotes(payment.notes);
-
     if (!bookingId) return;
 
     const { error } = await supabase
@@ -245,6 +261,11 @@ export default function AdminPaymentsPage() {
 
           {loading ? (
             <p className="mt-10 text-xl font-black">Loading payments...</p>
+          ) : pageError ? (
+            <div className="mt-10 rounded-[2rem] bg-white p-6 text-[#b30018]">
+              <p className="font-black">Unable to load payments</p>
+              <p className="mt-3">{pageError}</p>
+            </div>
           ) : filteredPayments.length === 0 ? (
             <div className="mt-10 rounded-[3rem] bg-black/25 p-10 text-center">
               <h2 className="font-display text-4xl font-bold">
