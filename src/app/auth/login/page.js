@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import DashboardChrome from "@/app/components/DashboardChrome";
@@ -43,17 +43,29 @@ function Petals() {
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
+
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem("rememberedEmail");
+
+    if (rememberedEmail) {
+      setForm((current) => ({
+        ...current,
+        email: rememberedEmail,
+      }));
+    }
+  }, []);
 
   async function handleLogin(event) {
     event.preventDefault();
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({
-      email: form.email,
+      email: form.email.trim().toLowerCase(),
       password: form.password,
     });
 
@@ -62,6 +74,12 @@ export default function LoginPage() {
     if (error) {
       alert(error.message);
       return;
+    }
+
+    if (rememberMe) {
+      localStorage.setItem("rememberedEmail", form.email.trim().toLowerCase());
+    } else {
+      localStorage.removeItem("rememberedEmail");
     }
 
     window.location.href = "/dashboard";
@@ -157,7 +175,10 @@ export default function LoginPage() {
                 className="w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/45 focus:border-white/30"
                 value={form.email}
                 onChange={(event) =>
-                  setForm({ ...form, email: event.target.value })
+                  setForm((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))
                 }
               />
 
@@ -169,7 +190,10 @@ export default function LoginPage() {
                   className="w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 pr-20 text-white outline-none placeholder:text-white/45 focus:border-white/30"
                   value={form.password}
                   onChange={(event) =>
-                    setForm({ ...form, password: event.target.value })
+                    setForm((current) => ({
+                      ...current,
+                      password: event.target.value,
+                    }))
                   }
                 />
 
@@ -182,6 +206,25 @@ export default function LoginPage() {
                 </button>
               </div>
 
+              <div className="flex items-center justify-between gap-4">
+                <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-white/80">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(event) => setRememberMe(event.target.checked)}
+                    className="h-4 w-4 rounded accent-white"
+                  />
+                  Remember me
+                </label>
+
+                <a
+                  href="/auth/forgot-password"
+                  className="text-sm font-bold text-red-100 hover:text-white"
+                >
+                  Forgot password?
+                </a>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
@@ -191,13 +234,9 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="mt-6 flex flex-col gap-3 text-center text-sm text-white/65 sm:flex-row sm:justify-between">
+            <div className="mt-6 text-center text-sm text-white/65">
               <a href="/auth/signup" className="font-bold text-white">
                 Create an account
-              </a>
-
-              <a href="/auth/forgot-password" className="font-bold text-red-100">
-                Forgot password?
               </a>
             </div>
           </div>

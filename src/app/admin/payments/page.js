@@ -124,25 +124,49 @@ export default function AdminPaymentsPage() {
 
   async function activateMembership(payment) {
     const planKey = getPlanKey(payment);
+    const email = payment.customer_email?.trim().toLowerCase();
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        plan: planKey,
-        membership_plan: planKey,
-        subscription: planKey,
-      })
-      .eq("email", payment.customer_email);
+    if (!email && !payment.user_id) {
+      throw new Error("Cannot upgrade membership because this payment has no user ID or email.");
+    }
+
+    let updateQuery = supabase.from("profiles").update({
+      plan: planKey,
+      membership_plan: planKey,
+      subscription: planKey,
+      updated_at: new Date().toISOString(),
+    });
+
+    if (payment.user_id) {
+      updateQuery = updateQuery.eq("id", payment.user_id);
+    } else {
+      updateQuery = updateQuery.ilike("email", email);
+    }
+
+    const { data, error } = await updateQuery.select(
+      "id,email,plan,membership_plan,subscription"
+    );
 
     if (error) throw new Error(error.message);
+
+    if (!data || data.length === 0) {
+      throw new Error(
+        `Payment was marked paid, but no matching profile was found for ${email}. Check that the user's profile email matches the payment email.`
+      );
+    }
   }
 
   async function activateAcademy(payment) {
     const courseKey = getCourseKeyFromNotes(payment.notes);
+    const email = payment.customer_email?.trim().toLowerCase();
+
+    if (!email) {
+      throw new Error("Cannot activate academy access because this payment has no email.");
+    }
 
     const { error } = await supabase.from("academy_enrollments").upsert(
       {
-        user_email: payment.customer_email,
+        user_email: email,
         customer_name: payment.customer_name,
         course_key: courseKey,
         course_title: payment.item_name,
@@ -160,16 +184,32 @@ export default function AdminPaymentsPage() {
 
   async function updateCounsellingBooking(payment, status) {
     const bookingId = getBookingIdFromNotes(payment.notes);
+
     if (!bookingId) return;
 
     const { error } = await supabase
       .from("counselling_bookings")
       .update({
         payment_status: status === "paid" ? "paid" : status,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", bookingId);
 
     if (error) throw new Error(error.message);
+  }
+
+  async function applyPaidAccess(payment, status) {
+    if (payment.purpose === "membership" && status === "paid") {
+      await activateMembership(payment);
+    }
+
+    if (payment.purpose === "academy" && status === "paid") {
+      await activateAcademy(payment);
+    }
+
+    if (payment.purpose === "counselling") {
+      await updateCounsellingBooking(payment, status);
+    }
   }
 
   async function updateStatus(payment, status) {
@@ -178,22 +218,15 @@ export default function AdminPaymentsPage() {
     try {
       const { error } = await supabase
         .from("payments")
-        .update({ status })
+        .update({
+          status,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", payment.id);
 
       if (error) throw new Error(error.message);
 
-      if (payment.purpose === "counselling") {
-        await updateCounsellingBooking(payment, status);
-      }
-
-      if (payment.purpose === "academy" && status === "paid") {
-        await activateAcademy(payment);
-      }
-
-      if (payment.purpose === "membership" && status === "paid") {
-        await activateMembership(payment);
-      }
+      await applyPaidAccess(payment, status);
 
       setPayments((currentPayments) =>
         currentPayments.map((item) =>
@@ -247,9 +280,9 @@ export default function AdminPaymentsPage() {
           <h1 className="font-display mt-4 text-6xl font-bold">Payments</h1>
 
           <p className="mt-5 max-w-3xl text-white/70">
-            Approve or reject manual payments. Approving membership payments
-            upgrades users automatically. Approving academy payments unlocks
-            academy access. Counselling payments update booking status.
+            Approve or reject payments. Paid membership payments upgrade users
+            automatically. Paid academy payments unlock academy access.
+            Counselling payments update booking status.
           </p>
 
           <input
@@ -305,14 +338,17 @@ export default function AdminPaymentsPage() {
                         <p>
                           <strong>Purpose:</strong> {payment.purpose || "N/A"}
                         </p>
+
                         <p>
                           <strong>Amount:</strong> {payment.currency || "USD"}{" "}
                           {payment.amount}
                         </p>
+
                         <p>
                           <strong>Method:</strong>{" "}
                           {payment.payment_method || "N/A"}
                         </p>
+
                         <p>
                           <strong>Date:</strong>{" "}
                           {payment.created_at
@@ -380,7 +416,7 @@ export default function AdminPaymentsPage() {
 
                       {updatingId === payment.id && (
                         <p className="w-full text-sm text-white/60">
-                          Updating...
+                          Updating access...
                         </p>
                       )}
                     </div>
