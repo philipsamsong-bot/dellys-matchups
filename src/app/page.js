@@ -45,7 +45,7 @@ const plans = [
   },
   {
     name: "Premium",
-    price: "$20",
+    price: "$30",
     image: "/premium-banner.png",
     featured: true,
     features: [

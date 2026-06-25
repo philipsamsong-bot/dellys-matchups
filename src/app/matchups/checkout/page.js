@@ -82,7 +82,7 @@ const dialCodes = [...new Set(Object.values(countryDialCodes).filter(Boolean))];
 const plans = {
   premium: {
     title: "Premium Membership",
-    price: 20,
+    price: 30,
     badge: "Most Popular",
     description:
       "Unlock direct messaging, full profile viewing, likes, connection tools and priority visibility.",

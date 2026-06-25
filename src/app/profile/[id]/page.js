@@ -2,6 +2,8 @@
 
 "use client";
 
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import DashboardChrome from "@/app/components/DashboardChrome";
 import { supabase } from "@/lib/supabase";
@@ -19,7 +21,11 @@ function getGallery(profile) {
   return Array.isArray(gallery) ? gallery.filter(Boolean) : [];
 }
 
-export default function PublicProfilePage({ params }) {
+export default function PublicProfilePage() {
+  const params = useParams();
+  const router = useRouter();
+  const profileId = params?.id;
+
   const [viewerProfile, setViewerProfile] = useState(null);
   const [profile, setProfile] = useState(null);
   const [liked, setLiked] = useState(false);
@@ -45,12 +51,14 @@ export default function PublicProfilePage({ params }) {
 
   useEffect(() => {
     async function loadProfile() {
+      if (!profileId) return;
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        window.location.href = "/auth/login";
+        router.push("/auth/login");
         return;
       }
 
@@ -62,18 +70,18 @@ export default function PublicProfilePage({ params }) {
 
       if (viewerError) {
         alert(viewerError.message);
-        window.location.href = "/dashboard";
+        router.push("/dashboard");
         return;
       }
 
       const { data: viewedProfile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", params.id)
+        .eq("id", profileId)
         .single();
 
       if (profileError || !viewedProfile) {
-        window.location.href = "/browse";
+        router.push("/browse");
         return;
       }
 
@@ -81,7 +89,7 @@ export default function PublicProfilePage({ params }) {
         .from("likes")
         .select("id")
         .eq("user_id", user.id)
-        .eq("liked_user_id", params.id)
+        .eq("liked_user_id", profileId)
         .maybeSingle();
 
       setViewerProfile(currentProfile);
@@ -91,7 +99,7 @@ export default function PublicProfilePage({ params }) {
     }
 
     loadProfile();
-  }, [params.id]);
+  }, [profileId, router]);
 
   async function handleLike() {
     if (liked || !profile?.id) return;
@@ -101,7 +109,7 @@ export default function PublicProfilePage({ params }) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      window.location.href = "/auth/login";
+      router.push("/auth/login");
       return;
     }
 
@@ -143,15 +151,15 @@ export default function PublicProfilePage({ params }) {
 
       <main className="min-h-screen select-none bg-[#b30018] px-6 pb-24 pt-16 text-white">
         <section className="mx-auto max-w-6xl">
-          <a href="/browse" className="font-bold text-white/75 hover:text-white">
+          <Link href="/browse" className="font-bold text-white/75 hover:text-white">
             ← Back to Browse
-          </a>
+          </Link>
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="relative overflow-hidden rounded-[3rem] bg-black/25 shadow-2xl">
               <img
                 src={profile?.avatar_url || "/placeholder-profile.jpg"}
-                alt="Locked profile photo"
+                alt={fullAccess ? profile?.full_name || "Profile" : "Locked profile photo"}
                 draggable="false"
                 onContextMenu={(event) => event.preventDefault()}
                 className="pointer-events-none h-[75vh] w-full object-cover object-top"
@@ -209,19 +217,19 @@ function LockedProfile() {
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <a
+        <Link
           href="/matchups/checkout?plan=premium"
           className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
         >
           Upgrade to Premium
-        </a>
+        </Link>
 
-        <a
+        <Link
           href="/matchups/checkout?plan=vip"
           className="rounded-full bg-yellow-300 px-8 py-4 text-center font-black text-black transition hover:scale-105"
         >
           Become VIP
-        </a>
+        </Link>
       </div>
 
       <p className="mt-6 text-sm leading-6 text-white/55">
@@ -307,19 +315,19 @@ function FullProfile({ profile, gallery, liked, handleLike }) {
       )}
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
-        <a
+        <Link
           href={`/chat/${profile.id}`}
           className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
         >
           Send Message
-        </a>
+        </Link>
 
-        <a
+        <Link
           href="/browse"
           className="rounded-full border border-white/20 bg-white/10 px-8 py-4 text-center font-black text-white transition hover:bg-white/20"
         >
           Continue Browsing
-        </a>
+        </Link>
       </div>
     </>
   );
