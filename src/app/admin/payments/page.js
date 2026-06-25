@@ -1,3 +1,5 @@
+// src/app/admin/payments/page.js
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -122,38 +124,56 @@ export default function AdminPaymentsPage() {
     );
   }, [payments, search]);
 
-  async function activateMembership(payment) {
-    const planKey = getPlanKey(payment);
+  async function findProfileForPayment(payment) {
     const email = payment.customer_email?.trim().toLowerCase();
 
-    if (!email && !payment.user_id) {
-      throw new Error("Cannot upgrade membership because this payment has no user ID or email.");
-    }
-
-    let updateQuery = supabase.from("profiles").update({
-      plan: planKey,
-      membership_plan: planKey,
-      subscription: planKey,
-      updated_at: new Date().toISOString(),
-    });
-
     if (payment.user_id) {
-      updateQuery = updateQuery.eq("id", payment.user_id);
-    } else {
-      updateQuery = updateQuery.ilike("email", email);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id,email")
+        .eq("id", payment.user_id)
+        .maybeSingle();
+
+      if (error) throw new Error(error.message);
+      if (data) return data;
     }
 
-    const { data, error } = await updateQuery.select(
-      "id,email,plan,membership_plan,subscription"
-    );
+    if (!email) {
+      throw new Error("This payment has no user ID or email.");
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id,email")
+      .ilike("email", email)
+      .limit(1)
+      .maybeSingle();
 
     if (error) throw new Error(error.message);
 
-    if (!data || data.length === 0) {
+    if (!data) {
       throw new Error(
-        `Payment was marked paid, but no matching profile was found for ${email}. Check that the user's profile email matches the payment email.`
+        `No matching profile found for ${email}. Check the profiles table email.`
       );
     }
+
+    return data;
+  }
+
+  async function activateMembership(payment) {
+    const planKey = getPlanKey(payment);
+    const matchedProfile = await findProfileForPayment(payment);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        plan: planKey,
+        membership_plan: planKey,
+        subscription: planKey,
+      })
+      .eq("id", matchedProfile.id);
+
+    if (error) throw new Error(error.message);
   }
 
   async function activateAcademy(payment) {
@@ -191,7 +211,6 @@ export default function AdminPaymentsPage() {
       .from("counselling_bookings")
       .update({
         payment_status: status === "paid" ? "paid" : status,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", bookingId);
 
@@ -216,17 +235,20 @@ export default function AdminPaymentsPage() {
     setUpdatingId(payment.id);
 
     try {
+      if (status === "paid") {
+        await applyPaidAccess(payment, status);
+      }
+
       const { error } = await supabase
         .from("payments")
-        .update({
-          status,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ status })
         .eq("id", payment.id);
 
       if (error) throw new Error(error.message);
 
-      await applyPaidAccess(payment, status);
+      if (status !== "paid") {
+        await applyPaidAccess(payment, status);
+      }
 
       setPayments((currentPayments) =>
         currentPayments.map((item) =>

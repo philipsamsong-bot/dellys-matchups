@@ -129,6 +129,7 @@ function MatchupsCheckoutContent() {
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
   const initialPlan = searchParams.get("plan") || "premium";
 
+  const [userId, setUserId] = useState(null);
   const [selectedPlanKey, setSelectedPlanKey] = useState(
     plans[initialPlan] ? initialPlan : "premium"
   );
@@ -144,7 +145,12 @@ function MatchupsCheckoutContent() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user) return;
+      if (!user) {
+        window.location.href = "/auth/login";
+        return;
+      }
+
+      setUserId(user.id);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -152,7 +158,13 @@ function MatchupsCheckoutContent() {
         .eq("id", user.id)
         .single();
 
-      if (!profile) return;
+      if (!profile) {
+        setForm((current) => ({
+          ...current,
+          customer_email: current.customer_email || user.email || "",
+        }));
+        return;
+      }
 
       const phoneParts = splitPhoneNumber(profile.phone || "");
 
@@ -223,22 +235,33 @@ function MatchupsCheckoutContent() {
   }
 
   async function activateMembership() {
-    const { error } = await supabase
+    if (!userId) {
+      throw new Error("Unable to upgrade membership because no user is logged in.");
+    }
+
+    const { data, error } = await supabase
       .from("profiles")
       .update({
         plan: selectedPlanKey,
         membership_plan: selectedPlanKey,
         subscription: selectedPlanKey,
+        updated_at: new Date().toISOString(),
       })
-      .eq("email", form.customer_email.trim().toLowerCase());
+      .eq("id", userId)
+      .select("id, plan, membership_plan, subscription");
 
     if (error) throw new Error(error.message);
+
+    if (!data || data.length === 0) {
+      throw new Error("Payment was successful, but your profile could not be upgraded.");
+    }
   }
 
   async function savePayment(status, providerReference = null) {
     const fullPhone = getFullPhone();
 
     const { error } = await supabase.from("payments").insert({
+      user_id: userId,
       customer_name: form.customer_name.trim(),
       customer_email: form.customer_email.trim().toLowerCase(),
       purpose: "membership",
@@ -253,7 +276,6 @@ function MatchupsCheckoutContent() {
 Country: ${form.country}
 Postal / ZIP Code: ${form.postal_code}
 Phone: ${fullPhone}
-
 ${form.notes || ""}`,
     });
 
@@ -284,7 +306,7 @@ ${form.notes || ""}`,
           },
           createOrder(data, actions) {
             if (!validateForm()) {
-              return actions.reject();
+              return Promise.reject(new Error("Membership details incomplete."));
             }
 
             return actions.order.create({
@@ -350,6 +372,7 @@ ${form.notes || ""}`,
     form.postal_code,
     form.phone_code,
     form.phone,
+    userId,
   ]);
 
   async function handleProofUpload(event) {
@@ -385,9 +408,7 @@ ${form.notes || ""}`,
     try {
       setSaving(true);
       await savePayment("pending_confirmation");
-      alert(
-        "Your payment has been submitted and is pending admin confirmation."
-      );
+      alert("Your payment has been submitted and is pending admin confirmation.");
       window.location.href = "/dashboard";
     } catch (error) {
       alert(error.message);
@@ -444,9 +465,11 @@ ${form.notes || ""}`,
                     <p className="text-xs font-black uppercase tracking-[0.3em]">
                       {plan.badge}
                     </p>
+
                     <h3 className="font-display mt-4 text-4xl font-bold">
                       {plan.title}
                     </h3>
+
                     <p className="mt-3 text-4xl font-black">${plan.price}</p>
                   </button>
                 ))}
@@ -630,7 +653,6 @@ function ManualPaymentBox({
           <div className="mt-5 rounded-2xl bg-black/20 p-5">
             <p className="text-white/70">Account Name</p>
             <p className="mt-1 text-2xl font-black">{mobileMoney.name}</p>
-
             <p className="mt-5 text-white/70">Mobile Money Number</p>
             <p className="mt-1 text-3xl font-black">{mobileMoney.number}</p>
           </div>

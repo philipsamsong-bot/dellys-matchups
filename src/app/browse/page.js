@@ -19,17 +19,12 @@ function isVip(profile) {
   return getPlan(profile) === "vip";
 }
 
-function getDisplayLocation(profile, hasFullAccess) {
-  if (!hasFullAccess) {
-    return profile?.country || "Location available after upgrade";
-  }
-
+function getDisplayLocation(profile) {
   return [profile?.city, profile?.country].filter(Boolean).join(", ") || "Location not added";
 }
 
 function getProfileScore(profile) {
   const plan = getPlan(profile);
-
   let score = 0;
 
   if (profile?.avatar_url) score += 100;
@@ -58,6 +53,24 @@ export default function BrowsePage() {
   const [userProfile, setUserProfile] = useState(null);
   const [likedProfiles, setLikedProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    function blockCopy(event) {
+      event.preventDefault();
+    }
+
+    document.addEventListener("contextmenu", blockCopy);
+    document.addEventListener("copy", blockCopy);
+    document.addEventListener("cut", blockCopy);
+    document.addEventListener("dragstart", blockCopy);
+
+    return () => {
+      document.removeEventListener("contextmenu", blockCopy);
+      document.removeEventListener("copy", blockCopy);
+      document.removeEventListener("cut", blockCopy);
+      document.removeEventListener("dragstart", blockCopy);
+    };
+  }, []);
 
   useEffect(() => {
     async function loadBrowsePage() {
@@ -118,6 +131,11 @@ export default function BrowsePage() {
   const hasFullAccess = useMemo(() => hasPremiumAccess(userProfile), [userProfile]);
 
   async function handleLike(profileId) {
+    if (!hasFullAccess) {
+      window.location.href = "/matchups/checkout?plan=premium";
+      return;
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -158,7 +176,7 @@ export default function BrowsePage() {
     <>
       <DashboardChrome />
 
-      <main className="min-h-screen bg-[#b30018] px-6 pb-24 pt-16 text-white">
+      <main className="min-h-screen select-none bg-[#b30018] px-6 pb-24 pt-16 text-white">
         <div className="mx-auto max-w-7xl">
           <motion.div
             initial={{ opacity: 0, y: 35 }}
@@ -177,8 +195,8 @@ export default function BrowsePage() {
             </h1>
 
             <p className="mt-6 text-lg leading-8 text-white/70">
-              Browse real profiles first. Upgrade only when you want to unlock
-              full profiles, galleries, and direct messaging.
+              Browse profile photos. Upgrade to unlock full profiles, galleries,
+              likes, and direct messaging.
             </p>
           </motion.div>
 
@@ -197,10 +215,23 @@ export default function BrowsePage() {
               <p className="mt-1 text-sm text-white/60">
                 {hasFullAccess
                   ? "Full access unlocked"
-                  : "Free browsing enabled. Premium features unlock when needed."}
+                  : "Free members see photos only. Upgrade to unlock details."}
               </p>
             </div>
           </div>
+
+          {!hasFullAccess && (
+            <div className="mt-8 rounded-[2rem] border border-yellow-300/30 bg-black/25 p-6">
+              <p className="font-black uppercase tracking-[0.25em] text-yellow-300">
+                Privacy Notice
+              </p>
+              <p className="mt-3 text-white/75">
+                Member details are private. Free users can view profile photos
+                only. Screenshots, copying, saving, or redistributing member
+                images is not permitted.
+              </p>
+            </div>
+          )}
 
           {profiles.length === 0 ? (
             <div className="mt-14 rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-white/70">
@@ -233,8 +264,10 @@ export default function BrowsePage() {
                         {profile.avatar_url ? (
                           <img
                             src={profile.avatar_url}
-                            alt={profile.full_name || "Member"}
-                            className="h-[440px] w-full object-cover object-top transition duration-700 hover:scale-105"
+                            alt="Locked member profile photo"
+                            draggable="false"
+                            onContextMenu={(event) => event.preventDefault()}
+                            className="pointer-events-none h-[440px] w-full object-cover object-top transition duration-700 group-hover:scale-105"
                           />
                         ) : (
                           <div className="flex h-[440px] items-center justify-center bg-black/30 text-white/40">
@@ -245,119 +278,118 @@ export default function BrowsePage() {
 
                       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
 
-                      <button
-                        type="button"
-                        onClick={() => handleLike(profile.id)}
-                        className={`absolute right-5 top-5 flex h-14 w-14 items-center justify-center rounded-full text-2xl transition ${
-                          isLiked
-                            ? "bg-red-700 text-white"
-                            : "bg-black/60 text-white hover:bg-red-700"
-                        }`}
-                      >
-                        {isLiked ? "♥" : "♡"}
-                      </button>
+                      {hasFullAccess && (
+                        <button
+                          type="button"
+                          onClick={() => handleLike(profile.id)}
+                          className={`absolute right-5 top-5 flex h-14 w-14 items-center justify-center rounded-full text-2xl transition ${
+                            isLiked
+                              ? "bg-red-700 text-white"
+                              : "bg-black/60 text-white hover:bg-red-700"
+                          }`}
+                        >
+                          {isLiked ? "♥" : "♡"}
+                        </button>
+                      )}
 
-                      {vipProfile && (
+                      {hasFullAccess && vipProfile && (
                         <div className="absolute left-5 top-5 rounded-full bg-yellow-400 px-4 py-2 text-sm font-black text-black">
                           👑 VIP
                         </div>
                       )}
 
-                      {premiumProfile && !vipProfile && (
+                      {hasFullAccess && premiumProfile && !vipProfile && (
                         <div className="absolute left-5 top-5 rounded-full bg-white px-4 py-2 text-sm font-black text-[#b30018]">
                           Premium
                         </div>
                       )}
 
-                      {profile.is_complete && (
+                      {hasFullAccess && profile.is_complete && (
                         <div className="absolute left-5 top-16 rounded-full bg-green-600 px-4 py-2 text-xs font-black uppercase">
                           ✓ Complete Profile
                         </div>
                       )}
 
-                      <div className="absolute bottom-6 left-6 right-6">
-                        <h2 className="font-display text-4xl font-black">
-                          {profile.full_name || "Unnamed Member"}
-                        </h2>
-
-                        <p className="mt-2 text-white/75">
-                          {hasFullAccess
-                            ? `${profile.age || "Age not added"} • ${getDisplayLocation(
-                                profile,
-                                hasFullAccess
-                              )}`
-                            : getDisplayLocation(profile, hasFullAccess)}
-                        </p>
-                      </div>
+                      {hasFullAccess ? (
+                        <div className="absolute bottom-6 left-6 right-6">
+                          <h2 className="font-display text-4xl font-black">
+                            {profile.full_name || "Unnamed Member"}
+                          </h2>
+                          <p className="mt-2 text-white/75">
+                            {profile.age || "Age not added"} •{" "}
+                            {getDisplayLocation(profile)}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="absolute bottom-6 left-6 right-6 rounded-[2rem] border border-white/15 bg-black/60 p-5 text-center backdrop-blur-xl">
+                          <p className="text-sm font-black uppercase tracking-[0.25em] text-yellow-300">
+                            Profile Locked
+                          </p>
+                          <p className="mt-2 text-white/75">
+                            Upgrade to unlock details.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex min-h-[320px] flex-col p-7">
-                      <div className="space-y-5">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.25em] text-red-200">
-                            About
-                          </p>
-                          <p className="mt-2 line-clamp-4 text-white/80">
-                            {profile.bio || "This member has not added a biography yet."}
-                          </p>
+                    {hasFullAccess ? (
+                      <div className="flex min-h-[320px] flex-col p-7">
+                        <div className="space-y-5">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.25em] text-red-200">
+                              About
+                            </p>
+                            <p className="mt-2 line-clamp-4 text-white/80">
+                              {profile.bio ||
+                                "This member has not added a biography yet."}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.25em] text-red-200">
+                              Interests
+                            </p>
+                            <p className="mt-2 text-white/75">
+                              {profile.interests || "Interests not added"}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.25em] text-red-200">
+                              Relationship Goal
+                            </p>
+                            <p className="mt-2 text-white/75">
+                              {profile.relationship_goal || "Not added"}
+                            </p>
+                          </div>
                         </div>
 
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.25em] text-red-200">
-                            Interests
-                          </p>
-                          <p
-                            className={
-                              hasFullAccess
-                                ? "mt-2 text-white/75"
-                                : "mt-2 select-none blur-sm text-white/60"
-                            }
+                        <div className="mt-auto grid gap-4 pt-8">
+                          <a
+                            href={profileHref}
+                            className="block w-full rounded-2xl bg-white px-6 py-4 text-center font-bold text-[#b30018] transition hover:scale-[1.02]"
                           >
-                            {profile.interests || "Interests not added"}
-                          </p>
-                        </div>
+                            View Profile
+                          </a>
 
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.25em] text-red-200">
-                            Relationship Goal
-                          </p>
-                          <p
-                            className={
-                              hasFullAccess
-                                ? "mt-2 text-white/75"
-                                : "mt-2 select-none blur-sm text-white/60"
-                            }
-                          >
-                            {profile.relationship_goal || "Not added"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-auto grid gap-4 pt-8">
-                        <a
-                          href={profileHref}
-                          className="block w-full rounded-2xl bg-white px-6 py-4 text-center font-bold text-[#b30018] transition hover:scale-[1.02]"
-                        >
-                          View Profile
-                        </a>
-
-                        {hasFullAccess ? (
                           <a
                             href={`/chat/${profile.id}`}
                             className="block w-full rounded-2xl border border-white/20 bg-white/10 px-6 py-4 text-center font-bold text-white transition hover:bg-white/20"
                           >
                             Message
                           </a>
-                        ) : (
-                          <a
-                            href="/matchups/checkout"
-                            className="block w-full rounded-2xl border border-white/20 bg-black/20 px-6 py-4 text-center font-bold text-white/75 transition hover:bg-white/10"
-                          >
-                            Unlock Messaging
-                          </a>
-                        )}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="p-7">
+                        <a
+                          href="/matchups/checkout?plan=premium"
+                          className="block w-full rounded-2xl bg-white px-6 py-4 text-center font-bold text-[#b30018] transition hover:scale-[1.02]"
+                        >
+                          Upgrade to Unlock Profile
+                        </a>
+                      </div>
+                    )}
                   </motion.article>
                 );
               })}

@@ -1,3 +1,5 @@
+// src/app/profile/[id]/page.js
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -9,14 +11,37 @@ function getPlan(profile) {
 }
 
 function hasPremiumAccess(profile) {
-  const plan = getPlan(profile);
-  return plan === "premium" || plan === "vip";
+  return ["premium", "vip"].includes(getPlan(profile));
+}
+
+function getGallery(profile) {
+  const gallery = profile?.gallery_urls || profile?.photos || profile?.photo_urls || [];
+  return Array.isArray(gallery) ? gallery.filter(Boolean) : [];
 }
 
 export default function PublicProfilePage({ params }) {
   const [viewerProfile, setViewerProfile] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [liked, setLiked] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    function blockCopy(event) {
+      event.preventDefault();
+    }
+
+    document.addEventListener("contextmenu", blockCopy);
+    document.addEventListener("copy", blockCopy);
+    document.addEventListener("cut", blockCopy);
+    document.addEventListener("dragstart", blockCopy);
+
+    return () => {
+      document.removeEventListener("contextmenu", blockCopy);
+      document.removeEventListener("copy", blockCopy);
+      document.removeEventListener("cut", blockCopy);
+      document.removeEventListener("dragstart", blockCopy);
+    };
+  }, []);
 
   useEffect(() => {
     async function loadProfile() {
@@ -29,30 +54,74 @@ export default function PublicProfilePage({ params }) {
         return;
       }
 
-      const { data: currentProfile } = await supabase
+      const { data: currentProfile, error: viewerError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
 
-      const { data: viewedProfile, error } = await supabase
+      if (viewerError) {
+        alert(viewerError.message);
+        window.location.href = "/dashboard";
+        return;
+      }
+
+      const { data: viewedProfile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", params.id)
         .single();
 
-      if (error || !viewedProfile) {
+      if (profileError || !viewedProfile) {
         window.location.href = "/browse";
         return;
       }
 
+      const { data: existingLike } = await supabase
+        .from("likes")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("liked_user_id", params.id)
+        .maybeSingle();
+
       setViewerProfile(currentProfile);
       setProfile(viewedProfile);
+      setLiked(Boolean(existingLike));
       setLoading(false);
     }
 
     loadProfile();
   }, [params.id]);
+
+  async function handleLike() {
+    if (liked || !profile?.id) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    const { error } = await supabase.from("likes").insert({
+      user_id: user.id,
+      liked_user_id: profile.id,
+    });
+
+    if (error) {
+      if (error.message.toLowerCase().includes("duplicate")) {
+        setLiked(true);
+        return;
+      }
+
+      alert(error.message);
+      return;
+    }
+
+    setLiked(true);
+  }
 
   if (loading) {
     return (
@@ -66,24 +135,38 @@ export default function PublicProfilePage({ params }) {
   }
 
   const fullAccess = hasPremiumAccess(viewerProfile);
+  const gallery = getGallery(profile);
 
   return (
     <>
       <DashboardChrome />
 
-      <main className="min-h-screen bg-[#b30018] px-6 pb-24 pt-16 text-white">
+      <main className="min-h-screen select-none bg-[#b30018] px-6 pb-24 pt-16 text-white">
         <section className="mx-auto max-w-6xl">
           <a href="/browse" className="font-bold text-white/75 hover:text-white">
             ← Back to Browse
           </a>
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="overflow-hidden rounded-[3rem] bg-black/25 shadow-2xl">
+            <div className="relative overflow-hidden rounded-[3rem] bg-black/25 shadow-2xl">
               <img
                 src={profile?.avatar_url || "/placeholder-profile.jpg"}
-                alt={profile?.full_name || "Profile"}
-                className="h-[75vh] w-full object-cover object-top"
+                alt="Locked profile photo"
+                draggable="false"
+                onContextMenu={(event) => event.preventDefault()}
+                className="pointer-events-none h-[75vh] w-full object-cover object-top"
               />
+
+              {!fullAccess && (
+                <div className="absolute bottom-6 left-6 right-6 rounded-[2rem] border border-white/20 bg-black/65 p-5 text-center backdrop-blur-xl">
+                  <p className="text-sm font-black uppercase tracking-[0.25em] text-yellow-300">
+                    Profile Locked
+                  </p>
+                  <p className="mt-2 text-white/80">
+                    Upgrade to unlock member details.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="rounded-[3rem] bg-[#c1121f] p-8 shadow-2xl md:p-12">
@@ -91,65 +174,16 @@ export default function PublicProfilePage({ params }) {
                 Matchups Profile
               </p>
 
-              <h1 className="font-display mt-5 text-6xl font-bold">
-                {profile?.full_name || "Member"}
-              </h1>
-
-              <p className="mt-4 text-lg text-white/75">
-                {fullAccess
-                  ? [profile?.age, profile?.city, profile?.country].filter(Boolean).join(" • ") ||
-                    "Profile details not added"
-                  : profile?.country || "Location available after upgrade"}
-              </p>
-
-              <div className="mt-10 space-y-8">
-                <ProfileSection title="About" value={profile?.bio || "No bio added yet."} />
-
-                <ProfileSection
-                  title="Interests"
-                  value={profile?.interests || "Not added"}
-                  locked={!fullAccess}
+              {!fullAccess ? (
+                <LockedProfile />
+              ) : (
+                <FullProfile
+                  profile={profile}
+                  gallery={gallery}
+                  liked={liked}
+                  handleLike={handleLike}
                 />
-
-                <ProfileSection
-                  title="Relationship Goal"
-                  value={profile?.relationship_goal || "Not added"}
-                  locked={!fullAccess}
-                />
-
-                <ProfileSection
-                  title="Faith Background"
-                  value={profile?.faith_background || "Not added"}
-                  locked={!fullAccess}
-                />
-              </div>
-
-              <div className="mt-10 grid gap-4 sm:grid-cols-2">
-                {fullAccess ? (
-                  <a
-                    href={`/chat/${profile.id}`}
-                    className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
-                  >
-                    Send Message
-                  </a>
-                ) : (
-                  <a
-                    href="/matchups/checkout"
-                    className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
-                  >
-                    Upgrade to Message
-                  </a>
-                )}
-
-                {!fullAccess && (
-                  <a
-                    href="/matchups/checkout"
-                    className="rounded-full border border-white/20 bg-white/10 px-8 py-4 text-center font-black text-white transition hover:bg-white/20"
-                  >
-                    Unlock Full Profile
-                  </a>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </section>
@@ -158,15 +192,157 @@ export default function PublicProfilePage({ params }) {
   );
 }
 
-function ProfileSection({ title, value, locked = false }) {
+function LockedProfile() {
+  return (
+    <div className="mt-10 rounded-[2rem] border border-white/15 bg-black/20 p-6">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-3xl">
+        🔒
+      </div>
+
+      <h1 className="font-display mt-6 text-5xl font-bold">
+        Upgrade to unlock this profile
+      </h1>
+
+      <p className="mt-5 text-lg leading-8 text-white/75">
+        Free members can view profile photos only. Upgrade to Premium or VIP to
+        unlock names, full details, gallery, likes, and messaging.
+      </p>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <a
+          href="/matchups/checkout?plan=premium"
+          className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
+        >
+          Upgrade to Premium
+        </a>
+
+        <a
+          href="/matchups/checkout?plan=vip"
+          className="rounded-full bg-yellow-300 px-8 py-4 text-center font-black text-black transition hover:scale-105"
+        >
+          Become VIP
+        </a>
+      </div>
+
+      <p className="mt-6 text-sm leading-6 text-white/55">
+        Screenshotting, copying, saving, or redistributing member photos is not
+        permitted.
+      </p>
+    </div>
+  );
+}
+
+function FullProfile({ profile, gallery, liked, handleLike }) {
+  return (
+    <>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="font-display mt-5 text-6xl font-bold">
+            {profile?.full_name || "Member"}
+          </h1>
+
+          <p className="mt-4 text-lg text-white/75">
+            {[profile?.age, profile?.city, profile?.country].filter(Boolean).join(" • ") ||
+              "Profile details not added"}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleLike}
+          className={`rounded-full px-6 py-4 font-black transition hover:scale-105 ${
+            liked ? "bg-red-700 text-white" : "bg-white text-[#b30018]"
+          }`}
+        >
+          {liked ? "♥ Liked" : "♡ Like"}
+        </button>
+      </div>
+
+      <div className="mt-10 grid gap-5 md:grid-cols-2">
+        <Info label="Age" value={profile?.age || "Not added"} />
+        <Info label="Gender" value={profile?.gender || "Not added"} />
+        <Info label="Country" value={profile?.country || "Not added"} />
+        <Info label="City" value={profile?.city || "Not added"} />
+        <Info label="Occupation" value={profile?.occupation || "Not added"} />
+        <Info
+          label="Religious Background"
+          value={
+            profile?.religious_background ||
+            profile?.faith_background ||
+            "Not added"
+          }
+        />
+        <Info label="Genotype" value={profile?.genotype || "Not added"} />
+        <Info label="Height" value={profile?.height || "Not added"} />
+      </div>
+
+      <div className="mt-10 space-y-8">
+        <ProfileSection title="About" value={profile?.bio || "No bio added yet."} />
+        <ProfileSection title="Interests" value={profile?.interests || "Not added"} />
+        <ProfileSection
+          title="Relationship Goal"
+          value={profile?.relationship_goal || "Not added"}
+        />
+      </div>
+
+      {gallery.length > 0 && (
+        <div className="mt-10">
+          <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
+            Gallery
+          </p>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            {gallery.map((image) => (
+              <img
+                key={image}
+                src={image}
+                alt="Profile gallery"
+                draggable="false"
+                onContextMenu={(event) => event.preventDefault()}
+                className="pointer-events-none h-72 rounded-[2rem] object-cover object-top"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-10 grid gap-4 sm:grid-cols-2">
+        <a
+          href={`/chat/${profile.id}`}
+          className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
+        >
+          Send Message
+        </a>
+
+        <a
+          href="/browse"
+          className="rounded-full border border-white/20 bg-white/10 px-8 py-4 text-center font-black text-white transition hover:bg-white/20"
+        >
+          Continue Browsing
+        </a>
+      </div>
+    </>
+  );
+}
+
+function Info({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-5">
+      <p className="text-xs font-black uppercase tracking-[0.25em] text-red-100">
+        {label}
+      </p>
+      <p className="mt-3 text-xl font-bold text-white">{value}</p>
+    </div>
+  );
+}
+
+function ProfileSection({ title, value }) {
   return (
     <div>
       <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
         {title}
       </p>
-      <p className={`mt-3 text-lg leading-8 text-white/80 ${locked ? "select-none blur-sm" : ""}`}>
-        {value}
-      </p>
+      <p className="mt-3 text-lg leading-8 text-white/80">{value}</p>
     </div>
   );
 }
