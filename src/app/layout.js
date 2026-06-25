@@ -13,27 +13,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = "https://dellysmatchups.org";
+const siteName = "Delly's Matchups";
+const logoUrl = `${siteUrl}/dellys-logo.png`;
+const siteDescription =
+  "Delly's Matchups is a global faith-based matchmaking, counselling and mentorship platform helping individuals build intentional, healthy and authentic relationships rooted in Biblical principles.";
+
 export const metadata = {
-  metadataBase: new URL("https://dellysmatchups.org"),
+  metadataBase: new URL(siteUrl),
   title: {
-    default: "Delly's Matchups",
-    template: "%s | Delly's Matchups",
+    default: siteName,
+    template: `%s | ${siteName}`,
   },
-  description:
-    "Delly's Matchups is a global faith-based matchmaking, counselling and mentorship platform helping individuals build intentional, healthy and authentic relationships.",
-  applicationName: "Delly's Matchups",
+  description: siteDescription,
+  applicationName: siteName,
   openGraph: {
-    title: "Delly's Matchups",
-    description:
-      "A global faith-based matchmaking, counselling and mentorship platform redefining authentic relationships.",
-    url: "https://dellysmatchups.org",
-    siteName: "Delly's Matchups",
+    title: siteName,
+    description: siteDescription,
+    url: siteUrl,
+    siteName,
     images: [
       {
-        url: "/dellys-logo.png",
+        url: logoUrl,
         width: 1200,
         height: 630,
-        alt: "Delly's Matchups",
+        alt: "Delly's Matchups Official Logo",
       },
     ],
     locale: "en_GB",
@@ -41,13 +45,13 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Delly's Matchups",
-    description:
-      "A global faith-based matchmaking, counselling and mentorship platform redefining authentic relationships.",
-    images: ["/dellys-logo.png"],
+    title: siteName,
+    description: siteDescription,
+    images: [logoUrl],
   },
   icons: {
     icon: "/dellys-logo.png",
+    shortcut: "/dellys-logo.png",
     apple: "/dellys-logo.png",
   },
 };
