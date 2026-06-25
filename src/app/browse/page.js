@@ -1,6 +1,8 @@
+// src/app/browse/page.js
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import DashboardChrome from "@/app/components/DashboardChrome";
@@ -10,8 +12,7 @@ function getPlan(profile) {
 }
 
 function hasPremiumAccess(profile) {
-  const plan = getPlan(profile);
-  return plan === "premium" || plan === "vip";
+  return ["premium", "vip"].includes(getPlan(profile));
 }
 
 function isVip(profile) {
@@ -24,6 +25,32 @@ function getDisplayLocation(profile, hasFullAccess) {
   }
 
   return [profile?.city, profile?.country].filter(Boolean).join(", ") || "Location not added";
+}
+
+function getProfileScore(profile) {
+  const plan = getPlan(profile);
+
+  let score = 0;
+
+  if (profile?.avatar_url) score += 100;
+  if (profile?.is_complete) score += 80;
+  if (plan === "vip") score += 40;
+  if (plan === "premium") score += 20;
+  if (profile?.bio) score += 10;
+  if (profile?.interests) score += 5;
+  if (profile?.relationship_goal) score += 5;
+
+  return score;
+}
+
+function sortProfiles(profiles) {
+  return [...profiles].sort((a, b) => {
+    const scoreDifference = getProfileScore(b) - getProfileScore(a);
+
+    if (scoreDifference !== 0) return scoreDifference;
+
+    return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+  });
 }
 
 export default function BrowsePage() {
@@ -43,27 +70,44 @@ export default function BrowsePage() {
         return;
       }
 
-      const { data: currentProfile } = await supabase
+      const { data: currentProfile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
 
-      const { data: otherProfiles } = await supabase
+      if (profileError) {
+        alert(profileError.message);
+        setLoading(false);
+        return;
+      }
+
+      const { data: otherProfiles, error: profilesError } = await supabase
         .from("profiles")
         .select("*")
         .neq("id", user.id)
         .eq("is_visible", true)
-        .eq("matchups_eligible", true)
-        .order("membership_plan", { ascending: false });
+        .eq("matchups_eligible", true);
 
-      const { data: likes } = await supabase
+      if (profilesError) {
+        alert(profilesError.message);
+        setLoading(false);
+        return;
+      }
+
+      const { data: likes, error: likesError } = await supabase
         .from("likes")
         .select("liked_user_id")
         .eq("user_id", user.id);
 
+      if (likesError) {
+        alert(likesError.message);
+        setLoading(false);
+        return;
+      }
+
       setUserProfile(currentProfile);
-      setProfiles(otherProfiles || []);
+      setProfiles(sortProfiles(otherProfiles || []));
       setLikedProfiles((likes || []).map((like) => like.liked_user_id));
       setLoading(false);
     }
@@ -71,7 +115,7 @@ export default function BrowsePage() {
     loadBrowsePage();
   }, []);
 
-  const hasFullAccess = hasPremiumAccess(userProfile);
+  const hasFullAccess = useMemo(() => hasPremiumAccess(userProfile), [userProfile]);
 
   async function handleLike(profileId) {
     const {
@@ -82,6 +126,8 @@ export default function BrowsePage() {
       window.location.href = "/auth/login";
       return;
     }
+
+    if (likedProfiles.includes(profileId)) return;
 
     const { error } = await supabase.from("likes").insert({
       user_id: user.id,
@@ -146,7 +192,7 @@ export default function BrowsePage() {
 
             <div className="md:text-right">
               <p className="font-bold text-white/80">
-                Members available to browse
+                Completed profiles with photos appear first.
               </p>
               <p className="mt-1 text-sm text-white/60">
                 {hasFullAccess
@@ -164,7 +210,9 @@ export default function BrowsePage() {
             <div className="mt-14 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
               {profiles.map((profile, index) => {
                 const vipProfile = isVip(profile);
+                const premiumProfile = getPlan(profile) === "premium";
                 const isLiked = likedProfiles.includes(profile.id);
+                const profileHref = `/profile/${profile.id}`;
 
                 return (
                   <motion.article
@@ -175,11 +223,13 @@ export default function BrowsePage() {
                     className={`group overflow-hidden rounded-[3rem] border shadow-2xl backdrop-blur-xl transition-all duration-500 hover:-translate-y-3 hover:scale-[1.01] ${
                       vipProfile
                         ? "border-yellow-400 bg-gradient-to-b from-yellow-500/20 via-[#4d0008] to-black shadow-[0_0_60px_rgba(250,204,21,0.35)]"
-                        : "border-white/10 bg-gradient-to-b from-white/10 to-[#3d0008]"
+                        : premiumProfile
+                          ? "border-red-300/40 bg-gradient-to-b from-red-500/20 to-[#3d0008]"
+                          : "border-white/10 bg-gradient-to-b from-white/10 to-[#3d0008]"
                     }`}
                   >
                     <div className="relative overflow-hidden">
-                      <a href={`/profile/${profile.id}`}>
+                      <a href={profileHref}>
                         {profile.avatar_url ? (
                           <img
                             src={profile.avatar_url}
@@ -193,7 +243,7 @@ export default function BrowsePage() {
                         )}
                       </a>
 
-                      <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
 
                       <button
                         type="button"
@@ -213,9 +263,15 @@ export default function BrowsePage() {
                         </div>
                       )}
 
+                      {premiumProfile && !vipProfile && (
+                        <div className="absolute left-5 top-5 rounded-full bg-white px-4 py-2 text-sm font-black text-[#b30018]">
+                          Premium
+                        </div>
+                      )}
+
                       {profile.is_complete && (
                         <div className="absolute left-5 top-16 rounded-full bg-green-600 px-4 py-2 text-xs font-black uppercase">
-                          ✓ Verified Profile
+                          ✓ Complete Profile
                         </div>
                       )}
 
@@ -235,15 +291,14 @@ export default function BrowsePage() {
                       </div>
                     </div>
 
-                    <div className="flex min-h-[300px] flex-col p-7">
+                    <div className="flex min-h-[320px] flex-col p-7">
                       <div className="space-y-5">
                         <div>
                           <p className="text-xs uppercase tracking-[0.25em] text-red-200">
                             About
                           </p>
                           <p className="mt-2 line-clamp-4 text-white/80">
-                            {profile.bio ||
-                              "This member has not added a biography yet."}
+                            {profile.bio || "This member has not added a biography yet."}
                           </p>
                         </div>
 
@@ -251,7 +306,13 @@ export default function BrowsePage() {
                           <p className="text-xs uppercase tracking-[0.25em] text-red-200">
                             Interests
                           </p>
-                          <p className={hasFullAccess ? "mt-2 text-white/75" : "mt-2 select-none blur-sm text-white/60"}>
+                          <p
+                            className={
+                              hasFullAccess
+                                ? "mt-2 text-white/75"
+                                : "mt-2 select-none blur-sm text-white/60"
+                            }
+                          >
                             {profile.interests || "Interests not added"}
                           </p>
                         </div>
@@ -260,15 +321,21 @@ export default function BrowsePage() {
                           <p className="text-xs uppercase tracking-[0.25em] text-red-200">
                             Relationship Goal
                           </p>
-                          <p className={hasFullAccess ? "mt-2 text-white/75" : "mt-2 select-none blur-sm text-white/60"}>
+                          <p
+                            className={
+                              hasFullAccess
+                                ? "mt-2 text-white/75"
+                                : "mt-2 select-none blur-sm text-white/60"
+                            }
+                          >
                             {profile.relationship_goal || "Not added"}
                           </p>
                         </div>
                       </div>
 
-                      <div className="mt-auto pt-8 grid gap-4">
+                      <div className="mt-auto grid gap-4 pt-8">
                         <a
-                          href={`/profile/${profile.id}`}
+                          href={profileHref}
                           className="block w-full rounded-2xl bg-white px-6 py-4 text-center font-bold text-[#b30018] transition hover:scale-[1.02]"
                         >
                           View Profile
