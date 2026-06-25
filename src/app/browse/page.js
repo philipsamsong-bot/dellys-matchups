@@ -1,7 +1,7 @@
-// src/app/browse/page.js
-
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -44,15 +44,25 @@ function sortProfiles(profiles) {
 
     if (scoreDifference !== 0) return scoreDifference;
 
-    return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+    return (
+      new Date(b.updated_at || b.created_at || 0) -
+      new Date(a.updated_at || a.created_at || 0)
+    );
   });
 }
 
 export default function BrowsePage() {
+  const router = useRouter();
+
   const [profiles, setProfiles] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
   const [likedProfiles, setLikedProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [locationFilter, setLocationFilter] = useState("");
+  const [genderFilter, setGenderFilter] = useState("");
+  const [minAgeFilter, setMinAgeFilter] = useState("");
+  const [maxAgeFilter, setMaxAgeFilter] = useState("");
 
   useEffect(() => {
     function blockCopy(event) {
@@ -79,7 +89,7 @@ export default function BrowsePage() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        window.location.href = "/auth/login";
+        router.push("/auth/login");
         return;
       }
 
@@ -126,13 +136,34 @@ export default function BrowsePage() {
     }
 
     loadBrowsePage();
-  }, []);
+  }, [router]);
 
   const hasFullAccess = useMemo(() => hasPremiumAccess(userProfile), [userProfile]);
 
+  const filteredProfiles = useMemo(() => {
+    return profiles.filter((profile) => {
+      const locationText = [profile?.city, profile?.country]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const locationMatch =
+        !locationFilter.trim() ||
+        locationText.includes(locationFilter.trim().toLowerCase());
+
+      const genderMatch =
+        !genderFilter || String(profile?.gender || "").toLowerCase() === genderFilter.toLowerCase();
+
+      const age = Number(profile?.age);
+      const minAgeMatch = !minAgeFilter || (age && age >= Number(minAgeFilter));
+      const maxAgeMatch = !maxAgeFilter || (age && age <= Number(maxAgeFilter));
+
+      return locationMatch && genderMatch && minAgeMatch && maxAgeMatch;
+    });
+  }, [profiles, locationFilter, genderFilter, minAgeFilter, maxAgeFilter]);
   async function handleLike(profileId) {
     if (!hasFullAccess) {
-      window.location.href = "/matchups/checkout?plan=premium";
+      router.push("/matchups/checkout?plan=premium");
       return;
     }
 
@@ -141,7 +172,7 @@ export default function BrowsePage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      window.location.href = "/auth/login";
+      router.push("/auth/login");
       return;
     }
 
@@ -205,7 +236,7 @@ export default function BrowsePage() {
               <p className="text-sm font-black uppercase tracking-[0.3em] text-red-200">
                 Active Members
               </p>
-              <h2 className="mt-2 text-5xl font-black">{profiles.length}</h2>
+              <h2 className="mt-2 text-5xl font-black">{filteredProfiles.length}</h2>
             </div>
 
             <div className="md:text-right">
@@ -220,6 +251,53 @@ export default function BrowsePage() {
             </div>
           </div>
 
+          <div className="mt-8 grid gap-4 rounded-[2rem] border border-white/10 bg-white/5 p-6 md:grid-cols-4">
+            <input
+              type="text"
+              value={locationFilter}
+              onChange={(event) => setLocationFilter(event.target.value)}
+              placeholder="Search location"
+              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/50"
+            />
+
+            <select
+              value={genderFilter}
+              onChange={(event) => setGenderFilter(event.target.value)}
+              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none"
+            >
+              <option value="" className="text-black">
+                All genders
+              </option>
+              <option value="Man" className="text-black">
+                Man
+              </option>
+              <option value="Woman" className="text-black">
+                Woman
+              </option>
+              <option value="Prefer not to say" className="text-black">
+                Prefer not to say
+              </option>
+            </select>
+
+            <input
+              type="number"
+              min="18"
+              value={minAgeFilter}
+              onChange={(event) => setMinAgeFilter(event.target.value)}
+              placeholder="Min age"
+              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/50"
+            />
+
+            <input
+              type="number"
+              min="18"
+              value={maxAgeFilter}
+              onChange={(event) => setMaxAgeFilter(event.target.value)}
+              placeholder="Max age"
+              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/50"
+            />
+          </div>
+
           {!hasFullAccess && (
             <div className="mt-8 rounded-[2rem] border border-yellow-300/30 bg-black/25 p-6">
               <p className="font-black uppercase tracking-[0.25em] text-yellow-300">
@@ -232,14 +310,13 @@ export default function BrowsePage() {
               </p>
             </div>
           )}
-
-          {profiles.length === 0 ? (
+{filteredProfiles.length === 0 ? (
             <div className="mt-14 rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-white/70">
-              No profiles available yet.
+              No profiles found.
             </div>
           ) : (
             <div className="mt-14 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-              {profiles.map((profile, index) => {
+              {filteredProfiles.map((profile, index) => {
                 const vipProfile = isVip(profile);
                 const premiumProfile = getPlan(profile) === "premium";
                 const isLiked = likedProfiles.includes(profile.id);
@@ -260,11 +337,15 @@ export default function BrowsePage() {
                     }`}
                   >
                     <div className="relative overflow-hidden">
-                      <a href={profileHref}>
+                      <Link href={profileHref} className="block">
                         {profile.avatar_url ? (
                           <img
                             src={profile.avatar_url}
-                            alt="Locked member profile photo"
+                            alt={
+                              hasFullAccess
+                                ? profile.full_name || "Member profile photo"
+                                : "Locked member profile photo"
+                            }
                             draggable="false"
                             onContextMenu={(event) => event.preventDefault()}
                             className="pointer-events-none h-[440px] w-full object-cover object-top transition duration-700 group-hover:scale-105"
@@ -274,7 +355,7 @@ export default function BrowsePage() {
                             No Photo
                           </div>
                         )}
-                      </a>
+                      </Link>
 
                       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
 
@@ -282,7 +363,7 @@ export default function BrowsePage() {
                         <button
                           type="button"
                           onClick={() => handleLike(profile.id)}
-                          className={`absolute right-5 top-5 flex h-14 w-14 items-center justify-center rounded-full text-2xl transition ${
+                          className={`absolute right-5 top-5 z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl transition ${
                             isLiked
                               ? "bg-red-700 text-white"
                               : "bg-black/60 text-white hover:bg-red-700"
@@ -293,25 +374,25 @@ export default function BrowsePage() {
                       )}
 
                       {hasFullAccess && vipProfile && (
-                        <div className="absolute left-5 top-5 rounded-full bg-yellow-400 px-4 py-2 text-sm font-black text-black">
+                        <div className="absolute left-5 top-5 z-20 rounded-full bg-yellow-400 px-4 py-2 text-sm font-black text-black">
                           👑 VIP
                         </div>
                       )}
 
                       {hasFullAccess && premiumProfile && !vipProfile && (
-                        <div className="absolute left-5 top-5 rounded-full bg-white px-4 py-2 text-sm font-black text-[#b30018]">
+                        <div className="absolute left-5 top-5 z-20 rounded-full bg-white px-4 py-2 text-sm font-black text-[#b30018]">
                           Premium
                         </div>
                       )}
 
                       {hasFullAccess && profile.is_complete && (
-                        <div className="absolute left-5 top-16 rounded-full bg-green-600 px-4 py-2 text-xs font-black uppercase">
+                        <div className="absolute left-5 top-16 z-20 rounded-full bg-green-600 px-4 py-2 text-xs font-black uppercase">
                           ✓ Complete Profile
                         </div>
                       )}
 
                       {hasFullAccess ? (
-                        <div className="absolute bottom-6 left-6 right-6">
+                        <div className="pointer-events-none absolute bottom-6 left-6 right-6">
                           <h2 className="font-display text-4xl font-black">
                             {profile.full_name || "Unnamed Member"}
                           </h2>
@@ -321,7 +402,7 @@ export default function BrowsePage() {
                           </p>
                         </div>
                       ) : (
-                        <div className="absolute bottom-6 left-6 right-6 rounded-[2rem] border border-white/15 bg-black/60 p-5 text-center backdrop-blur-xl">
+                        <div className="pointer-events-none absolute bottom-6 left-6 right-6 rounded-[2rem] border border-white/15 bg-black/60 p-5 text-center backdrop-blur-xl">
                           <p className="text-sm font-black uppercase tracking-[0.25em] text-yellow-300">
                             Profile Locked
                           </p>
@@ -365,29 +446,29 @@ export default function BrowsePage() {
                         </div>
 
                         <div className="mt-auto grid gap-4 pt-8">
-                          <a
+                          <Link
                             href={profileHref}
                             className="block w-full rounded-2xl bg-white px-6 py-4 text-center font-bold text-[#b30018] transition hover:scale-[1.02]"
                           >
                             View Profile
-                          </a>
+                          </Link>
 
-                          <a
+                          <Link
                             href={`/chat/${profile.id}`}
                             className="block w-full rounded-2xl border border-white/20 bg-white/10 px-6 py-4 text-center font-bold text-white transition hover:bg-white/20"
                           >
                             Message
-                          </a>
+                          </Link>
                         </div>
                       </div>
                     ) : (
                       <div className="p-7">
-                        <a
+                        <Link
                           href="/matchups/checkout?plan=premium"
                           className="block w-full rounded-2xl bg-white px-6 py-4 text-center font-bold text-[#b30018] transition hover:scale-[1.02]"
                         >
                           Upgrade to Unlock Profile
-                        </a>
+                        </Link>
                       </div>
                     )}
                   </motion.article>
