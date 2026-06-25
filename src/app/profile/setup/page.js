@@ -80,12 +80,13 @@ const emptyForm = {
   gender: "",
   marital_status: "",
   country: "",
-  postal_code: "",
   phone_code: "",
   phone: "",
   city: "",
   occupation: "",
-  faith_background: "",
+  religious_background: "",
+  genotype: "",
+  height: "",
   relationship_goal: "",
   interests: "",
   bio: "",
@@ -110,6 +111,8 @@ const maritalStatuses = [
   "Married",
   "Prefer not to say",
 ];
+
+const genotypes = ["AA", "AS", "SS", "AC", "SC", "Not sure", "Prefer not to say"];
 
 function splitPhoneNumber(phone) {
   if (!phone) {
@@ -169,15 +172,15 @@ function ProfileSetupPage() {
           gender: profile.gender || "",
           marital_status: profile.marital_status || "",
           country: profile.country || "",
-          postal_code: profile.postal_code || "",
           phone_code:
-            profilePhone.phone_code ||
-            countryDialCodes[profile.country] ||
-            "",
+            profilePhone.phone_code || countryDialCodes[profile.country] || "",
           phone: profilePhone.phone || "",
           city: profile.city || "",
           occupation: profile.occupation || "",
-          faith_background: profile.faith_background || "",
+          religious_background:
+            profile.religious_background || profile.faith_background || "",
+          genotype: profile.genotype || "",
+          height: profile.height || "",
           relationship_goal: profile.relationship_goal || "",
           interests: profile.interests || "",
           bio: profile.bio || "",
@@ -207,7 +210,6 @@ function ProfileSetupPage() {
       form.gender,
       form.marital_status,
       form.country,
-      form.postal_code,
       form.phone_code,
       form.phone,
       form.city,
@@ -268,12 +270,12 @@ function ProfileSetupPage() {
         updates.gender &&
         updates.marital_status &&
         updates.country &&
-        updates.postal_code &&
         updates.phone &&
         updates.city &&
         updates.relationship_goal &&
         updates.bio &&
-        updates.interests
+        updates.interests &&
+        updates.avatar_url
     );
   }
 
@@ -300,31 +302,33 @@ function ProfileSetupPage() {
         gender: form.gender,
         marital_status: form.marital_status,
         country: form.country,
-        postal_code: form.postal_code.trim(),
         phone: fullPhone,
         city: form.city.trim(),
         occupation: form.occupation.trim(),
-        faith_background: form.faith_background.trim(),
+        religious_background: form.religious_background.trim(),
+        faith_background: form.religious_background.trim(),
+        genotype: form.genotype,
+        height: form.height.trim(),
         relationship_goal: form.relationship_goal,
         interests: form.interests.trim(),
         bio: form.bio.trim(),
         matchups_eligible: form.marital_status !== "Married",
         is_visible: form.marital_status !== "Married",
         updated_at: new Date().toISOString(),
+        avatar_url: uploadedAvatarUrl || avatarUrl || null,
       };
 
       updates.is_complete = isProfileComplete(updates);
-
-      if (uploadedAvatarUrl) {
-        updates.avatar_url = uploadedAvatarUrl;
-        setAvatarUrl(uploadedAvatarUrl);
-      }
 
       const { error } = await supabase.from("profiles").upsert(updates);
 
       if (error) {
         alert(error.message);
         return;
+      }
+
+      if (uploadedAvatarUrl) {
+        setAvatarUrl(uploadedAvatarUrl);
       }
 
       localStorage.removeItem("profile-draft");
@@ -406,6 +410,7 @@ function ProfileSetupPage() {
                 onChange={(event) => {
                   const selectedFile = event.target.files?.[0] || null;
                   setPhoto(selectedFile);
+
                   if (selectedFile) {
                     setPreviewUrl(URL.createObjectURL(selectedFile));
                   }
@@ -515,17 +520,7 @@ function ProfileSetupPage() {
                   ))}
                 </select>
 
-                <input
-                  type="text"
-                  name="postal_code"
-                  placeholder="Enter postal / ZIP code"
-                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.postal_code}
-                  onChange={handleChange}
-                  required
-                />
-
-                <div className="flex h-16 overflow-hidden rounded-2xl border border-white/15 bg-white/10">
+                <div className="flex h-16 overflow-hidden rounded-2xl border border-white/15 bg-white/10 md:col-span-2">
                   <select
                     name="phone_code"
                     value={form.phone_code}
@@ -558,10 +553,39 @@ function ProfileSetupPage() {
                   type="text"
                   name="occupation"
                   placeholder="Enter your occupation"
-                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60 md:col-span-2"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.occupation}
                   onChange={handleChange}
                 />
+
+                <input
+                  type="text"
+                  name="height"
+                  placeholder="Enter your height e.g. 5'7 or 170cm"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                  value={form.height}
+                  onChange={handleChange}
+                />
+
+                <select
+                  name="genotype"
+                  className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
+                  value={form.genotype}
+                  onChange={handleChange}
+                >
+                  <option value="" className="text-black">
+                    Select genotype optional
+                  </option>
+                  {genotypes.map((genotype) => (
+                    <option
+                      key={genotype}
+                      value={genotype}
+                      className="text-black"
+                    >
+                      {genotype}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -573,10 +597,10 @@ function ProfileSetupPage() {
               <div className="mt-6 grid gap-6">
                 <input
                   type="text"
-                  name="faith_background"
-                  placeholder="Faith background e.g. Christian, church community, ministry"
+                  name="religious_background"
+                  placeholder="Religious background e.g. Christian, Catholic, Pentecostal, Baptist, non-denominational"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.faith_background}
+                  value={form.religious_background}
                   onChange={handleChange}
                 />
 
