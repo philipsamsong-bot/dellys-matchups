@@ -15,44 +15,50 @@ const geistMono = Geist_Mono({
 
 const siteUrl = "https://dellysmatchups.org";
 const siteName = "Delly's Matchups";
-const logoUrl = `${siteUrl}/dellys-logo.png`;
+const tagline = "Redefining Authentic Relationships";
+
 const siteDescription =
-  "Delly's Matchups is a global faith-based matchmaking, counselling and mentorship platform helping individuals build intentional, healthy and authentic relationships rooted in Biblical principles.";
+  "Delly's Matchups is a global faith-based matchmaking, counselling and mentorship platform redefining authentic relationships through Biblical principles, intentional connections, and meaningful community.";
 
 export const metadata = {
   metadataBase: new URL(siteUrl),
+
   title: {
     default: siteName,
     template: `%s | ${siteName}`,
   },
+
   description: siteDescription,
   applicationName: siteName,
+
   openGraph: {
-    title: siteName,
+    title: `${siteName} | ${tagline}`,
     description: siteDescription,
     url: siteUrl,
     siteName,
-    images: [
-      {
-        url: logoUrl,
-        width: 1200,
-        height: 630,
-        alt: "Delly's Matchups Official Logo",
-      },
-    ],
     locale: "en_GB",
     type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: `${siteName} - ${tagline}`,
+      },
+    ],
   },
+
   twitter: {
     card: "summary_large_image",
-    title: siteName,
+    title: `${siteName} | ${tagline}`,
     description: siteDescription,
-    images: [logoUrl],
+    images: ["/og-image.png"],
   },
+
   icons: {
-    icon: "/dellys-logo.png",
-    shortcut: "/dellys-logo.png",
-    apple: "/dellys-logo.png",
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
   },
 };
 
