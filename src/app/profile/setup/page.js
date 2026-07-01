@@ -1,3 +1,5 @@
+// src/app/profile/setup/page.js
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -114,18 +116,24 @@ const maritalStatuses = [
 
 const genotypes = ["AA", "AS", "SS", "AC", "SC", "Not sure", "Prefer not to say"];
 
+function getPlan(profile) {
+  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
+}
+
+function getGalleryLimit(plan) {
+  if (plan === "vip") return Infinity;
+  if (plan === "premium") return 5;
+  return 0;
+}
+
 function splitPhoneNumber(phone) {
-  if (!phone) {
-    return { phone_code: "", phone: "" };
-  }
+  if (!phone) return { phone_code: "", phone: "" };
 
   const matchedCode = dialCodes
     .sort((a, b) => b.length - a.length)
     .find((code) => phone.startsWith(code));
 
-  if (!matchedCode) {
-    return { phone_code: "", phone };
-  }
+  if (!matchedCode) return { phone_code: "", phone };
 
   return {
     phone_code: matchedCode,
@@ -133,13 +141,26 @@ function splitPhoneNumber(phone) {
   };
 }
 
+function getGallery(profile) {
+  const gallery = profile?.gallery_urls || profile?.photos || profile?.photo_urls || [];
+  return Array.isArray(gallery) ? gallery.filter(Boolean) : [];
+}
+
 function ProfileSetupPage() {
   const [user, setUser] = useState(null);
+  const [plan, setPlan] = useState("free");
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
+  const [galleryUrls, setGalleryUrls] = useState([]);
   const [form, setForm] = useState(emptyForm);
+
+  const galleryLimit = getGalleryLimit(plan);
+  const canUploadGallery = galleryLimit > 0;
+  const remainingGallerySlots =
+    galleryLimit === Infinity ? Infinity : Math.max(galleryLimit - galleryUrls.length, 0);
 
   useEffect(() => {
     async function getUser() {
@@ -164,7 +185,10 @@ function ProfileSetupPage() {
       const profilePhone = splitPhoneNumber(profile?.phone || "");
 
       if (profile) {
+        setPlan(getPlan(profile));
         setAvatarUrl(profile.avatar_url || "");
+        setGalleryUrls(getGallery(profile));
+
         setForm({
           full_name: profile.full_name || metadataName || "",
           email: profile.email || user.email || "",
@@ -172,8 +196,7 @@ function ProfileSetupPage() {
           gender: profile.gender || "",
           marital_status: profile.marital_status || "",
           country: profile.country || "",
-          phone_code:
-            profilePhone.phone_code || countryDialCodes[profile.country] || "",
+          phone_code: profilePhone.phone_code || countryDialCodes[profile.country] || "",
           phone: profilePhone.phone || "",
           city: profile.city || "",
           occupation: profile.occupation || "",
@@ -185,6 +208,7 @@ function ProfileSetupPage() {
           interests: profile.interests || "",
           bio: profile.bio || "",
         });
+
         return;
       }
 
@@ -255,11 +279,62 @@ function ProfileSetupPage() {
 
     if (error) throw error;
 
-    const { data } = supabase.storage
-      .from("profile-photos")
-      .getPublicUrl(filePath);
+    const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
 
     return data.publicUrl;
+  }
+
+  async function uploadGalleryFiles(event) {
+    const selectedFiles = Array.from(event.target.files || []);
+
+    if (!selectedFiles.length || !user) return;
+
+    if (!canUploadGallery) {
+      alert("Gallery uploads are available for Premium and VIP members only.");
+      return;
+    }
+
+    const allowedFiles =
+      galleryLimit === Infinity ? selectedFiles : selectedFiles.slice(0, remainingGallerySlots);
+
+    if (galleryLimit !== Infinity && selectedFiles.length > remainingGallerySlots) {
+      alert(`Premium members can upload up to ${galleryLimit} gallery photos.`);
+    }
+
+    if (!allowedFiles.length) return;
+
+    setUploadingGallery(true);
+
+    try {
+      const uploadedUrls = [];
+
+      for (const file of allowedFiles) {
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+        const filePath = `${user.id}/gallery/${fileName}`;
+
+        const { error } = await supabase.storage
+          .from("profile-photos")
+          .upload(filePath, file, { upsert: true });
+
+        if (error) throw error;
+
+        const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
+
+        uploadedUrls.push(data.publicUrl);
+      }
+
+      setGalleryUrls((current) => [...current, ...uploadedUrls]);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setUploadingGallery(false);
+      event.target.value = "";
+    }
+  }
+
+  function removeGalleryImage(imageUrl) {
+    setGalleryUrls((current) => current.filter((url) => url !== imageUrl));
   }
 
   function isProfileComplete(updates) {
@@ -312,6 +387,7 @@ function ProfileSetupPage() {
         relationship_goal: form.relationship_goal,
         interests: form.interests.trim(),
         bio: form.bio.trim(),
+        gallery_urls: galleryUrls,
         matchups_eligible: form.marital_status !== "Married",
         is_visible: form.marital_status !== "Married",
         updated_at: new Date().toISOString(),
@@ -389,9 +465,7 @@ function ProfileSetupPage() {
             className="mx-auto mt-14 rounded-[3rem] bg-[#c1121f] p-8 shadow-2xl md:p-12"
           >
             <div className="rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">
-                Profile Photo
-              </h2>
+              <h2 className="font-display text-4xl font-bold">Profile Photo</h2>
 
               {(previewUrl || avatarUrl) && (
                 <div className="mt-6 flex justify-center">
@@ -419,9 +493,69 @@ function ProfileSetupPage() {
             </div>
 
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">
-                Personal Information
-              </h2>
+              <h2 className="font-display text-4xl font-bold">Gallery Photos</h2>
+
+              <p className="mt-3 text-white/75">
+                {plan === "vip"
+                  ? "VIP members can upload unlimited gallery photos."
+                  : plan === "premium"
+                    ? "Premium members can upload up to 5 gallery photos."
+                    : "Gallery uploads are available for Premium and VIP members."}
+              </p>
+
+              {galleryUrls.length > 0 && (
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                  {galleryUrls.map((imageUrl) => (
+                    <div key={imageUrl} className="relative overflow-hidden rounded-[2rem]">
+                      <img
+                        src={imageUrl}
+                        alt="Gallery"
+                        className="h-56 w-full object-cover object-top"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => removeGalleryImage(imageUrl)}
+                        className="absolute right-3 top-3 rounded-full bg-black/70 px-4 py-2 text-sm font-black text-white"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {canUploadGallery ? (
+                <>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    disabled={uploadingGallery || remainingGallerySlots === 0}
+                    onChange={uploadGalleryFiles}
+                    className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-white outline-none file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-5 file:py-2 file:font-bold file:text-[#b30018] disabled:opacity-50"
+                  />
+
+                  <p className="mt-3 text-sm text-white/65">
+                    {uploadingGallery
+                      ? "Uploading gallery photos..."
+                      : galleryLimit === Infinity
+                        ? `${galleryUrls.length} gallery photos uploaded.`
+                        : `${galleryUrls.length}/${galleryLimit} gallery photos uploaded.`}
+                  </p>
+                </>
+              ) : (
+                <a
+                  href="/matchups/checkout?plan=premium"
+                  className="mt-6 inline-flex rounded-full bg-white px-8 py-4 font-black text-[#b30018] transition hover:scale-105"
+                >
+                  Upgrade to Add Gallery Photos
+                </a>
+              )}
+            </div>
+
+            <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
+              <h2 className="font-display text-4xl font-bold">Personal Information</h2>
 
               <div className="mt-6 grid gap-6 md:grid-cols-2">
                 <input
@@ -577,11 +711,7 @@ function ProfileSetupPage() {
                     Select genotype optional
                   </option>
                   {genotypes.map((genotype) => (
-                    <option
-                      key={genotype}
-                      value={genotype}
-                      className="text-black"
-                    >
+                    <option key={genotype} value={genotype} className="text-black">
                       {genotype}
                     </option>
                   ))}
@@ -649,7 +779,7 @@ function ProfileSetupPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || uploadingGallery}
               className="mt-10 w-full rounded-full bg-white py-5 text-lg font-black text-[#b30018] transition hover:scale-105 disabled:opacity-60"
             >
               {loading ? "Saving..." : "Save Profile"}

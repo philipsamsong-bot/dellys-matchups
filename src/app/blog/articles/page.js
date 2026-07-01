@@ -1,5 +1,8 @@
+// src/app/blog/articles/page.js
+
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 import { supabase } from "@/lib/supabase";
@@ -16,14 +19,17 @@ export default function ArticlesPage() {
     async function loadArticles() {
       const { data, error } = await supabase
         .from("articles")
-        .select("*")
+        .select("id,title,slug,author,featured_image,content,created_at")
         .eq("published", true)
         .order("created_at", { ascending: false });
 
-      if (!error) {
-        setArticles(data || []);
+      if (error) {
+        alert(error.message);
+        setLoading(false);
+        return;
       }
 
+      setArticles(data || []);
       setLoading(false);
     }
 
@@ -71,17 +77,19 @@ export default function ArticlesPage() {
                 key={article.id}
                 className="overflow-hidden rounded-[3rem] bg-black/25 shadow-2xl"
               >
-                <div className="flex h-72 items-center justify-center bg-white/10">
-                  {article.featured_image ? (
-                    <img
-                      src={article.featured_image}
-                      alt={article.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <p className="font-display text-5xl text-white/40">DM</p>
-                  )}
-                </div>
+                <Link href={`/blog/articles/${article.slug}`} className="block">
+                  <div className="flex h-72 items-center justify-center bg-white/10">
+                    {article.featured_image ? (
+                      <img
+                        src={article.featured_image}
+                        alt={article.title}
+                        className="h-full w-full object-cover object-top transition duration-500 hover:scale-105"
+                      />
+                    ) : (
+                      <p className="font-display text-5xl text-white/40">DM</p>
+                    )}
+                  </div>
+                </Link>
 
                 <div className="p-8">
                   <p className="text-xs font-black uppercase tracking-[0.35em] text-red-100">
@@ -96,12 +104,12 @@ export default function ArticlesPage() {
                     {getPreview(article.content)}...
                   </p>
 
-                  <a
+                  <Link
                     href={`/blog/articles/${article.slug}`}
-                    className="mt-8 inline-flex rounded-full bg-white px-7 py-4 font-black text-[#b30018]"
+                    className="mt-8 inline-flex rounded-full bg-white px-7 py-4 font-black text-[#b30018] transition hover:scale-105"
                   >
                     Read Article
-                  </a>
+                  </Link>
                 </div>
               </article>
             ))}

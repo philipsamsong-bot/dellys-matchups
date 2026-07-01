@@ -82,16 +82,16 @@ const dialCodes = [...new Set(Object.values(countryDialCodes).filter(Boolean))];
 const courses = {
   "full-academy": {
     title: "Full Academy Programme",
-    price: 297,
+    price: 500,
     description: "Access all 7 academy modules.",
   },
-  "module-1": { title: "Module 1: Counselling 101", price: 50 },
-  "module-2": { title: "Module 2: Counselling 102", price: 50 },
-  "module-3": { title: "Module 3: Counselling 103", price: 50 },
-  "module-4": { title: "Module 4: Leadership & Influence", price: 50 },
-  "module-5": { title: "Module 5: Healing & Restoration", price: 50 },
-  "module-6": { title: "Module 6: Master Classes", price: 50 },
-  "module-7": { title: "Module 7: Virginity 101", price: 50 },
+  "module-1": { title: "Module 1: Counselling 101", price: 100 },
+  "module-2": { title: "Module 2: Counselling 102", price: 100 },
+  "module-3": { title: "Module 3: Counselling 103", price: 100 },
+  "module-4": { title: "Module 4: Leadership & Influence", price: 100 },
+  "module-5": { title: "Module 5: Healing & Restoration", price: 100 },
+  "module-6": { title: "Module 6: Master Classes", price: 100 },
+  "module-7": { title: "Module 7: Virginity 101", price: 100 },
 };
 
 const moduleOptions = Object.entries(courses).filter(
@@ -460,7 +460,7 @@ ${form.notes || ""}`,
                     : "border-white/15 bg-white/10 text-white hover:bg-white/20"
                 }`}
               >
-                Full Academy Programme — $297 USD
+                Full Academy Programme — $500 USD
               </button>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">

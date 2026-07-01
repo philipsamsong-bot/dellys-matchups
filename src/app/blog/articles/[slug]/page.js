@@ -1,5 +1,8 @@
+// src/app/blog/articles/[slug]/page.js
+
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
@@ -8,7 +11,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function ArticleDetailPage() {
   const params = useParams();
-  const slug = params.slug;
+  const slug = params?.slug;
 
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -59,12 +62,12 @@ export default function ArticleDetailPage() {
               Article Not Found
             </h1>
 
-            <a
+            <Link
               href="/blog/articles"
               className="mt-8 inline-flex rounded-full bg-white px-8 py-4 font-black text-[#b30018]"
             >
               Back to Articles
-            </a>
+            </Link>
           </div>
         </main>
         <SiteFooter />
@@ -77,42 +80,44 @@ export default function ArticleDetailPage() {
       <SiteNav />
 
       <main className="min-h-screen bg-[#b30018] px-6 pb-24 pt-40 text-white">
-        <article className="mx-auto max-w-7xl">
-          <section className="rounded-[3rem] bg-black/25 p-8 shadow-2xl backdrop-blur-xl md:p-12">
-            <div className="grid gap-10 lg:grid-cols-[1.35fr_0.85fr] lg:items-start">
-              <div>
-                <p className="font-black uppercase tracking-[0.35em] text-red-100">
-                  Article
-                </p>
+        <article className="mx-auto max-w-6xl">
+          <Link href="/blog/articles" className="font-bold text-white/75 hover:text-white">
+            ← Back to Articles
+          </Link>
 
-                <h1 className="font-display mt-5 text-5xl font-bold leading-tight md:text-7xl">
-                  {article.title}
-                </h1>
+          <section className="mt-8 overflow-hidden rounded-[3rem] bg-black/25 shadow-2xl backdrop-blur-xl">
+            {article.featured_image && (
+              <img
+                src={article.featured_image}
+                alt={article.title}
+                className="max-h-[620px] w-full object-cover object-top"
+              />
+            )}
 
-                <div className="mt-5 flex flex-wrap gap-4 text-sm font-bold text-white/60">
-                  <span>{article.author || "Delly Singah"}</span>
-                  <span>•</span>
-                  <span>{new Date(article.created_at).toLocaleDateString()}</span>
-                </div>
+            <div className="p-8 md:p-12">
+              <p className="font-black uppercase tracking-[0.35em] text-red-100">
+                Article
+              </p>
 
-                <div className="mt-10 rounded-[2rem] bg-white/10 p-8 md:p-10">
-                  <p className="whitespace-pre-line text-[1.18rem] leading-[2.15rem] tracking-[0.025em] text-white/90">
-                    {article.content}
-                  </p>
-                </div>
+              <h1 className="font-display mt-5 text-5xl font-bold leading-tight md:text-7xl">
+                {article.title}
+              </h1>
+
+              <div className="mt-5 flex flex-wrap gap-4 text-sm font-bold text-white/60">
+                <span>{article.author || "Delly Singah"}</span>
+                <span>•</span>
+                <span>
+                  {article.created_at
+                    ? new Date(article.created_at).toLocaleDateString()
+                    : "Recently published"}
+                </span>
               </div>
 
-              {article.featured_image && (
-                <div className="lg:pt-10">
-                  <div className="overflow-hidden rounded-[2.5rem] bg-white/10 p-3">
-                    <img
-                      src={article.featured_image}
-                      alt={article.title}
-                      className="w-full rounded-[2rem] object-contain"
-                    />
-                  </div>
-                </div>
-              )}
+              <div className="mt-10 rounded-[2rem] bg-white/10 p-8 md:p-10">
+                <p className="whitespace-pre-line text-[1.18rem] leading-[2.15rem] tracking-[0.025em] text-white/90">
+                  {article.content}
+                </p>
+              </div>
             </div>
           </section>
 

@@ -8,10 +8,10 @@ import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 import { supabase } from "@/lib/supabase";
 
 const prices = {
-  individual: "50.00",
-  couple: "100.00",
+  individual: "100.00",
+  couple: "250.00",
   international_individual: "100.00",
-  international_couple: "200.00",
+  international_couple: "250.00",
 };
 
 const mobileMoney = {
@@ -267,16 +267,16 @@ function CounsellingPaymentContent() {
               className="mt-4 h-16 w-full rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
             >
               <option value="individual" className="text-black">
-                Individual Session - $50
+                Individual Session - $100
               </option>
               <option value="couple" className="text-black">
-                Couple Session - $100
+                Couple Session - $250
               </option>
               <option value="international_individual" className="text-black">
                 International Individual Session - $100
               </option>
               <option value="international_couple" className="text-black">
-                International Couple Session - $200
+                International Couple Session - $250
               </option>
             </select>
           </div>
