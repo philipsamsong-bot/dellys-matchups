@@ -234,8 +234,6 @@ function ProfileSetupPage() {
       form.gender,
       form.marital_status,
       form.country,
-      form.phone_code,
-      form.phone,
       form.city,
       form.relationship_goal,
       form.interests,
@@ -283,7 +281,6 @@ function ProfileSetupPage() {
 
     return data.publicUrl;
   }
-
   async function uploadGalleryFiles(event) {
     const selectedFiles = Array.from(event.target.files || []);
 
@@ -345,7 +342,6 @@ function ProfileSetupPage() {
         updates.gender &&
         updates.marital_status &&
         updates.country &&
-        updates.phone &&
         updates.city &&
         updates.relationship_goal &&
         updates.bio &&
@@ -367,7 +363,8 @@ function ProfileSetupPage() {
     try {
       const uploadedAvatarUrl = await uploadPhoto();
       const cleanPhone = form.phone.replace(/^0+/, "").trim();
-      const fullPhone = `${form.phone_code}${cleanPhone}`;
+      const fullPhone =
+        form.phone_code && cleanPhone ? `${form.phone_code}${cleanPhone}` : "";
 
       const updates = {
         id: user.id,
@@ -491,7 +488,6 @@ function ProfileSetupPage() {
                 }}
               />
             </div>
-
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
               <h2 className="font-display text-4xl font-bold">Gallery Photos</h2>
 
@@ -565,7 +561,6 @@ function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.full_name}
                   onChange={handleChange}
-                  required
                 />
 
                 <input
@@ -575,7 +570,6 @@ function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.email}
                   onChange={handleChange}
-                  required
                 />
 
                 <input
@@ -586,7 +580,6 @@ function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.age}
                   onChange={handleChange}
-                  required
                 />
 
                 <select
@@ -594,7 +587,6 @@ function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
                   value={form.gender}
                   onChange={handleChange}
-                  required
                 >
                   <option value="" className="text-black">
                     Select your gender
@@ -615,7 +607,6 @@ function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
                   value={form.marital_status}
                   onChange={handleChange}
-                  required
                 >
                   <option value="" className="text-black">
                     Select your relationship status
@@ -634,7 +625,6 @@ function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.city}
                   onChange={handleChange}
-                  required
                 />
 
                 <select
@@ -642,7 +632,6 @@ function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none md:col-span-2"
                   value={form.country}
                   onChange={handleChange}
-                  required
                 >
                   <option value="" className="text-black">
                     Select your country
@@ -659,7 +648,6 @@ function ProfileSetupPage() {
                     name="phone_code"
                     value={form.phone_code}
                     onChange={handleChange}
-                    required
                     className="w-28 bg-white/10 px-3 text-white outline-none"
                   >
                     <option value="" className="text-black">
@@ -675,11 +663,10 @@ function ProfileSetupPage() {
                   <input
                     type="tel"
                     name="phone"
-                    placeholder="Phone / WhatsApp number"
+                    placeholder="Phone / WhatsApp number optional"
                     className="min-w-0 flex-1 bg-transparent px-4 text-white outline-none placeholder:text-white/60"
                     value={form.phone}
                     onChange={handleChange}
-                    required
                   />
                 </div>
 
@@ -739,7 +726,6 @@ function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
                   value={form.relationship_goal}
                   onChange={handleChange}
-                  required
                 >
                   <option value="" className="text-black">
                     Select your relationship goal
@@ -758,7 +744,6 @@ function ProfileSetupPage() {
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.interests}
                   onChange={handleChange}
-                  required
                 />
               </div>
             </div>
@@ -773,7 +758,6 @@ function ProfileSetupPage() {
                 className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-5 text-white outline-none placeholder:text-white/60"
                 value={form.bio}
                 onChange={handleChange}
-                required
               />
             </div>
 
