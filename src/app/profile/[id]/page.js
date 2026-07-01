@@ -1,5 +1,4 @@
 // src/app/profile/[id]/page.js
-
 "use client";
 
 import Link from "next/link";
@@ -30,6 +29,7 @@ export default function PublicProfilePage() {
   const [profile, setProfile] = useState(null);
   const [liked, setLiked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activePhoto, setActivePhoto] = useState("");
 
   useEffect(() => {
     function blockCopy(event) {
@@ -95,6 +95,7 @@ export default function PublicProfilePage() {
       setViewerProfile(currentProfile);
       setProfile(viewedProfile);
       setLiked(Boolean(existingLike));
+      setActivePhoto(viewedProfile.avatar_url || "/placeholder-profile.jpg");
       setLoading(false);
     }
 
@@ -144,6 +145,7 @@ export default function PublicProfilePage() {
 
   const fullAccess = hasPremiumAccess(viewerProfile);
   const gallery = getGallery(profile);
+  const allPhotos = [profile?.avatar_url, ...gallery].filter(Boolean);
 
   return (
     <>
@@ -156,23 +158,48 @@ export default function PublicProfilePage() {
           </Link>
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="relative overflow-hidden rounded-[3rem] bg-black/25 shadow-2xl">
-              <img
-                src={profile?.avatar_url || "/placeholder-profile.jpg"}
-                alt={fullAccess ? profile?.full_name || "Profile" : "Locked profile photo"}
-                draggable="false"
-                onContextMenu={(event) => event.preventDefault()}
-                className="pointer-events-none h-[75vh] w-full object-cover object-top"
-              />
+            <div>
+              <div className="relative overflow-hidden rounded-[3rem] bg-black/25 shadow-2xl">
+                <img
+                  src={activePhoto || profile?.avatar_url || "/placeholder-profile.jpg"}
+                  alt={fullAccess ? profile?.full_name || "Profile" : "Locked profile photo"}
+                  draggable="false"
+                  onContextMenu={(event) => event.preventDefault()}
+                  className="pointer-events-none h-[75vh] w-full object-cover object-top"
+                />
 
-              {!fullAccess && (
-                <div className="absolute bottom-6 left-6 right-6 rounded-[2rem] border border-white/20 bg-black/65 p-5 text-center backdrop-blur-xl">
-                  <p className="text-sm font-black uppercase tracking-[0.25em] text-yellow-300">
-                    Profile Locked
-                  </p>
-                  <p className="mt-2 text-white/80">
-                    Upgrade to unlock member details.
-                  </p>
+                {!fullAccess && (
+                  <div className="absolute bottom-6 left-6 right-6 rounded-[2rem] border border-white/20 bg-black/65 p-5 text-center backdrop-blur-xl">
+                    <p className="text-sm font-black uppercase tracking-[0.25em] text-yellow-300">
+                      Profile Locked
+                    </p>
+                    <p className="mt-2 text-white/80">
+                      Upgrade to unlock member details and gallery.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {fullAccess && allPhotos.length > 1 && (
+                <div className="mt-5 grid grid-cols-4 gap-3">
+                  {allPhotos.map((photo) => (
+                    <button
+                      key={photo}
+                      type="button"
+                      onClick={() => setActivePhoto(photo)}
+                      className={`overflow-hidden rounded-2xl border-2 ${
+                        activePhoto === photo ? "border-white" : "border-white/10"
+                      }`}
+                    >
+                      <img
+                        src={photo}
+                        alt="Profile thumbnail"
+                        draggable="false"
+                        onContextMenu={(event) => event.preventDefault()}
+                        className="h-24 w-full object-cover object-top"
+                      />
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -190,6 +217,7 @@ export default function PublicProfilePage() {
                   gallery={gallery}
                   liked={liked}
                   handleLike={handleLike}
+                  setActivePhoto={setActivePhoto}
                 />
               )}
             </div>
@@ -240,7 +268,7 @@ function LockedProfile() {
   );
 }
 
-function FullProfile({ profile, gallery, liked, handleLike }) {
+function FullProfile({ profile, gallery, liked, handleLike, setActivePhoto }) {
   return (
     <>
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -301,14 +329,20 @@ function FullProfile({ profile, gallery, liked, handleLike }) {
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             {gallery.map((image) => (
-              <img
+              <button
                 key={image}
-                src={image}
-                alt="Profile gallery"
-                draggable="false"
-                onContextMenu={(event) => event.preventDefault()}
-                className="pointer-events-none h-72 rounded-[2rem] object-cover object-top"
-              />
+                type="button"
+                onClick={() => setActivePhoto(image)}
+                className="overflow-hidden rounded-[2rem]"
+              >
+                <img
+                  src={image}
+                  alt="Profile gallery"
+                  draggable="false"
+                  onContextMenu={(event) => event.preventDefault()}
+                  className="h-72 w-full object-cover object-top transition hover:scale-105"
+                />
+              </button>
             ))}
           </div>
         </div>
