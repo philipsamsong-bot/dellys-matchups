@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = "https://dellysmatchups.org";
+const siteUrl = "https://www.dellysmatchups.org";
 const siteName = "Delly's Matchups";
 const tagline = "Redefining Authentic Relationships";
 const siteDescription =
@@ -26,9 +26,6 @@ export const metadata = {
   },
   description: siteDescription,
   applicationName: siteName,
-  verification: {
-    google: "_eH4MIVSblkl7VzBOLj4egBWe_G3jnTiYNP8Wje97jA",
-  },
   openGraph: {
     title: `${siteName} | ${tagline}`,
     description: siteDescription,
@@ -54,11 +51,18 @@ export const metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
       { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-48x48.png", type: "image/png", sizes: "48x48" },
     ],
     shortcut: ["/favicon.ico"],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    other: [
+      {
+        rel: "manifest",
+        url: "/site.webmanifest",
+      },
+    ],
   },
 };
 
