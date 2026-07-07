@@ -56,6 +56,7 @@ export async function POST(request) {
       html: `
         <h2>Thank you for your order, ${customer.fullName}.</h2>
         <p>We have received your order successfully.</p>
+        <p><strong>Order Number:</strong> ${orderNumber}</p>
         <ul>${itemList}</ul>
         <p><strong>Total:</strong> $${total}</p>
         <p><strong>Payment Method:</strong> ${payment.method}</p>
@@ -69,6 +70,7 @@ export async function POST(request) {
       subject: "New Shop Order Received",
       html: `
         <h2>New Shop Order</h2>
+        <p><strong>Order Number:</strong> ${orderNumber}</p>
         <p><strong>Name:</strong> ${customer.fullName}</p>
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Phone:</strong> ${customer.phone}</p>

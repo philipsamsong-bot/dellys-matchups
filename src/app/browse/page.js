@@ -8,7 +8,12 @@ import { supabase } from "@/lib/supabase";
 import DashboardChrome from "@/app/components/DashboardChrome";
 
 function getPlan(profile) {
-  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
+  return (
+    profile?.plan ||
+    profile?.membership_plan ||
+    profile?.subscription ||
+    "free"
+  )?.toLowerCase();
 }
 
 function hasPremiumAccess(profile) {
@@ -24,31 +29,14 @@ function getDisplayLocation(profile) {
 }
 
 function getProfileScore(profile) {
-  const plan = getPlan(profile);
   let score = 0;
 
-  if (profile?.avatar_url) score += 100;
-  if (profile?.is_complete) score += 80;
-  if (plan === "vip") score += 40;
-  if (plan === "premium") score += 20;
-  if (profile?.bio) score += 10;
-  if (profile?.interests) score += 5;
-  if (profile?.relationship_goal) score += 5;
+  if (profile?.avatar_url) score += 50;
+  if (profile?.is_complete) score += 40;
+  if (isVip(profile)) score += 30;
+  if (getPlan(profile) === "premium") score += 20;
 
   return score;
-}
-
-function sortProfiles(profiles) {
-  return [...profiles].sort((a, b) => {
-    const scoreDifference = getProfileScore(b) - getProfileScore(a);
-
-    if (scoreDifference !== 0) return scoreDifference;
-
-    return (
-      new Date(b.updated_at || b.created_at || 0) -
-      new Date(a.updated_at || a.created_at || 0)
-    );
-  });
 }
 
 export default function BrowsePage() {
@@ -58,6 +46,7 @@ export default function BrowsePage() {
   const [userProfile, setUserProfile] = useState(null);
   const [likedProfiles, setLikedProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [totalMembers, setTotalMembers] = useState(0);
 
   const [locationFilter, setLocationFilter] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
@@ -83,121 +72,121 @@ export default function BrowsePage() {
   }, []);
 
   useEffect(() => {
-    async function loadBrowsePage() {
+    async function loadBrowseData() {
+      setLoading(true);
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        router.push("/auth/login");
+        router.push("/login");
         return;
       }
 
-      const { data: currentProfile, error: profileError } = await supabase
+      const { data: currentProfile } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
-        .single();
-
-      if (profileError) {
-        alert(profileError.message);
-        setLoading(false);
-        return;
-      }
-
-      const { data: otherProfiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("*")
-        .neq("id", user.id)
-        .eq("is_visible", true)
-        .eq("matchups_eligible", true);
-
-      if (profilesError) {
-        alert(profilesError.message);
-        setLoading(false);
-        return;
-      }
-
-      const { data: likes, error: likesError } = await supabase
-        .from("likes")
-        .select("liked_user_id")
-        .eq("user_id", user.id);
-
-      if (likesError) {
-        alert(likesError.message);
-        setLoading(false);
-        return;
-      }
+        .maybeSingle();
 
       setUserProfile(currentProfile);
-      setProfiles(sortProfiles(otherProfiles || []));
-      setLikedProfiles((likes || []).map((like) => like.liked_user_id));
+
+      const { data: profileRows, count, error } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact" })
+        .neq("id", user.id);
+
+      if (error) {
+        console.error("Failed to load profiles:", error);
+        setProfiles([]);
+        setTotalMembers(0);
+        setLoading(false);
+        return;
+      }
+
+      const sortedProfiles = (profileRows || []).sort((a, b) => {
+        return getProfileScore(b) - getProfileScore(a);
+      });
+
+      setProfiles(sortedProfiles);
+      setTotalMembers(count ?? sortedProfiles.length);
+
+      const { data: likes } = await supabase
+        .from("profile_likes")
+        .select("liked_profile_id")
+        .eq("user_id", user.id);
+
+      setLikedProfiles((likes || []).map((like) => like.liked_profile_id));
+
       setLoading(false);
     }
 
-    loadBrowsePage();
+    loadBrowseData();
   }, [router]);
 
-  const hasFullAccess = useMemo(() => hasPremiumAccess(userProfile), [userProfile]);
+  const hasFullAccess = hasPremiumAccess(userProfile);
 
   const filteredProfiles = useMemo(() => {
     return profiles.filter((profile) => {
-      const locationText = [profile?.city, profile?.country]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+      const location = getDisplayLocation(profile).toLowerCase();
+      const gender = profile?.gender || "";
+      const age = Number(profile?.age || 0);
 
-      const locationMatch =
-        !locationFilter.trim() ||
-        locationText.includes(locationFilter.trim().toLowerCase());
+      const matchesLocation =
+        !locationFilter ||
+        location.includes(locationFilter.trim().toLowerCase());
 
-      const genderMatch =
-        !genderFilter || String(profile?.gender || "").toLowerCase() === genderFilter.toLowerCase();
+      const matchesGender = !genderFilter || gender === genderFilter;
 
-      const age = Number(profile?.age);
-      const minAgeMatch = !minAgeFilter || (age && age >= Number(minAgeFilter));
-      const maxAgeMatch = !maxAgeFilter || (age && age <= Number(maxAgeFilter));
+      const matchesMinAge =
+        !minAgeFilter || (age && age >= Number(minAgeFilter));
 
-      return locationMatch && genderMatch && minAgeMatch && maxAgeMatch;
+      const matchesMaxAge =
+        !maxAgeFilter || (age && age <= Number(maxAgeFilter));
+
+      return matchesLocation && matchesGender && matchesMinAge && matchesMaxAge;
     });
   }, [profiles, locationFilter, genderFilter, minAgeFilter, maxAgeFilter]);
+
   async function handleLike(profileId) {
-    if (!hasFullAccess) {
-      router.push("/matchups/checkout?plan=premium");
+    if (!userProfile?.id) return;
+
+    const alreadyLiked = likedProfiles.includes(profileId);
+
+    if (alreadyLiked) {
+      setLikedProfiles((current) => current.filter((id) => id !== profileId));
+
+      await supabase
+        .from("profile_likes")
+        .delete()
+        .eq("user_id", userProfile.id)
+        .eq("liked_profile_id", profileId);
+
       return;
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    setLikedProfiles((current) => [...current, profileId]);
 
-    if (!user) {
-      router.push("/auth/login");
-      return;
-    }
-
-    if (likedProfiles.includes(profileId)) return;
-
-    const { error } = await supabase.from("likes").insert({
-      user_id: user.id,
-      liked_user_id: profileId,
+    await supabase.from("profile_likes").insert({
+      user_id: userProfile.id,
+      liked_profile_id: profileId,
     });
-
-    if (error) {
-      if (error.message.toLowerCase().includes("duplicate")) return;
-      alert(error.message);
-      return;
-    }
-
-    setLikedProfiles((currentLikes) => [...currentLikes, profileId]);
   }
 
   if (loading) {
     return (
       <>
         <DashboardChrome />
-        <main className="flex min-h-screen items-center justify-center bg-[#b30018] text-white">
-          <p className="text-xl font-bold">Loading Matchups...</p>
+        <main className="min-h-screen bg-[#b30018] px-6 py-24 text-white">
+          <div className="mx-auto max-w-7xl">
+            <p className="text-sm font-black uppercase tracking-[0.3em] text-red-200">
+              Browse Matchups
+            </p>
+            <h1 className="mt-6 font-display text-5xl font-black md:text-7xl">
+              Loading profiles...
+            </h1>
+          </div>
         </main>
       </>
     );
@@ -207,25 +196,24 @@ export default function BrowsePage() {
     <>
       <DashboardChrome />
 
-      <main className="min-h-screen select-none bg-[#b30018] px-6 pb-24 pt-16 text-white">
+      <main className="min-h-screen bg-gradient-to-b from-[#b30018] via-[#cf001c] to-[#7a000d] px-6 py-24 text-white">
         <div className="mx-auto max-w-7xl">
           <motion.div
-            initial={{ opacity: 0, y: 35 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="max-w-3xl"
+            transition={{ duration: 0.6 }}
           >
-            <p className="text-sm font-black uppercase tracking-[0.35em] text-red-200">
+            <p className="text-sm font-black uppercase tracking-[0.35em] text-red-100">
               Browse Matchups
             </p>
 
-            <h1 className="font-display mt-5 text-6xl font-black leading-tight md:text-7xl">
+            <h1 className="mt-6 max-w-3xl font-display text-5xl font-black leading-tight md:text-7xl">
               Discover Your
               <br />
               Meaningful Match
             </h1>
 
-            <p className="mt-6 text-lg leading-8 text-white/70">
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-white/70">
               Browse profile photos. Upgrade to unlock full profiles, galleries,
               likes, and direct messaging.
             </p>
@@ -236,7 +224,9 @@ export default function BrowsePage() {
               <p className="text-sm font-black uppercase tracking-[0.3em] text-red-200">
                 Active Members
               </p>
-              <h2 className="mt-2 text-5xl font-black">{filteredProfiles.length}</h2>
+              <h2 className="mt-2 text-5xl font-black">
+                {totalMembers.toLocaleString()}
+              </h2>
             </div>
 
             <div className="md:text-right">
@@ -310,7 +300,8 @@ export default function BrowsePage() {
               </p>
             </div>
           )}
-{filteredProfiles.length === 0 ? (
+
+          {filteredProfiles.length === 0 ? (
             <div className="mt-14 rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-white/70">
               No profiles found.
             </div>

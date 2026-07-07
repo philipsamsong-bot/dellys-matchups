@@ -14,7 +14,7 @@ export async function POST(request) {
     } = body;
 
     const response = await resend.emails.send({
-      from: "DMs Counselling <${process.env.RESND_FROM_EMAIL}>",
+      from: `DMs Counselling <${process.env.RESEND_FROM_EMAIL}>`,
       to: email,
       subject: "Your Counselling Session Has Been Confirmed",
       html: `

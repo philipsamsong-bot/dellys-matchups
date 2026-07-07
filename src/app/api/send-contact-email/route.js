@@ -15,7 +15,7 @@ export async function POST(request) {
     } = body;
 
     await resend.emails.send({
-      from: "DMs Contact <${process.env.RESND_FROM_EMAIL}>",
+      from: `DMs Contact <${process.env.RESEND_FROM_EMAIL}>`,
       to: email,
       subject: "We Received Your Message",
       html: `
@@ -61,8 +61,8 @@ export async function POST(request) {
     });
 
     await resend.emails.send({
-      from: "DMs Contact Alert <${process.env.RESND_FROM_EMAIL}>",
-      to: "philipsamsong@gmail.com",
+      from: `DMs Contact Alert <${process.env.RESEND_FROM_EMAIL}>`,
+      to: process.env.ADMIN_EMAIL,
       subject: "New Contact Message Received",
       html: `
         <div style="font-family: Arial, sans-serif; padding: 40px;">
