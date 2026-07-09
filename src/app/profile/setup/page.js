@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { compressImage } from "@/lib/compressImage";
 import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 
 const countries = [
@@ -160,7 +161,9 @@ function ProfileSetupPage() {
   const galleryLimit = getGalleryLimit(plan);
   const canUploadGallery = galleryLimit > 0;
   const remainingGallerySlots =
-    galleryLimit === Infinity ? Infinity : Math.max(galleryLimit - galleryUrls.length, 0);
+    galleryLimit === Infinity
+      ? Infinity
+      : Math.max(galleryLimit - galleryUrls.length, 0);
 
   useEffect(() => {
     async function getUser() {
@@ -263,24 +266,35 @@ function ProfileSetupPage() {
       [name]: value,
     }));
   }
-
   async function uploadPhoto() {
     if (!photo || !user) return null;
 
-    const fileExt = photo.name.split(".").pop();
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+    const compressedPhoto = await compressImage(photo, {
+      maxWidth: 900,
+      maxHeight: 1200,
+      quality: 0.78,
+      outputType: "image/webp",
+    });
+
+    const fileName = `${user.id}-${Date.now()}.webp`;
     const filePath = `${user.id}/${fileName}`;
 
     const { error } = await supabase.storage
       .from("profile-photos")
-      .upload(filePath, photo, { upsert: true });
+      .upload(filePath, compressedPhoto, {
+        contentType: "image/webp",
+        upsert: true,
+      });
 
     if (error) throw error;
 
-    const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
+    const { data } = supabase.storage
+      .from("profile-photos")
+      .getPublicUrl(filePath);
 
     return data.publicUrl;
   }
+
   async function uploadGalleryFiles(event) {
     const selectedFiles = Array.from(event.target.files || []);
 
@@ -292,7 +306,9 @@ function ProfileSetupPage() {
     }
 
     const allowedFiles =
-      galleryLimit === Infinity ? selectedFiles : selectedFiles.slice(0, remainingGallerySlots);
+      galleryLimit === Infinity
+        ? selectedFiles
+        : selectedFiles.slice(0, remainingGallerySlots);
 
     if (galleryLimit !== Infinity && selectedFiles.length > remainingGallerySlots) {
       alert(`Premium members can upload up to ${galleryLimit} gallery photos.`);
@@ -306,17 +322,31 @@ function ProfileSetupPage() {
       const uploadedUrls = [];
 
       for (const file of allowedFiles) {
-        const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+        const compressedFile = await compressImage(file, {
+          maxWidth: 900,
+          maxHeight: 1200,
+          quality: 0.78,
+          outputType: "image/webp",
+        });
+
+        const fileName = `${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}.webp`;
+
         const filePath = `${user.id}/gallery/${fileName}`;
 
         const { error } = await supabase.storage
           .from("profile-photos")
-          .upload(filePath, file, { upsert: true });
+          .upload(filePath, compressedFile, {
+            contentType: "image/webp",
+            upsert: true,
+          });
 
         if (error) throw error;
 
-        const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
+        const { data } = supabase.storage
+          .from("profile-photos")
+          .getPublicUrl(filePath);
 
         uploadedUrls.push(data.publicUrl);
       }
@@ -333,7 +363,6 @@ function ProfileSetupPage() {
   function removeGalleryImage(imageUrl) {
     setGalleryUrls((current) => current.filter((url) => url !== imageUrl));
   }
-
   function isProfileComplete(updates) {
     return Boolean(
       updates.full_name &&
@@ -413,7 +442,6 @@ function ProfileSetupPage() {
       setLoading(false);
     }
   }
-
   return (
     <>
       <SiteNav />
@@ -488,6 +516,7 @@ function ProfileSetupPage() {
                 }}
               />
             </div>
+
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
               <h2 className="font-display text-4xl font-bold">Gallery Photos</h2>
 
@@ -534,7 +563,7 @@ function ProfileSetupPage() {
 
                   <p className="mt-3 text-sm text-white/65">
                     {uploadingGallery
-                      ? "Uploading gallery photos..."
+                      ? "Compressing and uploading gallery photos..."
                       : galleryLimit === Infinity
                         ? `${galleryUrls.length} gallery photos uploaded.`
                         : `${galleryUrls.length}/${galleryLimit} gallery photos uploaded.`}
@@ -549,9 +578,10 @@ function ProfileSetupPage() {
                 </a>
               )}
             </div>
-
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">Personal Information</h2>
+              <h2 className="font-display text-4xl font-bold">
+                Personal Information
+              </h2>
 
               <div className="mt-6 grid gap-6 md:grid-cols-2">
                 <input
@@ -698,7 +728,11 @@ function ProfileSetupPage() {
                     Select genotype optional
                   </option>
                   {genotypes.map((genotype) => (
-                    <option key={genotype} value={genotype} className="text-black">
+                    <option
+                      key={genotype}
+                      value={genotype}
+                      className="text-black"
+                    >
                       {genotype}
                     </option>
                   ))}
