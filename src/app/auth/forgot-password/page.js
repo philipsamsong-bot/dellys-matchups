@@ -5,6 +5,11 @@ import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import DashboardChrome from "@/app/components/DashboardChrome";
 
+const RESET_REDIRECT_URL =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3000/auth/reset-password"
+    : "https://www.dellysmatchups.org/auth/reset-password";
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,10 +19,12 @@ export default function ForgotPasswordPage() {
     event.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
-    });
-
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      {
+        redirectTo: RESET_REDIRECT_URL,
+      }
+    );
     setLoading(false);
 
     if (error) {
