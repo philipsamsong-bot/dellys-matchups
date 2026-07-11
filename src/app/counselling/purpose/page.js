@@ -114,7 +114,7 @@ export default function PurposeDiscoveryPage() {
             >
               <div className="flex min-h-[680px] items-center justify-center overflow-hidden rounded-[3rem] bg-[#7a0010]/40 p-4 shadow-2xl">
                 <img
-                  src="/purpose.jpg"
+                  src="/purpose.webp"
                   alt="Purpose discovery"
                   className="max-h-[760px] w-full rounded-[2.5rem] object-contain"
                 />

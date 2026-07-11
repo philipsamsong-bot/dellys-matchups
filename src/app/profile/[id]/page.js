@@ -95,7 +95,7 @@ export default function PublicProfilePage() {
       setViewerProfile(currentProfile);
       setProfile(viewedProfile);
       setLiked(Boolean(existingLike));
-      setActivePhoto(viewedProfile.avatar_url || "/placeholder-profile.jpg");
+      setActivePhoto(viewedProfile.avatar_url || "/placeholder-profile.webp");
       setLoading(false);
     }
 
@@ -161,7 +161,7 @@ export default function PublicProfilePage() {
             <div>
               <div className="relative overflow-hidden rounded-[3rem] bg-black/25 shadow-2xl">
                 <img
-                  src={activePhoto || profile?.avatar_url || "/placeholder-profile.jpg"}
+                  src={activePhoto || profile?.avatar_url || "/placeholder-profile.webp"}
                   alt={fullAccess ? profile?.full_name || "Profile" : "Locked profile photo"}
                   draggable="false"
                   onContextMenu={(event) => event.preventDefault()}

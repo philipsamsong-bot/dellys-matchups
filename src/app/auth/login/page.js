@@ -121,7 +121,7 @@ export default function LoginPage() {
               className="inline-flex w-fit rounded-2xl bg-white px-4 py-2 shadow-2xl"
             >
               <img
-                src="/dellys-logo.png"
+                src="/dellys-logo.webp"
                 alt="Delly's Matchups"
                 className="h-24 w-auto object-contain"
               />
@@ -152,7 +152,7 @@ export default function LoginPage() {
             <div className="mb-8 flex justify-center lg:hidden">
               <a href="/" className="rounded-2xl bg-white px-4 py-2 shadow-2xl">
                 <img
-                  src="/dellys-logo.png"
+                  src="/dellys-logo.webp"
                   alt="Delly's Matchups"
                   className="h-24 w-auto object-contain"
                 />

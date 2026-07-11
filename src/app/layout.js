@@ -35,7 +35,7 @@ export const metadata = {
     type: "website",
     images: [
       {
-        url: "/og-image.png",
+        url: "/og-image.webp",
         width: 1200,
         height: 630,
         alt: `${siteName} - ${tagline}`,
@@ -46,30 +46,30 @@ export const metadata = {
     card: "summary_large_image",
     title: `${siteName} | ${tagline}`,
     description: siteDescription,
-    images: ["/og-image.png"],
+    images: ["/og-image.webp"],
   },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
-      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
-      { url: "/favicon-48x48.png", type: "image/png", sizes: "48x48" },
-      { url: "/favicon-64x64.png", type: "image/png", sizes: "64x64" },
-      { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
+      { url: "/favicon-16x16.webp", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-32x32.webp", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-48x48.webp", type: "image/png", sizes: "48x48" },
+      { url: "/favicon-64x64.webp", type: "image/png", sizes: "64x64" },
+      { url: "/favicon-96x96.webp", type: "image/png", sizes: "96x96" },
     ],
     shortcut: ["/favicon.ico"],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    apple: [{ url: "/apple-touch-icon.webp", sizes: "180x180" }],
     other: [
       { rel: "manifest", url: "/site.webmanifest" },
       {
         rel: "icon",
-        url: "/android-chrome-192x192.png",
+        url: "/android-chrome-192x192.webp",
         type: "image/png",
         sizes: "192x192",
       },
       {
         rel: "icon",
-        url: "/android-chrome-512x512.png",
+        url: "/android-chrome-512x512.webp",
         type: "image/png",
         sizes: "512x512",
       },

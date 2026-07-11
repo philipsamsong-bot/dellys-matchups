@@ -74,7 +74,7 @@ export default function MatchupsPage() {
             >
 
               <img
-                src="/matchups-hero.png"
+                src="/matchups-hero.webp"
                 alt="Delly's Matchups"
                 className="h-[650px] w-full object-cover"
               />

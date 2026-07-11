@@ -114,7 +114,7 @@ export default function EmotionalHealingPage() {
             >
               <div className="flex min-h-[680px] items-center justify-center overflow-hidden rounded-[3rem] bg-[#7a0010]/40 p-4 shadow-2xl">
                 <img
-                  src="/healing.jpg"
+                  src="/healing.webp"
                   alt="Emotional healing"
                   className="max-h-[760px] w-full rounded-[2.5rem] object-contain"
                 />

@@ -30,7 +30,7 @@ export default function AboutPlatformPage() {
         <section className="relative flex min-h-[115vh] items-start overflow-hidden pt-[115px]">
           <div className="absolute inset-0 right-0 top-0 bottom-0">
             <img
-              src="/about-platform.jpg"
+              src="/about-platform.webp"
               alt="Delly's Matchups"
               className="h-full w-full object-cover object-[center_50%]"
             />
@@ -112,7 +112,7 @@ export default function AboutPlatformPage() {
               <div className="sticky top-40 space-y-10">
              <div className ="h-fit overflow-hidden rounded-[3rem] shadow-2xl">
                 <img
-                  src="/gallery5.jpg"
+                  src="/gallery5.webp"
                   alt="About Delly's Matchups"
                   className="h-full min-h-[650px] w-full object-cover object-center"
                 />
@@ -120,7 +120,7 @@ export default function AboutPlatformPage() {
 
              <div className= "h-fit overflow-hidden rounded-[3rem] shadow-2xl">
                 <img
-                  src="/academy4.jpg"
+                  src="/academy4.webp"
                   alt="About Delly's Matchups"
                   className="h-full min-h-[650px] w-full object-cover object-center"
                 />

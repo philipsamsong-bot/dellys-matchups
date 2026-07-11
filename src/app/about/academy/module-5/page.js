@@ -26,7 +26,7 @@ export default function ModuleFivePage() {
         <section className="relative min-h-screen overflow-hidden">
           <div className="absolute inset-0">
             <img
-              src="/gallery2.jpg"
+              src="/gallery2.webp"
               alt="Healing & Restoration Clinic"
               className="h-full w-full object-cover"
             />
@@ -119,7 +119,7 @@ export default function ModuleFivePage() {
               className="overflow-hidden rounded-[3rem] border border-black/10 bg-white p-4 shadow-2xl"
             >
               <img
-                src="/gallery3.jpg"
+                src="/gallery3.webp"
                 alt="Healing and Restoration"
                 className="h-[720px] w-full rounded-[2.5rem] object-cover"
               />

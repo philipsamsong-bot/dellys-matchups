@@ -26,7 +26,7 @@ export default function ModuleThreePage() {
         <section className="relative min-h-screen overflow-hidden">
           <div className="absolute inset-0">
             <img
-              src="/academy3.jpg"
+              src="/academy3.webp"
               alt="Counselling 103"
               className="h-full w-full object-cover"
             />
@@ -117,7 +117,7 @@ export default function ModuleThreePage() {
               className="overflow-hidden rounded-[3rem] border border-black/10 bg-white p-4 shadow-2xl"
             >
               <img
-                src="/academy4.jpg"
+                src="/academy4.webp"
                 alt="Becoming a Seasoned Counsellor"
                 className="h-[720px] w-full rounded-[2.5rem] object-cover"
               />

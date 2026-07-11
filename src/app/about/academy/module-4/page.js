@@ -26,7 +26,7 @@ export default function ModuleFourPage() {
         <section className="relative min-h-screen overflow-hidden">
           <div className="absolute inset-0">
             <img
-              src="/academy4.jpg"
+              src="/academy4.webp"
               alt="Leadership & Influence"
               className="h-full w-full object-cover"
             />
@@ -119,7 +119,7 @@ export default function ModuleFourPage() {
               className="overflow-hidden rounded-[3rem] border border-black/10 bg-white p-4 shadow-2xl"
             >
               <img
-                src="/gallery1.jpg"
+                src="/gallery1.webp"
                 alt="Leadership Training"
                 className="h-[720px] w-full rounded-[2.5rem] object-cover"
               />

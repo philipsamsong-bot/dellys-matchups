@@ -10,7 +10,7 @@ const books = [
     title: "I DO, I DON’T",
     year: "2023",
     price: "$25",
-    image: "/ido-idont-book.jpg",
+    image: "/ido-idont-book.webp",
     description:
       "Inspired by a decade of counselling experience and godly wisdom, this transformational book helps singles make emotionally intelligent relationship decisions and equips couples with principles for building lasting, healthy marriages.",
     link: "/shop/books/ido-idont",
@@ -20,7 +20,7 @@ const books = [
     title: "Diary of a Special Mum",
     year: "2024",
     price: "$25",
-    image: "/book-diary.jpg",
+    image: "/book-diary.webp",
     description:
     "Foreworded by Eric CHINJE, this inspiring book shares Delly Singah's real-life experiences as a special-needs parent, offering practical insights, hope, and autism awareness while challenging stereotypes and reducing stigma.",
     link: "/shop/books/diary-of-a-special-mum",
@@ -30,7 +30,7 @@ const books = [
     title: "Adventures of Delphine",
     year: "2025",
     price: "$40",
-    image: "/book-adventures.jpg",
+    image: "/book-adventures.webp",
     description:
       "Foreworded by Dr. Richard Munang. A collection of 30 independent, fun, heartfelt childwood stories inspired by real-life experiences. Set in Mulang, the book follows Delphine through family, friendships, school, chores, discipline, laughter, mistakes, and life lessons. A 220-page independently published book suitable for all ages.",
     link: "/shop/books/adventures-of-delphine",
@@ -40,7 +40,7 @@ const books = [
     title: "Journal d'une Maman Spéciale",
     year:"2024",
     price:"$25",
-    image: "/journal-maman-speciale.jpg",
+    image: "/journal-maman-speciale.webp",
     description:
     "The French edition of Diary of a Special Mum, offering encouragement,resilience,autism awareness,and hope for mothers,families, and caregivers.",
     link: "/shop/books/journal-d'une-maman-spécial",
@@ -84,7 +84,7 @@ export default function BooksPage() {
       <section className="relative min-h-screen overflow-hidden">
   <div className="absolute inset-0">
     <img
-      src="/ido-idont-book.jpg"
+      src="/ido-idont-book.webp"
       alt="Delly Singah Books"
       className=" absolute right-[-200px] top-2 h-full w-auto max-w-none object-cover"
     />
@@ -270,7 +270,7 @@ export default function BooksPage() {
               className="overflow-hidden rounded-[3rem] border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl"
             >
               <img
-                src="/founder-book.jpg"
+                src="/founder-book.webp"
                 alt="Delly Singah Author"
                 className="h-[760px] w-full rounded-[2.5rem] object-cover"
               />

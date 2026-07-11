@@ -342,7 +342,7 @@ export default function DashboardPage() {
                     className="overflow-hidden rounded-[2rem] bg-white/10 shadow-2xl transition hover:scale-[1.02] hover:bg-white hover:text-[#b30018]"
                   >
                     <img
-                      src={item.avatar_url || "/placeholder-profile.jpg"}
+                      src={item.avatar_url || "/placeholder-profile.webp"}
                       alt={item.full_name || "Profile"}
                       className="h-72 w-full object-cover object-top"
                     />

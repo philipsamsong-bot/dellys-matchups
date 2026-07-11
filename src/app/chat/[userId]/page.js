@@ -241,7 +241,7 @@ export default function ChatPage() {
                       }`}
                     >
                       <img
-                        src={profile.avatar_url || "/placeholder-profile.jpg"}
+                        src={profile.avatar_url || "/placeholder-profile.webp"}
                         alt={profile.full_name || "Member"}
                         className="h-14 w-14 rounded-full object-cover object-top"
                       />
@@ -272,7 +272,7 @@ export default function ChatPage() {
                 className="flex items-center gap-4"
               >
                 <img
-                  src={receiverProfile?.avatar_url || "/placeholder-profile.jpg"}
+                  src={receiverProfile?.avatar_url || "/placeholder-profile.webp"}
                   alt={receiverProfile?.full_name || "Member"}
                   className="h-14 w-14 rounded-full object-cover object-top"
                 />
@@ -386,7 +386,7 @@ export default function ChatPage() {
               className="block rounded-[2rem] border border-white/10 bg-white/10 p-5 transition hover:bg-white/15"
             >
               <img
-                src={receiverProfile?.avatar_url || "/placeholder-profile.jpg"}
+                src={receiverProfile?.avatar_url || "/placeholder-profile.webp"}
                 alt={receiverProfile?.full_name || "Member"}
                 className="h-72 w-full rounded-[1.5rem] object-cover object-top"
               />

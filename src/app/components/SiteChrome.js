@@ -94,7 +94,7 @@ export function SiteNav() {
       <div className="mx-auto flex h-28 max-w-7xl items-center justify-between px-6">
         <a href="/" className="flex shrink-0 items-center">
           <img
-            src="/dellys-logo.png"
+            src="/dellys-logo.webp"
             alt="Delly's Matchups"
             className="h-24 w-auto object-contain"
           />
@@ -313,7 +313,7 @@ export function SiteFooter() {
         <div className="grid gap-12 lg:grid-cols-4">
           <div>
             <img
-              src="/dellys-logo.png"
+              src="/dellys-logo.webp"
               alt="Delly's Matchups"
               className="h-28 w-auto object-contain"
             />

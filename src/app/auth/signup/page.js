@@ -121,7 +121,7 @@ export default function SignupPage() {
           <div className="hidden flex-col justify-between bg-black/30 p-10 lg:flex">
             <a href="/" className="inline-flex w-fit">
               <img
-                src="/dellys-logo.png"
+                src="/dellys-logo.webp"
                 alt="Delly's Matchups"
                 className="h-28 w-auto object-contain"
               />
@@ -152,7 +152,7 @@ export default function SignupPage() {
             <div className="mb-8 flex justify-center lg:hidden">
               <a href="/" className="inline-flex">
                 <img
-                  src="/dellys-logo.png"
+                  src="/dellys-logo.webp"
                   alt="Delly's Matchups"
                   className="h-24 w-auto object-contain"
                 />

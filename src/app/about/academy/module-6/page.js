@@ -26,7 +26,7 @@ export default function ModuleSixPage() {
         <section className="relative min-h-screen overflow-hidden">
           <div className="absolute inset-0">
             <img
-              src="/gallery4.jpg"
+              src="/gallery4.webp"
               alt="Master Classes"
               className="h-full w-full object-cover"
             />
@@ -177,7 +177,7 @@ export default function ModuleSixPage() {
               className="overflow-hidden rounded-[3rem] border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl"
             >
               <img
-                src="/academy10.jpg"
+                src="/academy10.webp"
                 alt="Master Classes"
                 className="h-[720px] w-full rounded-[2.5rem] object-cover"
               />

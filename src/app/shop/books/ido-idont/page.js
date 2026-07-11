@@ -9,7 +9,7 @@ export default function IDoIDontPage() {
     type: "book",
     title: "I DO, I DON’T",
     price: "$25",
-    image: "/ido-idont-book.jpg",
+    image: "/ido-idont-book.webp",
   };
 
   function addToCart() {
@@ -94,7 +94,7 @@ export default function IDoIDontPage() {
               className="overflow-hidden rounded-[3rem] bg-white p-5 shadow-2xl"
             >
               <img
-                src="/ido-idont-book.jpg"
+                src="/ido-idont-book.webp"
                 alt="I DO, I DON’T"
                 className="h-[760px] w-full rounded-[2.5rem] object-contain"
               />

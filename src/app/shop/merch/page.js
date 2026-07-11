@@ -11,7 +11,7 @@ const merch = [
     title: "Receive Sense T-Shirt",
     price: "$25",
     image:
-     "/receivesense2.jpg",
+     "/receivesense2.webp",
     category: "T-Shirts",
   },
   {
@@ -19,7 +19,7 @@ const merch = [
     title: "Receive Sense Hoodie",
     price: "$100",
     image:
-      "/receivesense1.jpg",
+      "/receivesense1.webp",
     category: "Hoodies",
   },
   {
@@ -27,7 +27,7 @@ const merch = [
     title: "Receive Sense Cap",
     price: "$50",
     image:
-      "/receivesense-cap.jpg",
+      "/receivesense-cap.webp",
     category: "Caps",
   },
   {
@@ -35,7 +35,7 @@ const merch = [
     title: "Customised Hoodie",
     price: "$100",
     image:
-     "/customisedhoodie.png",
+     "/customisedhoodie.webp",
     category: "Custom",
   },
   {
@@ -43,7 +43,7 @@ const merch = [
     title: "Favourite Scriptures T-Shirt",
     price: "$30",
     image:
-     "/customised-tshirt.png",
+     "/customised-tshirt.webp",
     category: "Faith Collection",
   },
   {
@@ -51,7 +51,7 @@ const merch = [
     title: "Customised T-Shirt",
     price: "$30",
     image:
-      "/customisedt-shirt1.jpg",
+      "/customisedt-shirt1.webp",
     category: "Custom",
   },
 ];

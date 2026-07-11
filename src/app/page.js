@@ -20,7 +20,7 @@ const testimonials = [
   },
 ];
 
-const gallery = ["/gallery1.jpg", "/gallery2.jpg", "/gallery3.jpg", "/gallery4.jpg"];
+const gallery = ["/gallery1.webp", "/gallery2.webp", "/gallery3.webp", "/gallery4.webp"];
 
 const plans = [
   {
@@ -46,7 +46,7 @@ const plans = [
   {
     name: "Premium",
     price: "$30",
-    image: "/premium-banner.png",
+    image: "/premium-banner.webp",
     featured: true,
     features: [
       "Upload up to 5 photos",
@@ -60,7 +60,7 @@ const plans = [
   {
     name: "VIP",
     price: "$100",
-    image: "/vip-banner.png",
+    image: "/vip-banner.webp",
     features: [
       "Everything in Premium",
       "Unlimited photos",
@@ -259,7 +259,7 @@ export default function Home() {
 
             <div className="relative overflow-hidden rounded-[3rem] border border-white/10 bg-black/30 p-5 backdrop-blur-xl">
               <img
-                src="/dellys-logo2.png"
+                src="/dellys-logo2.webp"
                 alt="Delly's Matchups"
                 className="mx-auto w-full max-w-2xl object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.35)]"
               />
@@ -275,7 +275,7 @@ export default function Home() {
                     muted
                     loop
                     playsInline
-                    poster="/dellys-logo2.png"
+                    poster="/dellys-logo2.webp"
                     className="aspect-square w-full max-w-[520px] rounded-[1.5rem] object-contain"
                   >
                     <source src="/intro-video.mp4" type="video/mp4" />
@@ -328,7 +328,7 @@ export default function Home() {
         >
           <div className="overflow-hidden rounded-[3rem] border border-white/10 bg-white/10 p-4 shadow-2xl">
             <img
-              src="/about-platform.jpg"
+              src="/about-platform.webp"
               alt="Delly's Matchups"
               className="h-[520px] w-full rounded-[2.5rem] object-cover"
             />
@@ -404,7 +404,7 @@ export default function Home() {
             <div className="absolute inset-0 rounded-full bg-red-200 blur-3xl" />
 
             <img
-              src="/ido-idont-book.jpg"
+              src="/ido-idont-book.webp"
               alt="I DO I DON'T"
               className="relative z-10 max-w-lg rounded-[2rem] object-contain drop-shadow-2xl"
             />
@@ -689,7 +689,7 @@ export default function Home() {
         <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-4">
           <div>
             <img
-              src="/dellys-logo.png"
+              src="/dellys-logo.webp"
               alt="Delly's Matchups"
               className="h-32 w-auto object-contain drop-shadow-[0_0_25px_rgba(255,255,255,0.35)]"
             />

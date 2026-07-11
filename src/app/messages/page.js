@@ -194,7 +194,7 @@ export default function MessagesPage() {
                   <img
                     src={
                       conversation.profile?.avatar_url ||
-                      "/placeholder-profile.jpg"
+                      "/placeholder-profile.webp"
                     }
                     alt={conversation.profile?.full_name || "Member"}
                     className="h-20 w-20 rounded-full object-cover object-top"

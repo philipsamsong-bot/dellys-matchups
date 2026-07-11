@@ -36,7 +36,7 @@ export default function FounderPage() {
               className="overflow-hidden rounded-[3rem] border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl"
             >
               <img
-                src="/founder.jpg"
+                src="/founder.webp"
                 alt="Delly Singah"
                 className="h-[760px] w-full rounded-[2.5rem] object-cover"
               />
@@ -191,7 +191,7 @@ export default function FounderPage() {
     >
       
       <img
-        src="/gallery5.jpg"
+        src="/gallery5.webp"
         alt="Delly Singah"
         className="h-[680px] w-full rounded-[2.5rem] object-cover"
       />
@@ -407,7 +407,7 @@ export default function FounderPage() {
       className="overflow-hidden rounded-[2.5rem]"
     >
       <img
-        src="/gallery6.jpg"
+        src="/gallery6.webp"
         alt="Delly Singah"
         className="h-[720px] w-full rounded-[2.5rem] object-cover"
       />
@@ -490,11 +490,11 @@ export default function FounderPage() {
           {[
             {
               title: "Diary of a Special Mum (2024)",
-              image: "/book-diary.jpg",
+              image: "/book-diary.webp",
             },
             {
               title: "Adventures of Delphine (2025)",
-              image: "/book-adventures.jpg",
+              image: "/book-adventures.webp",
             },
           ].map((book) => (
             <div
@@ -526,7 +526,7 @@ export default function FounderPage() {
       className="overflow-hidden rounded-[2.5rem]"
     >
       <img
-        src="/founder-book.jpg"
+        src="/founder-book.webp"
         alt="Delly Singah"
         className="h-[760px] w-full rounded-[2.5rem] object-cover"
       />

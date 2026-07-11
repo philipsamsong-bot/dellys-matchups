@@ -9,49 +9,49 @@ const modules = [
     description:
       "Foundational relationship and life counselling principles for beginners.",
     link: "/about/academy/module-1",
-    image: "/thumbnail.png",
+    image: "/thumbnail.webp",
   },
   {
     title: "Counselling 102",
     description:
       "Advanced relationship and emotional counselling techniques.",
     link: "/about/academy/module-2",
-    image: "/thumbnail.png",
+    image: "/thumbnail.webp",
   },
   {
     title: "Counselling 103",
     description:
       "Becoming a seasoned transformational counsellor and mentor.",
     link: "/about/academy/module-3",
-    image: "/thumbnail.png",
+    image: "/thumbnail.webp",
   },
   {
     title: "Leadership & Influence",
     description:
       "Building confidence, public speaking and transformational leadership.",
     link: "/about/academy/module-4",
-    image: "/thumbnail.png",
+    image: "/thumbnail.webp",
   },
   {
     title: "Healing & Restoration",
     description:
       "Emotional recovery, healing and restoration mentorship.",
     link: "/about/academy/module-5",
-    image: "/thumbnail.png",
+    image: "/thumbnail.webp",
   },
   {
     title: "Master Classes",
     description:
       "Specialized trainings on relationships, healing, mentorship and family.",
     link: "/about/academy/module-6",
-    image: "/thumbnail.png",
+    image: "/thumbnail.webp",
   },
   {
     title: "Virginity 101",
     description:
       "Purity, self-worth, emotional intelligence and intentional living.",
     link: "/about/academy/module-7",
-    image: "/thumbnail.png",
+    image: "/thumbnail.webp",
   },
 ];
 
@@ -82,7 +82,7 @@ export default function AcademyPage() {
         <section className="relative min-h-[110vh] overflow-hidden">
           <div className="absolute inset-0">
             <img
-              src="/academy1.jpg"
+              src="/academy1.webp"
               alt="Delly's Mentoring Academy"
               className="h-full w-full object-cover"
             />
@@ -185,7 +185,7 @@ export default function AcademyPage() {
               className="overflow-hidden rounded-[3rem] border border-black/10 bg-white p-4 shadow-2xl"
             >
               <img
-                src="/academy10.jpg"
+                src="/academy10.webp"
                 alt="Academy Vision"
                 className="h-[750px] w-full rounded-[2.5rem] object-cover"
               />
@@ -265,7 +265,7 @@ export default function AcademyPage() {
         <section className="relative overflow-hidden px-6 py-32">
           <div className="absolute inset-0">
             <img
-              src="/academy4.jpg"
+              src="/academy4.webp"
               alt="Join The Academy"
               className="h-full w-full object-cover"
             />

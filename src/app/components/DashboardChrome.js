@@ -142,7 +142,7 @@ export default function DashboardChrome() {
         >
 
           <img
-            src="/dellys-logo.png"
+            src="/dellys-logo.webp"
 
             alt="Delly's Matchups"
 
