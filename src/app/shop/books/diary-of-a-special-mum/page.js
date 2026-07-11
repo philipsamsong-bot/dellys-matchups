@@ -9,7 +9,7 @@ export default function DiaryOfASpecialMumPage() {
     type: "book",
     title: "Diary of a Special Mum",
     price: "$25",
-    image: "/book-diary.jpg",
+    image: "/book-diary.webp",
   };
 
   function addToCart() {
@@ -98,7 +98,7 @@ export default function DiaryOfASpecialMumPage() {
               className="overflow-hidden rounded-[3rem] border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl"
             >
               <img
-                src="/book-diary.jpg"
+                src="/book-diary.webp"
                 alt="Diary of a Special Mum"
                 className="h-[760px] w-full rounded-[2.5rem] bg-white object-contain p-6"
               />

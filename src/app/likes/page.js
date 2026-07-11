@@ -184,7 +184,7 @@ export default function LikesPage() {
                     <a href={`/profile/${profile.id}`} className="block">
                       <div className="relative">
                         <img
-                          src={profile.avatar_url || "/placeholder-profile.jpg"}
+                          src={profile.avatar_url || "/placeholder-profile.webp"}
                           alt={profile.full_name || "Member"}
                           className="h-[420px] w-full object-cover object-top"
                         />

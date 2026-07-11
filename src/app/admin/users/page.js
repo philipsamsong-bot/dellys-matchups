@@ -169,7 +169,7 @@ export default function AdminUsersPage() {
                         <td className="py-5 pr-4">
                           <div className="flex items-center gap-4">
                             <img
-                              src={user.avatar_url || "/placeholder-profile.jpg"}
+                              src={user.avatar_url || "/placeholder-profile.webp"}
                               alt={user.full_name || "User"}
                               className="h-14 w-14 rounded-full object-cover object-top"
                             />

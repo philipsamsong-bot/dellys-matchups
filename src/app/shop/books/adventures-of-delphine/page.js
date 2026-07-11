@@ -9,7 +9,7 @@ export default function AdventuresOfDelphinePage() {
     type: "book",
     title: "Adventures of Delphine",
     price: "$40",
-    image: "/book-adventures.jpg",
+    image: "/book-adventures.webp",
   };
 
   function addToCart() {
@@ -108,7 +108,7 @@ export default function AdventuresOfDelphinePage() {
               className="overflow-hidden rounded-[3rem] border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl"
             >
               <img
-                src="/book-adventures.jpg"
+                src="/book-adventures.webp"
                 alt="Adventures of Delphine"
                 className="h-[760px] w-full rounded-[2.5rem] bg-white object-contain p-6"
               />

@@ -77,7 +77,7 @@ export default function CounsellingPage() {
 
       <section className="relative flex min-h-screen items-center justify-center overflow-hidden">
   <img
-    src="/hero.jpg"
+    src="/hero.webp"
     alt="Counselling"
     className="absolute inset-0 h-full w-full object-cover"
   />

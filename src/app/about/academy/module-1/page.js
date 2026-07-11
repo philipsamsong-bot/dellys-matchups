@@ -26,7 +26,7 @@ export default function ModuleOnePage() {
         <section className="relative min-h-screen overflow-hidden">
           <div className="absolute inset-0">
             <img
-              src="/academy1.jpg"
+              src="/academy1.webp"
               alt="Counselling 101"
               className="h-full w-full object-cover"
             />
@@ -117,7 +117,7 @@ export default function ModuleOnePage() {
               className="overflow-hidden rounded-[3rem] border border-black/10 bg-white p-4 shadow-2xl"
             >
               <img
-                src="/academy8.png"
+                src="/academy8.webp"
                 alt="Counselling 101 Training"
                 className="h-[720px] w-full rounded-[2.5rem] object-cover"
               />
