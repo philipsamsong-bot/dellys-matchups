@@ -1,5 +1,3 @@
-// src/app/admin/payments/page.js
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -26,7 +24,7 @@ function getCourseKeyFromNotes(notes) {
 }
 
 function getPlanKey(payment) {
-  const planFromNotes = payment.notes?.split("Plan:")[1]?.split("\n")[0]?.trim();
+  const planFromNotes = payment.notes?.split("Plan:")[1]?.split("\n")[0]?.trim()?.toLowerCase();
 
   if (planFromNotes === "vip" || planFromNotes === "premium") {
     return planFromNotes;
@@ -37,6 +35,13 @@ function getPlanKey(payment) {
 
 function isAdmin(profile) {
   return profile?.role === "admin";
+}
+
+function addOneMonth(dateValue) {
+  const startDate = new Date(dateValue);
+  const nextDate = new Date(startDate);
+  nextDate.setMonth(nextDate.getMonth() + 1);
+  return nextDate.toISOString();
 }
 
 export default function AdminPaymentsPage() {
@@ -104,7 +109,6 @@ export default function AdminPaymentsPage() {
 
   const filteredPayments = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-
     if (!keyword) return payments;
 
     return payments.filter((payment) =>
@@ -152,9 +156,7 @@ export default function AdminPaymentsPage() {
     if (error) throw new Error(error.message);
 
     if (!data) {
-      throw new Error(
-        `No matching profile found for ${email}. Check the profiles table email.`
-      );
+      throw new Error(`No matching profile found for ${email}. Check the profiles table email.`);
     }
 
     return data;
@@ -163,12 +165,17 @@ export default function AdminPaymentsPage() {
   async function activateMembership(payment) {
     const planKey = getPlanKey(payment);
     const matchedProfile = await findProfileForPayment(payment);
+    const startedAt = payment.created_at || new Date().toISOString();
+    const expiresAt = addOneMonth(startedAt);
 
     const { error } = await supabase
       .from("profiles")
       .update({
-        plan: planKey,
+        membership_status: planKey,
         membership_plan: planKey,
+        membership_started_at: startedAt,
+        membership_expires_at: expiresAt,
+        plan: planKey,
         subscription: planKey,
       })
       .eq("id", matchedProfile.id);
@@ -204,7 +211,6 @@ export default function AdminPaymentsPage() {
 
   async function updateCounsellingBooking(payment, status) {
     const bookingId = getBookingIdFromNotes(payment.notes);
-
     if (!bookingId) return;
 
     const { error } = await supabase
@@ -367,8 +373,7 @@ export default function AdminPaymentsPage() {
                         </p>
 
                         <p>
-                          <strong>Method:</strong>{" "}
-                          {payment.payment_method || "N/A"}
+                          <strong>Method:</strong> {payment.payment_method || "N/A"}
                         </p>
 
                         <p>
@@ -381,8 +386,7 @@ export default function AdminPaymentsPage() {
 
                       {payment.provider_reference && (
                         <p className="mt-4 text-white/70">
-                          <strong>Reference:</strong>{" "}
-                          {payment.provider_reference}
+                          <strong>Reference:</strong> {payment.provider_reference}
                         </p>
                       )}
 
