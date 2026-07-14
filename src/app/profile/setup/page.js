@@ -8,91 +8,250 @@ import { supabase } from "@/lib/supabase";
 import { compressImage } from "@/lib/compressImage";
 import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 
-const countries = [
+const ISO_COUNTRY_CODES = [
+  "AF", "AL", "DZ", "AD", "AO", "AG", "AR", "AM", "AU", "AT", "AZ", "BS", "BH", "BD", "BB", "BY", "BE", "BZ", "BJ", "BT",
+  "BO", "BA", "BW", "BR", "BN", "BG", "BF", "BI", "CV", "KH", "CM", "CA", "CF", "TD", "CL", "CN", "CO", "KM", "CG", "CD",
+  "CR", "CI", "HR", "CU", "CY", "CZ", "DK", "DJ", "DM", "DO", "EC", "EG", "SV", "GQ", "ER", "EE", "SZ", "ET", "FJ", "FI",
+  "FR", "GA", "GM", "GE", "DE", "GH", "GR", "GD", "GT", "GN", "GW", "GY", "HT", "HN", "HU", "IS", "IN", "ID", "IR", "IQ",
+  "IE", "IL", "IT", "JM", "JP", "JO", "KZ", "KE", "KI", "KP", "KR", "KW", "KG", "LA", "LV", "LB", "LS", "LR", "LY", "LI",
+  "LT", "LU", "MG", "MW", "MY", "MV", "ML", "MT", "MH", "MR", "MU", "MX", "FM", "MD", "MC", "MN", "ME", "MA", "MZ", "MM",
+  "NA", "NR", "NP", "NL", "NZ", "NI", "NE", "NG", "MK", "NO", "OM", "PK", "PW", "PA", "PG", "PY", "PE", "PH", "PL", "PT",
+  "QA", "RO", "RU", "RW", "KN", "LC", "VC", "WS", "SM", "ST", "SA", "SN", "RS", "SC", "SL", "SG", "SK", "SI", "SB", "SO",
+  "ZA", "SS", "ES", "LK", "SD", "SR", "SE", "CH", "SY", "TJ", "TZ", "TH", "TL", "TG", "TO", "TT", "TN", "TR", "TM", "TV",
+  "UG", "UA", "AE", "GB", "US", "UY", "UZ", "VU", "VA", "VE", "VN", "YE", "ZM", "ZW",
+];
+
+const COUNTRY_NAME_OVERRIDES = {
+  AE: "United Arab Emirates",
+  BO: "Bolivia",
+  BN: "Brunei",
+  CV: "Cape Verde",
+  CZ: "Czech Republic",
+  FM: "Micronesia",
+  GB: "United Kingdom",
+  IR: "Iran",
+  KR: "South Korea",
+  KP: "North Korea",
+  LA: "Laos",
+  MD: "Moldova",
+  MK: "North Macedonia",
+  RU: "Russia",
+  SY: "Syria",
+  TZ: "Tanzania",
+  US: "United States",
+  VE: "Venezuela",
+  VN: "Vietnam",
+};
+
+const FALLBACK_COUNTRIES = [
+  "Australia",
+  "Belgium",
+  "Brazil",
   "Cameroon",
-  "Nigeria",
-  "Ghana",
-  "South Africa",
-  "Kenya",
-  "Uganda",
-  "Tanzania",
-  "Rwanda",
-  "Zambia",
-  "Zimbabwe",
-  "Ethiopia",
-  "United Kingdom",
-  "United States",
   "Canada",
+  "China",
+  "Finland",
   "France",
   "Germany",
-  "Belgium",
-  "Netherlands",
-  "Italy",
-  "Spain",
-  "Ireland",
-  "Switzerland",
-  "Australia",
-  "United Arab Emirates",
-  "Qatar",
-  "Saudi Arabia",
-  "China",
+  "Ghana",
   "India",
-  "Brazil",
+  "Ireland",
+  "Italy",
+  "Kenya",
+  "Netherlands",
+  "Nigeria",
+  "Qatar",
+  "Rwanda",
+  "Saudi Arabia",
+  "South Africa",
+  "Spain",
+  "Sweden",
+  "Switzerland",
+  "Tanzania",
+  "Uganda",
+  "United Arab Emirates",
+  "United Kingdom",
+  "United States",
+  "Zambia",
+  "Zimbabwe",
   "Other",
 ];
 
-const countryDialCodes = {
+const COUNTRY_DIAL_CODES = {
+  Australia: "+61",
+  Belgium: "+32",
+  Brazil: "+55",
   Cameroon: "+237",
-  Nigeria: "+234",
-  Ghana: "+233",
-  "South Africa": "+27",
-  Kenya: "+254",
-  Uganda: "+256",
-  Tanzania: "+255",
-  Rwanda: "+250",
-  Zambia: "+260",
-  Zimbabwe: "+263",
-  Ethiopia: "+251",
-  "United Kingdom": "+44",
-  "United States": "+1",
   Canada: "+1",
+  China: "+86",
+  Finland: "+358",
   France: "+33",
   Germany: "+49",
-  Belgium: "+32",
-  Netherlands: "+31",
-  Italy: "+39",
-  Spain: "+34",
-  Ireland: "+353",
-  Switzerland: "+41",
-  Australia: "+61",
-  "United Arab Emirates": "+971",
-  Qatar: "+974",
-  "Saudi Arabia": "+966",
-  China: "+86",
+  Ghana: "+233",
   India: "+91",
-  Brazil: "+55",
+  Ireland: "+353",
+  Italy: "+39",
+  Kenya: "+254",
+  Netherlands: "+31",
+  Nigeria: "+234",
+  Norway: "+47",
+  Portugal: "+351",
+  Qatar: "+974",
+  Rwanda: "+250",
+  "Saudi Arabia": "+966",
+  "South Africa": "+27",
+  Spain: "+34",
+  Sweden: "+46",
+  Switzerland: "+41",
+  Tanzania: "+255",
+  Uganda: "+256",
+  "United Arab Emirates": "+971",
+  "United Kingdom": "+44",
+  "United States": "+1",
+  Zambia: "+260",
+  Zimbabwe: "+263",
   Other: "",
 };
 
-const dialCodes = [...new Set(Object.values(countryDialCodes).filter(Boolean))];
-
-const emptyForm = {
-  full_name: "",
-  email: "",
-  age: "",
-  gender: "",
-  marital_status: "",
-  country: "",
-  phone_code: "",
-  phone: "",
-  city: "",
-  occupation: "",
-  religious_background: "",
-  genotype: "",
-  height: "",
-  relationship_goal: "",
-  interests: "",
-  bio: "",
+const COUNTRY_POSTAL_RULES = {
+  Australia: {
+    label: "Postcode",
+    required: true,
+    regex: /^\d{4}$/,
+    hint: "4 digits",
+  },
+  Austria: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{4}$/,
+    hint: "4 digits",
+  },
+  Belgium: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{4}$/,
+    hint: "4 digits",
+  },
+  Brazil: {
+    label: "CEP",
+    required: true,
+    regex: /^\d{5}-?\d{3}$/,
+    hint: "12345-678",
+  },
+  Canada: {
+    label: "Postal code",
+    required: true,
+    regex: /^[A-Z]\d[A-Z][ -]?\d[A-Z]\d$/i,
+    hint: "A1A 1A1",
+  },
+  China: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{6}$/,
+    hint: "6 digits",
+  },
+  Finland: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{5}$/,
+    hint: "5 digits",
+  },
+  France: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{5}$/,
+    hint: "5 digits",
+  },
+  Germany: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{5}$/,
+    hint: "5 digits",
+  },
+  India: {
+    label: "PIN code",
+    required: true,
+    regex: /^\d{6}$/,
+    hint: "6 digits",
+  },
+  Ireland: {
+    label: "Eircode",
+    required: false,
+    regex: /^[AC-FHKNPRTV-Y]\d{2}\s?[0-9AC-FHKNPRTV-Y]{4}$/i,
+    hint: "Optional, e.g. D02 X285",
+  },
+  Italy: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{5}$/,
+    hint: "5 digits",
+  },
+  Netherlands: {
+    label: "Postcode",
+    required: true,
+    regex: /^\d{4}\s?[A-Z]{2}$/i,
+    hint: "1234 AB",
+  },
+  Nigeria: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{6}$/,
+    hint: "6 digits",
+  },
+  Norway: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{4}$/,
+    hint: "4 digits",
+  },
+  Portugal: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{4}-\d{3}$/,
+    hint: "1234-567",
+  },
+  "Saudi Arabia": {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{5}$/,
+    hint: "5 digits",
+  },
+  "South Africa": {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{4}$/,
+    hint: "4 digits",
+  },
+  Spain: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{5}$/,
+    hint: "5 digits",
+  },
+  Sweden: {
+    label: "Postcode",
+    required: true,
+    regex: /^\d{3}\s?\d{2}$/,
+    hint: "123 45",
+  },
+  Switzerland: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{4}$/,
+    hint: "4 digits",
+  },
+  "United Kingdom": {
+    label: "Postcode",
+    required: true,
+    regex: /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/i,
+    hint: "SW1A 1AA",
+  },
+  "United States": {
+    label: "ZIP code",
+    required: true,
+    regex: /^\d{5}(-\d{4})?$/,
+    hint: "12345 or 12345-6789",
+  },
 };
 
 const relationshipGoals = [
@@ -117,6 +276,26 @@ const maritalStatuses = [
 
 const genotypes = ["AA", "AS", "SS", "AC", "SC", "Not sure", "Prefer not to say"];
 
+const emptyForm = {
+  full_name: "",
+  email: "",
+  age: "",
+  gender: "",
+  marital_status: "",
+  country: "",
+  postal_code: "",
+  phone_code: "",
+  phone: "",
+  city: "",
+  occupation: "",
+  religious_background: "",
+  genotype: "",
+  height: "",
+  relationship_goal: "",
+  interests: "",
+  bio: "",
+};
+
 function getPlan(profile) {
   return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
 }
@@ -127,14 +306,38 @@ function getGalleryLimit(plan) {
   return 0;
 }
 
+function buildCountryList() {
+  if (typeof Intl === "undefined" || typeof Intl.DisplayNames !== "function") {
+    return FALLBACK_COUNTRIES;
+  }
+
+  const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+
+  return [
+    ...ISO_COUNTRY_CODES.map((code) => COUNTRY_NAME_OVERRIDES[code] || regionNames.of(code))
+      .filter((name) => typeof name === "string" && name.trim())
+      .sort((a, b) => a.localeCompare(b)),
+    "Other",
+  ];
+}
+
+function getDialCodes() {
+  return [...new Set(Object.values(COUNTRY_DIAL_CODES).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b)
+  );
+}
+
 function splitPhoneNumber(phone) {
   if (!phone) return { phone_code: "", phone: "" };
 
-  const matchedCode = dialCodes
+  const dialCodes = getDialCodes();
+  const matchedCode = [...dialCodes]
     .sort((a, b) => b.length - a.length)
     .find((code) => phone.startsWith(code));
 
-  if (!matchedCode) return { phone_code: "", phone };
+  if (!matchedCode) {
+    return { phone_code: "", phone };
+  }
 
   return {
     phone_code: matchedCode,
@@ -147,6 +350,49 @@ function getGallery(profile) {
   return Array.isArray(gallery) ? gallery.filter(Boolean) : [];
 }
 
+function getPostalConfig(country) {
+  if (!country || country === "Other") {
+    return {
+      label: "Postal code",
+      required: false,
+      regex: null,
+      hint: "Optional",
+    };
+  }
+
+  return (
+    COUNTRY_POSTAL_RULES[country] || {
+      label: "Postal code",
+      required: false,
+      regex: null,
+      hint: "Optional",
+    }
+  );
+}
+
+function normalizePostalCode(value) {
+  return value.trim().toUpperCase();
+}
+
+function validatePostalCode(country, postalCode) {
+  const config = getPostalConfig(country);
+  const value = normalizePostalCode(postalCode);
+
+  if (!config.required && !value) {
+    return "";
+  }
+
+  if (config.required && !value) {
+    return `${config.label} is required for ${country}.`;
+  }
+
+  if (config.regex && value && !config.regex.test(value)) {
+    return `Enter a valid ${config.label.toLowerCase()} for ${country}${config.hint ? ` (${config.hint})` : ""}.`;
+  }
+
+  return "";
+}
+
 function ProfileSetupPage() {
   const [user, setUser] = useState(null);
   const [plan, setPlan] = useState("free");
@@ -157,34 +403,37 @@ function ProfileSetupPage() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [galleryUrls, setGalleryUrls] = useState([]);
   const [form, setForm] = useState(emptyForm);
+  const [postalError, setPostalError] = useState("");
+
+  const countries = useMemo(buildCountryList, []);
+  const dialCodes = useMemo(getDialCodes, []);
+  const selectedPostalConfig = useMemo(() => getPostalConfig(form.country), [form.country]);
 
   const galleryLimit = getGalleryLimit(plan);
   const canUploadGallery = galleryLimit > 0;
   const remainingGallerySlots =
-    galleryLimit === Infinity
-      ? Infinity
-      : Math.max(galleryLimit - galleryUrls.length, 0);
+    galleryLimit === Infinity ? Infinity : Math.max(galleryLimit - galleryUrls.length, 0);
 
   useEffect(() => {
     async function getUser() {
       const {
-        data: { user },
+        data: { user: authUser },
       } = await supabase.auth.getUser();
 
-      if (!user) {
+      if (!authUser) {
         window.location.href = "/auth/login";
         return;
       }
 
-      setUser(user);
+      setUser(authUser);
 
       const { data: profile } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
+        .eq("id", authUser.id)
         .single();
 
-      const metadataName = user.user_metadata?.full_name || "";
+      const metadataName = authUser.user_metadata?.full_name || "";
       const profilePhone = splitPhoneNumber(profile?.phone || "");
 
       if (profile) {
@@ -194,17 +443,17 @@ function ProfileSetupPage() {
 
         setForm({
           full_name: profile.full_name || metadataName || "",
-          email: profile.email || user.email || "",
+          email: profile.email || authUser.email || "",
           age: profile.age || "",
           gender: profile.gender || "",
           marital_status: profile.marital_status || "",
           country: profile.country || "",
-          phone_code: profilePhone.phone_code || countryDialCodes[profile.country] || "",
+          postal_code: profile.postal_code || "",
+          phone_code: profilePhone.phone_code || COUNTRY_DIAL_CODES[profile.country] || "",
           phone: profilePhone.phone || "",
           city: profile.city || "",
           occupation: profile.occupation || "",
-          religious_background:
-            profile.religious_background || profile.faith_background || "",
+          religious_background: profile.religious_background || profile.faith_background || "",
           genotype: profile.genotype || "",
           height: profile.height || "",
           relationship_goal: profile.relationship_goal || "",
@@ -218,7 +467,7 @@ function ProfileSetupPage() {
       setForm((current) => ({
         ...current,
         full_name: metadataName,
-        email: user.email || "",
+        email: authUser.email || "",
       }));
     }
 
@@ -229,8 +478,17 @@ function ProfileSetupPage() {
     localStorage.setItem("profile-draft", JSON.stringify(form));
   }, [form]);
 
+  useEffect(() => {
+    if (!form.country) {
+      setPostalError("");
+      return;
+    }
+
+    setPostalError(validatePostalCode(form.country, form.postal_code));
+  }, [form.country, form.postal_code]);
+
   const completionPercentage = useMemo(() => {
-    const completionFields = [
+    const baseFields = [
       form.full_name,
       form.email,
       form.age,
@@ -244,10 +502,12 @@ function ProfileSetupPage() {
       previewUrl || avatarUrl,
     ];
 
-    return Math.round(
-      (completionFields.filter(Boolean).length / completionFields.length) * 100
-    );
-  }, [form, previewUrl, avatarUrl]);
+    const completionFields = selectedPostalConfig.required
+      ? [...baseFields, form.postal_code]
+      : baseFields;
+
+    return Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100);
+  }, [form, previewUrl, avatarUrl, selectedPostalConfig.required]);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -256,8 +516,10 @@ function ProfileSetupPage() {
       setForm((currentForm) => ({
         ...currentForm,
         country: value,
-        phone_code: countryDialCodes[value] || currentForm.phone_code,
+        postal_code: "",
+        phone_code: COUNTRY_DIAL_CODES[value] || currentForm.phone_code,
       }));
+      setPostalError("");
       return;
     }
 
@@ -266,6 +528,7 @@ function ProfileSetupPage() {
       [name]: value,
     }));
   }
+
   async function uploadPhoto() {
     if (!photo || !user) return null;
 
@@ -279,19 +542,16 @@ function ProfileSetupPage() {
     const fileName = `${user.id}-${Date.now()}.webp`;
     const filePath = `${user.id}/${fileName}`;
 
-    const { error } = await supabase.storage
-      .from("profile-photos")
-      .upload(filePath, compressedPhoto, {
-        contentType: "image/webp",
-        upsert: true,
-      });
+    const { error } = await supabase.storage.from("profile-photos").upload(filePath, compressedPhoto, {
+      contentType: "image/webp",
+      upsert: true,
+    });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
-    const { data } = supabase.storage
-      .from("profile-photos")
-      .getPublicUrl(filePath);
-
+    const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
     return data.publicUrl;
   }
 
@@ -306,9 +566,7 @@ function ProfileSetupPage() {
     }
 
     const allowedFiles =
-      galleryLimit === Infinity
-        ? selectedFiles
-        : selectedFiles.slice(0, remainingGallerySlots);
+      galleryLimit === Infinity ? selectedFiles : selectedFiles.slice(0, remainingGallerySlots);
 
     if (galleryLimit !== Infinity && selectedFiles.length > remainingGallerySlots) {
       alert(`Premium members can upload up to ${galleryLimit} gallery photos.`);
@@ -329,10 +587,7 @@ function ProfileSetupPage() {
           outputType: "image/webp",
         });
 
-        const fileName = `${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}.webp`;
-
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
         const filePath = `${user.id}/gallery/${fileName}`;
 
         const { error } = await supabase.storage
@@ -342,12 +597,11 @@ function ProfileSetupPage() {
             upsert: true,
           });
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
-        const { data } = supabase.storage
-          .from("profile-photos")
-          .getPublicUrl(filePath);
-
+        const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
         uploadedUrls.push(data.publicUrl);
       }
 
@@ -363,7 +617,11 @@ function ProfileSetupPage() {
   function removeGalleryImage(imageUrl) {
     setGalleryUrls((current) => current.filter((url) => url !== imageUrl));
   }
+
   function isProfileComplete(updates) {
+    const postalConfig = getPostalConfig(updates.country);
+    const hasPostal = postalConfig.required ? Boolean(updates.postal_code) : true;
+
     return Boolean(
       updates.full_name &&
         updates.email &&
@@ -375,7 +633,8 @@ function ProfileSetupPage() {
         updates.relationship_goal &&
         updates.bio &&
         updates.interests &&
-        updates.avatar_url
+        updates.avatar_url &&
+        hasPostal
     );
   }
 
@@ -387,13 +646,21 @@ function ProfileSetupPage() {
       return;
     }
 
+    const normalizedPostalCode = normalizePostalCode(form.postal_code);
+    const postalValidationMessage = validatePostalCode(form.country, normalizedPostalCode);
+
+    if (postalValidationMessage) {
+      setPostalError(postalValidationMessage);
+      alert(postalValidationMessage);
+      return;
+    }
+
     setLoading(true);
 
     try {
       const uploadedAvatarUrl = await uploadPhoto();
       const cleanPhone = form.phone.replace(/^0+/, "").trim();
-      const fullPhone =
-        form.phone_code && cleanPhone ? `${form.phone_code}${cleanPhone}` : "";
+      const fullPhone = form.phone_code && cleanPhone ? `${form.phone_code}${cleanPhone}` : "";
 
       const updates = {
         id: user.id,
@@ -403,6 +670,7 @@ function ProfileSetupPage() {
         gender: form.gender,
         marital_status: form.marital_status,
         country: form.country,
+        postal_code: normalizedPostalCode || null,
         phone: fullPhone,
         city: form.city.trim(),
         occupation: form.occupation.trim(),
@@ -442,6 +710,7 @@ function ProfileSetupPage() {
       setLoading(false);
     }
   }
+
   return (
     <>
       <SiteNav />
@@ -463,8 +732,8 @@ function ProfileSetupPage() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-white/80">
-              Complete your profile so Delly&apos;s Matchups can support
-              intentional, meaningful connections.
+              Complete your profile so Delly&apos;s Matchups can support intentional,
+              meaningful connections.
             </p>
           </motion.div>
 
@@ -537,7 +806,6 @@ function ProfileSetupPage() {
                         alt="Gallery"
                         className="h-56 w-full object-cover object-top"
                       />
-
                       <button
                         type="button"
                         onClick={() => removeGalleryImage(imageUrl)}
@@ -578,10 +846,9 @@ function ProfileSetupPage() {
                 </a>
               )}
             </div>
+
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">
-                Personal Information
-              </h2>
+              <h2 className="font-display text-4xl font-bold">Personal Information</h2>
 
               <div className="mt-6 grid gap-6 md:grid-cols-2">
                 <input
@@ -673,6 +940,30 @@ function ProfileSetupPage() {
                   ))}
                 </select>
 
+                <div className="md:col-span-2">
+                  <input
+                    type="text"
+                    name="postal_code"
+                    placeholder={
+                      selectedPostalConfig.hint
+                        ? `${selectedPostalConfig.label}${selectedPostalConfig.required ? "" : " optional"} e.g. ${selectedPostalConfig.hint}`
+                        : `${selectedPostalConfig.label}${selectedPostalConfig.required ? "" : " optional"}`
+                    }
+                    className="h-16 w-full rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+                    value={form.postal_code}
+                    onChange={handleChange}
+                  />
+                  {postalError ? (
+                    <p className="mt-2 text-sm font-semibold text-red-100">{postalError}</p>
+                  ) : (
+                    <p className="mt-2 text-sm text-white/65">
+                      {selectedPostalConfig.required
+                        ? `${selectedPostalConfig.label} is required${selectedPostalConfig.hint ? ` (${selectedPostalConfig.hint})` : ""}.`
+                        : `${selectedPostalConfig.label} is optional${selectedPostalConfig.hint ? ` (${selectedPostalConfig.hint})` : ""}.`}
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex h-16 overflow-hidden rounded-2xl border border-white/15 bg-white/10 md:col-span-2">
                   <select
                     name="phone_code"
@@ -728,11 +1019,7 @@ function ProfileSetupPage() {
                     Select genotype optional
                   </option>
                   {genotypes.map((genotype) => (
-                    <option
-                      key={genotype}
-                      value={genotype}
-                      className="text-black"
-                    >
+                    <option key={genotype} value={genotype} className="text-black">
                       {genotype}
                     </option>
                   ))}
@@ -741,9 +1028,7 @@ function ProfileSetupPage() {
             </div>
 
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">
-                Faith & Relationship Journey
-              </h2>
+              <h2 className="font-display text-4xl font-bold">Faith & Relationship Journey</h2>
 
               <div className="mt-6 grid gap-6">
                 <input
