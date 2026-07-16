@@ -1,34 +1,129 @@
+// src/app/articles/page.js
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 
+const REACTION_BREAKDOWN = [
+  { key: "like", emoji: "👍" },
+  { key: "love", emoji: "❤️" },
+  { key: "fire", emoji: "🔥" },
+  { key: "pray", emoji: "🙏" },
+];
+
 export default function ArticlesPage() {
   const [articles, setArticles] = useState([]);
+  const [commentCounts, setCommentCounts] = useState({});
+  const [reactionBreakdown, setReactionBreakdown] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadArticles() {
-      const { data, error } = await supabase
+    async function loadArticlesAndCounts() {
+      setLoading(true);
+
+      const { data: articleData, error: articleError } = await supabase
         .from("articles")
         .select("*")
         .eq("published", true)
         .order("created_at", { ascending: false });
 
-      if (error) {
-        alert(error.message);
+      if (articleError) {
+        alert(articleError.message);
         setLoading(false);
         return;
       }
 
-      setArticles(data || []);
+      const publishedArticles = articleData || [];
+      setArticles(publishedArticles);
+
+      if (publishedArticles.length === 0) {
+        setCommentCounts({});
+        setReactionBreakdown({});
+        setLoading(false);
+        return;
+      }
+
+      const articleIds = publishedArticles.map((article) => article.id);
+
+      const [
+        { data: commentsData, error: commentsError },
+        { data: reactionsData, error: reactionsError },
+      ] = await Promise.all([
+        supabase
+          .from("article_comments")
+          .select("id,article_id")
+          .in("article_id", articleIds),
+        supabase
+          .from("article_reactions")
+          .select("article_id,reaction_type")
+          .in("article_id", articleIds),
+      ]);
+
+      if (commentsError) {
+        alert(commentsError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (reactionsError) {
+        alert(reactionsError.message);
+        setLoading(false);
+        return;
+      }
+
+      const nextCommentCounts = {};
+      for (const comment of commentsData || []) {
+        nextCommentCounts[comment.article_id] =
+          (nextCommentCounts[comment.article_id] || 0) + 1;
+      }
+
+      const nextReactionBreakdown = {};
+      for (const article of publishedArticles) {
+        nextReactionBreakdown[article.id] = {
+          like: 0,
+          love: 0,
+          fire: 0,
+          pray: 0,
+        };
+      }
+
+      for (const reaction of reactionsData || []) {
+        if (!nextReactionBreakdown[reaction.article_id]) {
+          nextReactionBreakdown[reaction.article_id] = {
+            like: 0,
+            love: 0,
+            fire: 0,
+            pray: 0,
+          };
+        }
+
+        const key = reaction.reaction_type || "like";
+        nextReactionBreakdown[reaction.article_id][key] =
+          (nextReactionBreakdown[reaction.article_id][key] || 0) + 1;
+      }
+
+      setCommentCounts(nextCommentCounts);
+      setReactionBreakdown(nextReactionBreakdown);
       setLoading(false);
     }
 
-    loadArticles();
+    loadArticlesAndCounts();
   }, []);
+
+  const articleCards = useMemo(() => {
+    return articles.map((article) => ({
+      ...article,
+      commentCount: commentCounts[article.id] || 0,
+      reactions: reactionBreakdown[article.id] || {
+        like: 0,
+        love: 0,
+        fire: 0,
+        pray: 0,
+      },
+    }));
+  }, [articles, commentCounts, reactionBreakdown]);
 
   return (
     <>
@@ -60,7 +155,7 @@ export default function ArticlesPage() {
             <p className="mt-16 text-center text-xl font-bold">
               Loading articles...
             </p>
-          ) : articles.length === 0 ? (
+          ) : articleCards.length === 0 ? (
             <div className="mt-16 rounded-[3rem] bg-[#c1121f] p-10 text-center">
               <p className="text-lg text-white/80">
                 No articles published yet.
@@ -68,7 +163,7 @@ export default function ArticlesPage() {
             </div>
           ) : (
             <div className="mt-16 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-              {articles.map((article, index) => (
+              {articleCards.map((article, index) => (
                 <motion.article
                   key={article.id}
                   initial={{ y: 50, opacity: 0 }}
@@ -102,6 +197,21 @@ export default function ArticlesPage() {
                     <p className="mt-5 line-clamp-4 leading-8 text-white/75">
                       {article.content}
                     </p>
+
+                    <div className="mt-6 flex flex-wrap gap-3 text-sm font-bold text-white/80">
+                      <span className="rounded-full bg-white/10 px-4 py-2">
+                        💬 {article.commentCount} comments
+                      </span>
+
+                      {REACTION_BREAKDOWN.map((reaction) => (
+                        <span
+                          key={reaction.key}
+                          className="rounded-full bg-white/10 px-4 py-2"
+                        >
+                          {reaction.emoji} {article.reactions[reaction.key] || 0}
+                        </span>
+                      ))}
+                    </div>
 
                     <a
                       href={`/articles/${article.slug}`}

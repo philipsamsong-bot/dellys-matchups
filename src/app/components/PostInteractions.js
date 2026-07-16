@@ -1,9 +1,17 @@
+// src/app/components/PostInteractions.js
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const reactionOptions = [
+const ARTICLE_REACTION_OPTIONS = [
+  { key: "like", emoji: "👍", label: "Like" },
+  { key: "love", emoji: "❤️", label: "Love" },
+  { key: "fire", emoji: "🔥", label: "Fire" },
+  { key: "pray", emoji: "🙏", label: "Pray" },
+];
+
+const DEFAULT_REACTION_OPTIONS = [
   { key: "love", emoji: "❤️", label: "Love" },
   { key: "agree", emoji: "👍", label: "Agree" },
   { key: "helpful", emoji: "🙏", label: "Helpful" },
@@ -12,7 +20,21 @@ const reactionOptions = [
   { key: "sad", emoji: "💔", label: "Sad" },
 ];
 
+function formatDate(value) {
+  if (!value) return "";
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return "";
+  }
+}
+
 export default function PostInteractions({ postType, postId }) {
+  const isArticle = postType === "article";
+  const reactionOptions = isArticle ? ARTICLE_REACTION_OPTIONS : DEFAULT_REACTION_OPTIONS;
+  const commentsTable = isArticle ? "article_comments" : "comments";
+  const reactionsTable = isArticle ? "article_reactions" : "reactions";
+
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [reactions, setReactions] = useState([]);
@@ -22,63 +44,93 @@ export default function PostInteractions({ postType, postId }) {
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [reactionLoading, setReactionLoading] = useState(false);
 
   useEffect(() => {
     async function loadUserAndData() {
       const {
-        data: { user },
+        data: { user: authUser },
       } = await supabase.auth.getUser();
 
-      setUser(user);
+      setUser(authUser || null);
 
-      if (user) {
+      if (authUser) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("role")
-          .eq("id", user.id)
-          .single();
+          .eq("id", authUser.id)
+          .maybeSingle();
 
         setIsAdmin(profile?.role === "admin");
+      } else {
+        setIsAdmin(false);
       }
 
-      await loadReactions();
-      await loadComments();
+      await Promise.all([loadReactions(), loadComments()]);
     }
 
-    loadUserAndData();
+    if (postId) {
+      loadUserAndData();
+    }
   }, [postId, postType]);
 
   async function loadReactions() {
-    const { data, error } = await supabase
-      .from("reactions")
-      .select("*")
-      .eq("post_type", postType)
-      .eq("post_id", postId);
+    let query = supabase.from(reactionsTable).select("*");
 
-    if (!error) {
-      setReactions(data || []);
+    if (isArticle) {
+      query = query.eq("article_id", postId);
+    } else {
+      query = query.eq("post_type", postType).eq("post_id", postId);
     }
+
+    const { data, error } = await query;
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setReactions(data || []);
   }
 
   async function loadComments() {
-    const { data, error } = await supabase
-      .from("comments")
-      .select("*")
-      .eq("post_type", postType)
-      .eq("post_id", postId)
-      .order("created_at", { ascending: true });
+    let query = supabase.from(commentsTable).select("*");
 
-    if (!error) {
-      setComments(data || []);
+    if (isArticle) {
+      query = query.eq("article_id", postId);
+    } else {
+      query = query.eq("post_type", postType).eq("post_id", postId);
     }
+
+    const { data, error } = await query.order("created_at", { ascending: true });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setComments(data || []);
   }
 
+  const myReaction = useMemo(() => {
+    if (!user) return null;
+
+    if (isArticle) {
+      return reactions.find((item) => item.user_id === user.id)?.reaction_type || null;
+    }
+
+    return reactions.find((item) => item.user_id === user.id)?.reaction || null;
+  }, [isArticle, reactions, user]);
+
   function getReactionCount(reactionKey) {
-    return reactions.filter((item) => item.reaction === reactionKey).length;
+    return reactions.filter((item) => {
+      const value = isArticle ? item.reaction_type : item.reaction;
+      return value === reactionKey;
+    }).length;
   }
 
   function canManageComment(comment) {
-    return user && (comment.user_id === user.id || isAdmin);
+    return Boolean(user && (comment.user_id === user.id || isAdmin));
   }
 
   async function handleReaction(reactionKey) {
@@ -87,24 +139,65 @@ export default function PostInteractions({ postType, postId }) {
       return;
     }
 
-    const existingReaction = reactions.find(
-      (item) => item.user_id === user.id && item.reaction === reactionKey
-    );
+    setReactionLoading(true);
 
-    if (existingReaction) {
-      await supabase.from("reactions").delete().eq("id", existingReaction.id);
+    try {
+      if (isArticle) {
+        const existingReaction = reactions.find((item) => item.user_id === user.id);
+
+        if (existingReaction?.reaction_type === reactionKey) {
+          const { error } = await supabase
+            .from(reactionsTable)
+            .delete()
+            .eq("id", existingReaction.id);
+
+          if (error) throw error;
+        } else if (existingReaction) {
+          const { error } = await supabase
+            .from(reactionsTable)
+            .update({ reaction_type: reactionKey })
+            .eq("id", existingReaction.id);
+
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from(reactionsTable).insert({
+            article_id: postId,
+            user_id: user.id,
+            reaction_type: reactionKey,
+          });
+
+          if (error) throw error;
+        }
+      } else {
+        const existingReaction = reactions.find(
+          (item) => item.user_id === user.id && item.reaction === reactionKey
+        );
+
+        if (existingReaction) {
+          const { error } = await supabase
+            .from(reactionsTable)
+            .delete()
+            .eq("id", existingReaction.id);
+
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from(reactionsTable).insert({
+            post_type: postType,
+            post_id: postId,
+            user_id: user.id,
+            reaction: reactionKey,
+          });
+
+          if (error) throw error;
+        }
+      }
+
       await loadReactions();
-      return;
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setReactionLoading(false);
     }
-
-    await supabase.from("reactions").insert({
-      post_type: postType,
-      post_id: postId,
-      user_id: user.id,
-      reaction: reactionKey,
-    });
-
-    await loadReactions();
   }
 
   async function handleCommentSubmit(event) {
@@ -115,47 +208,70 @@ export default function PostInteractions({ postType, postId }) {
       return;
     }
 
-    if (!commentText.trim()) return;
+    const content = commentText.trim();
+    if (!content) return;
 
     setLoading(true);
 
-    const authorName =
-      user.user_metadata?.full_name || user.email || "Anonymous";
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name,email")
+        .eq("id", user.id)
+        .maybeSingle();
 
-    const { error } = await supabase.from("comments").insert({
-      post_type: postType,
-      post_id: postId,
-      user_id: user.id,
-      author_name: authorName,
-      content: commentText,
-      parent_id: null,
-    });
+      const authorName =
+        profile?.full_name || user.user_metadata?.full_name || user.email || "Anonymous";
+      const authorEmail = profile?.email || user.email || null;
 
-    setLoading(false);
+      const payload = isArticle
+        ? {
+            article_id: postId,
+            user_id: user.id,
+            author_name: authorName,
+            author_email: authorEmail,
+            content,
+          }
+        : {
+            post_type: postType,
+            post_id: postId,
+            user_id: user.id,
+            author_name: authorName,
+            content,
+            parent_id: null,
+          };
 
-    if (error) {
+      const { error } = await supabase.from(commentsTable).insert(payload);
+
+      if (error) throw error;
+
+      setCommentText("");
+      await loadComments();
+    } catch (error) {
       alert(error.message);
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    setCommentText("");
-    await loadComments();
   }
 
   async function handleReplySubmit(parentId) {
+    if (isArticle) {
+      alert("Replies are not enabled for article comments yet.");
+      return;
+    }
+
     if (!user) {
       window.location.href = "/auth/login";
       return;
     }
 
-    const content = replyText[parentId];
-
-    if (!content?.trim()) return;
+    const content = replyText[parentId]?.trim();
+    if (!content) return;
 
     const authorName =
       user.user_metadata?.full_name || user.email || "Anonymous";
 
-    const { error } = await supabase.from("comments").insert({
+    const { error } = await supabase.from(commentsTable).insert({
       post_type: postType,
       post_id: postId,
       user_id: user.id,
@@ -185,12 +301,14 @@ export default function PostInteractions({ postType, postId }) {
   async function saveEdit(commentId) {
     if (!editingText.trim()) return;
 
+    const updates = {
+      content: editingText.trim(),
+      updated_at: new Date().toISOString(),
+    };
+
     const { error } = await supabase
-      .from("comments")
-      .update({
-        content: editingText,
-        updated_at: new Date().toISOString(),
-      })
+      .from(commentsTable)
+      .update(updates)
       .eq("id", commentId);
 
     if (error) {
@@ -205,28 +323,42 @@ export default function PostInteractions({ postType, postId }) {
 
   async function deleteComment(commentId) {
     const confirmed = confirm("Delete this comment?");
-
     if (!confirmed) return;
 
-    const { error } = await supabase
-      .from("comments")
-      .update({
-        content: "This comment has been deleted.",
-        deleted_at: new Date().toISOString(),
-      })
-      .eq("id", commentId);
+    if (isArticle) {
+      const { error } = await supabase
+        .from(commentsTable)
+        .delete()
+        .eq("id", commentId);
 
-    if (error) {
-      alert(error.message);
-      return;
+      if (error) {
+        alert(error.message);
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from(commentsTable)
+        .update({
+          content: "This comment has been deleted.",
+          deleted_at: new Date().toISOString(),
+        })
+        .eq("id", commentId);
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
     }
 
     await loadComments();
   }
 
-  const topLevelComments = comments.filter((comment) => !comment.parent_id);
+  const topLevelComments = isArticle
+    ? comments
+    : comments.filter((comment) => !comment.parent_id);
 
   function getReplies(commentId) {
+    if (isArticle) return [];
     return comments.filter((comment) => comment.parent_id === commentId);
   }
 
@@ -237,12 +369,11 @@ export default function PostInteractions({ postType, postId }) {
       return (
         <div className="mt-4">
           <textarea
-            rows="3"
+            rows={3}
             value={editingText}
             onChange={(event) => setEditingText(event.target.value)}
             className="w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none"
           />
-
           <div className="mt-3 flex gap-3">
             <button
               type="button"
@@ -251,7 +382,6 @@ export default function PostInteractions({ postType, postId }) {
             >
               Save
             </button>
-
             <button
               type="button"
               onClick={() => {
@@ -280,26 +410,33 @@ export default function PostInteractions({ postType, postId }) {
 
   return (
     <section className="mt-16 rounded-[3rem] border border-white/10 bg-black/20 p-6 text-white shadow-2xl md:p-10">
-      <h2 className="font-display text-4xl font-bold">
-        Join The Conversation
-      </h2>
+      <h2 className="font-display text-4xl font-bold">Join The Conversation</h2>
 
       <div className="mt-8 flex flex-wrap gap-3">
-        {reactionOptions.map((reaction) => (
-          <button
-            key={reaction.key}
-            type="button"
-            onClick={() => handleReaction(reaction.key)}
-            className="rounded-full border border-white/10 bg-white/10 px-5 py-3 font-bold transition hover:bg-white hover:text-[#b30018]"
-          >
-            {reaction.emoji} {reaction.label} {getReactionCount(reaction.key)}
-          </button>
-        ))}
+        {reactionOptions.map((reaction) => {
+          const active = myReaction === reaction.key;
+
+          return (
+            <button
+              key={reaction.key}
+              type="button"
+              disabled={reactionLoading}
+              onClick={() => handleReaction(reaction.key)}
+              className={`rounded-full border px-5 py-3 font-bold transition ${
+                active
+                  ? "border-white bg-white text-[#b30018]"
+                  : "border-white/10 bg-white/10 hover:bg-white hover:text-[#b30018]"
+              } ${reactionLoading ? "opacity-60" : "text-white"}`}
+            >
+              {reaction.emoji} {reaction.label} {getReactionCount(reaction.key)}
+            </button>
+          );
+        })}
       </div>
 
       <form onSubmit={handleCommentSubmit} className="mt-10">
         <textarea
-          rows="4"
+          rows={4}
           value={commentText}
           onChange={(event) => setCommentText(event.target.value)}
           placeholder="Leave your thoughts..."
@@ -317,9 +454,7 @@ export default function PostInteractions({ postType, postId }) {
 
       <div className="mt-12 space-y-6">
         {topLevelComments.length === 0 && (
-          <p className="text-white/60">
-            No comments yet. Be the first to respond.
-          </p>
+          <p className="text-white/60">No comments yet. Be the first to respond.</p>
         )}
 
         {topLevelComments.map((comment) => (
@@ -329,18 +464,13 @@ export default function PostInteractions({ postType, postId }) {
           >
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="font-black">
-                  {comment.author_name || "Anonymous"}
-                </p>
-
+                <p className="font-black">{comment.author_name || "Anonymous"}</p>
                 {comment.updated_at && !comment.deleted_at && (
                   <p className="mt-1 text-xs text-white/40">Edited</p>
                 )}
               </div>
 
-              <p className="text-xs text-white/50">
-                {new Date(comment.created_at).toLocaleString()}
-              </p>
+              <p className="text-xs text-white/50">{formatDate(comment.created_at)}</p>
             </div>
 
             <CommentBody comment={comment} />
@@ -354,7 +484,6 @@ export default function PostInteractions({ postType, postId }) {
                 >
                   Edit
                 </button>
-
                 <button
                   type="button"
                   onClick={() => deleteComment(comment.id)}
@@ -365,54 +494,52 @@ export default function PostInteractions({ postType, postId }) {
               </div>
             )}
 
-            <div className="mt-5 space-y-4">
-              {getReplies(comment.id).map((reply) => (
-                <div
-                  key={reply.id}
-                  className="ml-4 rounded-2xl border border-white/10 bg-black/20 p-4"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-black">
-                        {reply.author_name || "Anonymous"}
+            {!isArticle && getReplies(comment.id).length > 0 && (
+              <div className="mt-5 space-y-4">
+                {getReplies(comment.id).map((reply) => (
+                  <div
+                    key={reply.id}
+                    className="ml-4 rounded-2xl border border-white/10 bg-black/20 p-4"
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-black">{reply.author_name || "Anonymous"}</p>
+                        {reply.updated_at && !reply.deleted_at && (
+                          <p className="mt-1 text-xs text-white/40">Edited</p>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-white/50">
+                        {formatDate(reply.created_at)}
                       </p>
-
-                      {reply.updated_at && !reply.deleted_at && (
-                        <p className="mt-1 text-xs text-white/40">Edited</p>
-                      )}
                     </div>
 
-                    <p className="text-xs text-white/50">
-                      {new Date(reply.created_at).toLocaleString()}
-                    </p>
+                    <CommentBody comment={reply} />
+
+                    {canManageComment(reply) && !reply.deleted_at && (
+                      <div className="mt-4 flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => startEditing(reply)}
+                          className="text-sm font-bold text-white/70 hover:text-white"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteComment(reply.id)}
+                          className="text-sm font-bold text-red-200 hover:text-white"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
+                ))}
+              </div>
+            )}
 
-                  <CommentBody comment={reply} />
-
-                  {canManageComment(reply) && !reply.deleted_at && (
-                    <div className="mt-4 flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => startEditing(reply)}
-                        className="text-sm font-bold text-white/70 hover:text-white"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => deleteComment(reply.id)}
-                        className="text-sm font-bold text-red-200 hover:text-white"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {!comment.deleted_at && (
+            {!isArticle && !comment.deleted_at && (
               <div className="mt-5 flex gap-3">
                 <input
                   type="text"
@@ -426,7 +553,6 @@ export default function PostInteractions({ postType, postId }) {
                   placeholder="Reply..."
                   className="h-12 flex-1 rounded-full border border-white/10 bg-white/10 px-5 text-white outline-none placeholder:text-white/50"
                 />
-
                 <button
                   type="button"
                   onClick={() => handleReplySubmit(comment.id)}
