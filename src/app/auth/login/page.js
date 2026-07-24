@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import DashboardChrome from "@/app/components/DashboardChrome";
+import AppAuthBridge from "@/app/components/AppAuthBridge";
 
 const petals = Array.from({ length: 24 }, (_, index) => ({
   id: index,
@@ -87,6 +88,7 @@ export default function LoginPage() {
 
   return (
     <>
+     <AppAuthBridge/>
       <DashboardChrome />
 
       <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#b30018] px-5 py-20 text-white">
