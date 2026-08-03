@@ -4,21 +4,206 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { supabase } from "@/lib/supabase";
+
+import { SiteFooter, SiteNav } from "@/app/components/SiteChrome";
 import { compressImage } from "@/lib/compressImage";
-import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
+import { supabase } from "@/lib/supabase";
 
 const ISO_COUNTRY_CODES = [
-  "AF", "AL", "DZ", "AD", "AO", "AG", "AR", "AM", "AU", "AT", "AZ", "BS", "BH", "BD", "BB", "BY", "BE", "BZ", "BJ", "BT",
-  "BO", "BA", "BW", "BR", "BN", "BG", "BF", "BI", "CV", "KH", "CM", "CA", "CF", "TD", "CL", "CN", "CO", "KM", "CG", "CD",
-  "CR", "CI", "HR", "CU", "CY", "CZ", "DK", "DJ", "DM", "DO", "EC", "EG", "SV", "GQ", "ER", "EE", "SZ", "ET", "FJ", "FI",
-  "FR", "GA", "GM", "GE", "DE", "GH", "GR", "GD", "GT", "GN", "GW", "GY", "HT", "HN", "HU", "IS", "IN", "ID", "IR", "IQ",
-  "IE", "IL", "IT", "JM", "JP", "JO", "KZ", "KE", "KI", "KP", "KR", "KW", "KG", "LA", "LV", "LB", "LS", "LR", "LY", "LI",
-  "LT", "LU", "MG", "MW", "MY", "MV", "ML", "MT", "MH", "MR", "MU", "MX", "FM", "MD", "MC", "MN", "ME", "MA", "MZ", "MM",
-  "NA", "NR", "NP", "NL", "NZ", "NI", "NE", "NG", "MK", "NO", "OM", "PK", "PW", "PA", "PG", "PY", "PE", "PH", "PL", "PT",
-  "QA", "RO", "RU", "RW", "KN", "LC", "VC", "WS", "SM", "ST", "SA", "SN", "RS", "SC", "SL", "SG", "SK", "SI", "SB", "SO",
-  "ZA", "SS", "ES", "LK", "SD", "SR", "SE", "CH", "SY", "TJ", "TZ", "TH", "TL", "TG", "TO", "TT", "TN", "TR", "TM", "TV",
-  "UG", "UA", "AE", "GB", "US", "UY", "UZ", "VU", "VA", "VE", "VN", "YE", "ZM", "ZW",
+  "AF",
+  "AL",
+  "DZ",
+  "AD",
+  "AO",
+  "AG",
+  "AR",
+  "AM",
+  "AU",
+  "AT",
+  "AZ",
+  "BS",
+  "BH",
+  "BD",
+  "BB",
+  "BY",
+  "BE",
+  "BZ",
+  "BJ",
+  "BT",
+  "BO",
+  "BA",
+  "BW",
+  "BR",
+  "BN",
+  "BG",
+  "BF",
+  "BI",
+  "CV",
+  "KH",
+  "CM",
+  "CA",
+  "CF",
+  "TD",
+  "CL",
+  "CN",
+  "CO",
+  "KM",
+  "CG",
+  "CD",
+  "CR",
+  "CI",
+  "HR",
+  "CU",
+  "CY",
+  "CZ",
+  "DK",
+  "DJ",
+  "DM",
+  "DO",
+  "EC",
+  "EG",
+  "SV",
+  "GQ",
+  "ER",
+  "EE",
+  "SZ",
+  "ET",
+  "FJ",
+  "FI",
+  "FR",
+  "GA",
+  "GM",
+  "GE",
+  "DE",
+  "GH",
+  "GR",
+  "GD",
+  "GT",
+  "GN",
+  "GW",
+  "GY",
+  "HT",
+  "HN",
+  "HU",
+  "IS",
+  "IN",
+  "ID",
+  "IR",
+  "IQ",
+  "IE",
+  "IL",
+  "IT",
+  "JM",
+  "JP",
+  "JO",
+  "KZ",
+  "KE",
+  "KI",
+  "KP",
+  "KR",
+  "KW",
+  "KG",
+  "LA",
+  "LV",
+  "LB",
+  "LS",
+  "LR",
+  "LY",
+  "LI",
+  "LT",
+  "LU",
+  "MG",
+  "MW",
+  "MY",
+  "MV",
+  "ML",
+  "MT",
+  "MH",
+  "MR",
+  "MU",
+  "MX",
+  "FM",
+  "MD",
+  "MC",
+  "MN",
+  "ME",
+  "MA",
+  "MZ",
+  "MM",
+  "NA",
+  "NR",
+  "NP",
+  "NL",
+  "NZ",
+  "NI",
+  "NE",
+  "NG",
+  "MK",
+  "NO",
+  "OM",
+  "PK",
+  "PW",
+  "PA",
+  "PG",
+  "PY",
+  "PE",
+  "PH",
+  "PL",
+  "PT",
+  "QA",
+  "RO",
+  "RU",
+  "RW",
+  "KN",
+  "LC",
+  "VC",
+  "WS",
+  "SM",
+  "ST",
+  "SA",
+  "SN",
+  "RS",
+  "SC",
+  "SL",
+  "SG",
+  "SK",
+  "SI",
+  "SB",
+  "SO",
+  "ZA",
+  "SS",
+  "ES",
+  "LK",
+  "SD",
+  "SR",
+  "SE",
+  "CH",
+  "SY",
+  "TJ",
+  "TZ",
+  "TH",
+  "TL",
+  "TG",
+  "TO",
+  "TT",
+  "TN",
+  "TR",
+  "TM",
+  "TV",
+  "UG",
+  "UA",
+  "AE",
+  "GB",
+  "US",
+  "UY",
+  "UZ",
+  "VU",
+  "VA",
+  "VE",
+  "VN",
+  "YE",
+  "ZM",
+  "ZW",
 ];
 
 const COUNTRY_NAME_OVERRIDES = {
@@ -43,74 +228,398 @@ const COUNTRY_NAME_OVERRIDES = {
   VN: "Vietnam",
 };
 
-const FALLBACK_COUNTRIES = [
-  "Australia",
-  "Belgium",
-  "Brazil",
-  "Cameroon",
-  "Canada",
-  "China",
-  "Finland",
-  "France",
-  "Germany",
-  "Ghana",
-  "India",
-  "Ireland",
-  "Italy",
-  "Kenya",
-  "Netherlands",
-  "Nigeria",
-  "Qatar",
-  "Rwanda",
-  "Saudi Arabia",
-  "South Africa",
-  "Spain",
-  "Sweden",
-  "Switzerland",
-  "Tanzania",
-  "Uganda",
-  "United Arab Emirates",
-  "United Kingdom",
-  "United States",
-  "Zambia",
-  "Zimbabwe",
-  "Other",
-];
+const COUNTRY_DIAL_CODE_BY_ISO = {
+  AF: "+93",
+  AL: "+355",
+  DZ: "+213",
+  AD: "+376",
+  AO: "+244",
+  AG: "+1",
+  AR: "+54",
+  AM: "+374",
+  AU: "+61",
+  AT: "+43",
+  AZ: "+994",
+  BS: "+1",
+  BH: "+973",
+  BD: "+880",
+  BB: "+1",
+  BY: "+375",
+  BE: "+32",
+  BZ: "+501",
+  BJ: "+229",
+  BT: "+975",
+  BO: "+591",
+  BA: "+387",
+  BW: "+267",
+  BR: "+55",
+  BN: "+673",
+  BG: "+359",
+  BF: "+226",
+  BI: "+257",
+  CV: "+238",
+  KH: "+855",
+  CM: "+237",
+  CA: "+1",
+  CF: "+236",
+  TD: "+235",
+  CL: "+56",
+  CN: "+86",
+  CO: "+57",
+  KM: "+269",
+  CG: "+242",
+  CD: "+243",
+  CR: "+506",
+  CI: "+225",
+  HR: "+385",
+  CU: "+53",
+  CY: "+357",
+  CZ: "+420",
+  DK: "+45",
+  DJ: "+253",
+  DM: "+1",
+  DO: "+1",
+  EC: "+593",
+  EG: "+20",
+  SV: "+503",
+  GQ: "+240",
+  ER: "+291",
+  EE: "+372",
+  SZ: "+268",
+  ET: "+251",
+  FJ: "+679",
+  FI: "+358",
+  FR: "+33",
+  GA: "+241",
+  GM: "+220",
+  GE: "+995",
+  DE: "+49",
+  GH: "+233",
+  GR: "+30",
+  GD: "+1",
+  GT: "+502",
+  GN: "+224",
+  GW: "+245",
+  GY: "+592",
+  HT: "+509",
+  HN: "+504",
+  HU: "+36",
+  IS: "+354",
+  IN: "+91",
+  ID: "+62",
+  IR: "+98",
+  IQ: "+964",
+  IE: "+353",
+  IL: "+972",
+  IT: "+39",
+  JM: "+1",
+  JP: "+81",
+  JO: "+962",
+  KZ: "+7",
+  KE: "+254",
+  KI: "+686",
+  KP: "+850",
+  KR: "+82",
+  KW: "+965",
+  KG: "+996",
+  LA: "+856",
+  LV: "+371",
+  LB: "+961",
+  LS: "+266",
+  LR: "+231",
+  LY: "+218",
+  LI: "+423",
+  LT: "+370",
+  LU: "+352",
+  MG: "+261",
+  MW: "+265",
+  MY: "+60",
+  MV: "+960",
+  ML: "+223",
+  MT: "+356",
+  MH: "+692",
+  MR: "+222",
+  MU: "+230",
+  MX: "+52",
+  FM: "+691",
+  MD: "+373",
+  MC: "+377",
+  MN: "+976",
+  ME: "+382",
+  MA: "+212",
+  MZ: "+258",
+  MM: "+95",
+  NA: "+264",
+  NR: "+674",
+  NP: "+977",
+  NL: "+31",
+  NZ: "+64",
+  NI: "+505",
+  NE: "+227",
+  NG: "+234",
+  MK: "+389",
+  NO: "+47",
+  OM: "+968",
+  PK: "+92",
+  PW: "+680",
+  PA: "+507",
+  PG: "+675",
+  PY: "+595",
+  PE: "+51",
+  PH: "+63",
+  PL: "+48",
+  PT: "+351",
+  QA: "+974",
+  RO: "+40",
+  RU: "+7",
+  RW: "+250",
+  KN: "+1",
+  LC: "+1",
+  VC: "+1",
+  WS: "+685",
+  SM: "+378",
+  ST: "+239",
+  SA: "+966",
+  SN: "+221",
+  RS: "+381",
+  SC: "+248",
+  SL: "+232",
+  SG: "+65",
+  SK: "+421",
+  SI: "+386",
+  SB: "+677",
+  SO: "+252",
+  ZA: "+27",
+  SS: "+211",
+  ES: "+34",
+  LK: "+94",
+  SD: "+249",
+  SR: "+597",
+  SE: "+46",
+  CH: "+41",
+  SY: "+963",
+  TJ: "+992",
+  TZ: "+255",
+  TH: "+66",
+  TL: "+670",
+  TG: "+228",
+  TO: "+676",
+  TT: "+1",
+  TN: "+216",
+  TR: "+90",
+  TM: "+993",
+  TV: "+688",
+  UG: "+256",
+  UA: "+380",
+  AE: "+971",
+  GB: "+44",
+  US: "+1",
+  UY: "+598",
+  UZ: "+998",
+  VU: "+678",
+  VA: "+39",
+  VE: "+58",
+  VN: "+84",
+  YE: "+967",
+  ZM: "+260",
+  ZW: "+263",
+};
 
-const COUNTRY_DIAL_CODES = {
-  Australia: "+61",
-  Belgium: "+32",
-  Brazil: "+55",
-  Cameroon: "+237",
-  Canada: "+1",
-  China: "+86",
-  Finland: "+358",
-  France: "+33",
-  Germany: "+49",
-  Ghana: "+233",
-  India: "+91",
-  Ireland: "+353",
-  Italy: "+39",
-  Kenya: "+254",
-  Netherlands: "+31",
-  Nigeria: "+234",
-  Norway: "+47",
-  Portugal: "+351",
-  Qatar: "+974",
-  Rwanda: "+250",
-  "Saudi Arabia": "+966",
-  "South Africa": "+27",
-  Spain: "+34",
-  Sweden: "+46",
-  Switzerland: "+41",
-  Tanzania: "+255",
-  Uganda: "+256",
-  "United Arab Emirates": "+971",
-  "United Kingdom": "+44",
-  "United States": "+1",
-  Zambia: "+260",
-  Zimbabwe: "+263",
-  Other: "",
+const FALLBACK_COUNTRY_NAMES = {
+  AF: "Afghanistan",
+  AL: "Albania",
+  DZ: "Algeria",
+  AD: "Andorra",
+  AO: "Angola",
+  AG: "Antigua and Barbuda",
+  AR: "Argentina",
+  AM: "Armenia",
+  AU: "Australia",
+  AT: "Austria",
+  AZ: "Azerbaijan",
+  BS: "Bahamas",
+  BH: "Bahrain",
+  BD: "Bangladesh",
+  BB: "Barbados",
+  BY: "Belarus",
+  BE: "Belgium",
+  BZ: "Belize",
+  BJ: "Benin",
+  BT: "Bhutan",
+  BO: "Bolivia",
+  BA: "Bosnia and Herzegovina",
+  BW: "Botswana",
+  BR: "Brazil",
+  BN: "Brunei",
+  BG: "Bulgaria",
+  BF: "Burkina Faso",
+  BI: "Burundi",
+  CV: "Cape Verde",
+  KH: "Cambodia",
+  CM: "Cameroon",
+  CA: "Canada",
+  CF: "Central African Republic",
+  TD: "Chad",
+  CL: "Chile",
+  CN: "China",
+  CO: "Colombia",
+  KM: "Comoros",
+  CG: "Congo",
+  CD: "Democratic Republic of the Congo",
+  CR: "Costa Rica",
+  CI: "Côte d’Ivoire",
+  HR: "Croatia",
+  CU: "Cuba",
+  CY: "Cyprus",
+  CZ: "Czech Republic",
+  DK: "Denmark",
+  DJ: "Djibouti",
+  DM: "Dominica",
+  DO: "Dominican Republic",
+  EC: "Ecuador",
+  EG: "Egypt",
+  SV: "El Salvador",
+  GQ: "Equatorial Guinea",
+  ER: "Eritrea",
+  EE: "Estonia",
+  SZ: "Eswatini",
+  ET: "Ethiopia",
+  FJ: "Fiji",
+  FI: "Finland",
+  FR: "France",
+  GA: "Gabon",
+  GM: "Gambia",
+  GE: "Georgia",
+  DE: "Germany",
+  GH: "Ghana",
+  GR: "Greece",
+  GD: "Grenada",
+  GT: "Guatemala",
+  GN: "Guinea",
+  GW: "Guinea-Bissau",
+  GY: "Guyana",
+  HT: "Haiti",
+  HN: "Honduras",
+  HU: "Hungary",
+  IS: "Iceland",
+  IN: "India",
+  ID: "Indonesia",
+  IR: "Iran",
+  IQ: "Iraq",
+  IE: "Ireland",
+  IL: "Israel",
+  IT: "Italy",
+  JM: "Jamaica",
+  JP: "Japan",
+  JO: "Jordan",
+  KZ: "Kazakhstan",
+  KE: "Kenya",
+  KI: "Kiribati",
+  KP: "North Korea",
+  KR: "South Korea",
+  KW: "Kuwait",
+  KG: "Kyrgyzstan",
+  LA: "Laos",
+  LV: "Latvia",
+  LB: "Lebanon",
+  LS: "Lesotho",
+  LR: "Liberia",
+  LY: "Libya",
+  LI: "Liechtenstein",
+  LT: "Lithuania",
+  LU: "Luxembourg",
+  MG: "Madagascar",
+  MW: "Malawi",
+  MY: "Malaysia",
+  MV: "Maldives",
+  ML: "Mali",
+  MT: "Malta",
+  MH: "Marshall Islands",
+  MR: "Mauritania",
+  MU: "Mauritius",
+  MX: "Mexico",
+  FM: "Micronesia",
+  MD: "Moldova",
+  MC: "Monaco",
+  MN: "Mongolia",
+  ME: "Montenegro",
+  MA: "Morocco",
+  MZ: "Mozambique",
+  MM: "Myanmar",
+  NA: "Namibia",
+  NR: "Nauru",
+  NP: "Nepal",
+  NL: "Netherlands",
+  NZ: "New Zealand",
+  NI: "Nicaragua",
+  NE: "Niger",
+  NG: "Nigeria",
+  MK: "North Macedonia",
+  NO: "Norway",
+  OM: "Oman",
+  PK: "Pakistan",
+  PW: "Palau",
+  PA: "Panama",
+  PG: "Papua New Guinea",
+  PY: "Paraguay",
+  PE: "Peru",
+  PH: "Philippines",
+  PL: "Poland",
+  PT: "Portugal",
+  QA: "Qatar",
+  RO: "Romania",
+  RU: "Russia",
+  RW: "Rwanda",
+  KN: "Saint Kitts and Nevis",
+  LC: "Saint Lucia",
+  VC: "Saint Vincent and the Grenadines",
+  WS: "Samoa",
+  SM: "San Marino",
+  ST: "São Tomé and Príncipe",
+  SA: "Saudi Arabia",
+  SN: "Senegal",
+  RS: "Serbia",
+  SC: "Seychelles",
+  SL: "Sierra Leone",
+  SG: "Singapore",
+  SK: "Slovakia",
+  SI: "Slovenia",
+  SB: "Solomon Islands",
+  SO: "Somalia",
+  ZA: "South Africa",
+  SS: "South Sudan",
+  ES: "Spain",
+  LK: "Sri Lanka",
+  SD: "Sudan",
+  SR: "Suriname",
+  SE: "Sweden",
+  CH: "Switzerland",
+  SY: "Syria",
+  TJ: "Tajikistan",
+  TZ: "Tanzania",
+  TH: "Thailand",
+  TL: "Timor-Leste",
+  TG: "Togo",
+  TO: "Tonga",
+  TT: "Trinidad and Tobago",
+  TN: "Tunisia",
+  TR: "Turkey",
+  TM: "Turkmenistan",
+  TV: "Tuvalu",
+  UG: "Uganda",
+  UA: "Ukraine",
+  AE: "United Arab Emirates",
+  GB: "United Kingdom",
+  US: "United States",
+  UY: "Uruguay",
+  UZ: "Uzbekistan",
+  VU: "Vanuatu",
+  VA: "Vatican City",
+  VE: "Venezuela",
+  VN: "Vietnam",
+  YE: "Yemen",
+  ZM: "Zambia",
+  ZW: "Zimbabwe",
 };
 
 const COUNTRY_POSTAL_RULES = {
@@ -178,13 +687,19 @@ const COUNTRY_POSTAL_RULES = {
     label: "Eircode",
     required: false,
     regex: /^[AC-FHKNPRTV-Y]\d{2}\s?[0-9AC-FHKNPRTV-Y]{4}$/i,
-    hint: "Optional, e.g. D02 X285",
+    hint: "D02 X285",
   },
   Italy: {
     label: "Postal code",
     required: true,
     regex: /^\d{5}$/,
     hint: "5 digits",
+  },
+  Japan: {
+    label: "Postal code",
+    required: true,
+    regex: /^\d{3}-?\d{4}$/,
+    hint: "123-4567",
   },
   Netherlands: {
     label: "Postcode",
@@ -274,7 +789,15 @@ const maritalStatuses = [
   "Prefer not to say",
 ];
 
-const genotypes = ["AA", "AS", "SS", "AC", "SC", "Not sure", "Prefer not to say"];
+const genotypes = [
+  "AA",
+  "AS",
+  "SS",
+  "AC",
+  "SC",
+  "Not sure",
+  "Prefer not to say",
+];
 
 const emptyForm = {
   full_name: "",
@@ -297,57 +820,154 @@ const emptyForm = {
 };
 
 function getPlan(profile) {
-  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
-}
-
-function getGalleryLimit(plan) {
-  if (plan === "vip") return Infinity;
-  if (plan === "premium") return 5;
-  return 0;
-}
-
-function buildCountryList() {
-  if (typeof Intl === "undefined" || typeof Intl.DisplayNames !== "function") {
-    return FALLBACK_COUNTRIES;
-  }
-
-  const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
-
-  return [
-    ...ISO_COUNTRY_CODES.map((code) => COUNTRY_NAME_OVERRIDES[code] || regionNames.of(code))
-      .filter((name) => typeof name === "string" && name.trim())
-      .sort((a, b) => a.localeCompare(b)),
-    "Other",
-  ];
-}
-
-function getDialCodes() {
-  return [...new Set(Object.values(COUNTRY_DIAL_CODES).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b)
+  return (
+    profile?.plan ||
+    profile?.membership_plan ||
+    profile?.subscription ||
+    "free"
   );
 }
 
-function splitPhoneNumber(phone) {
-  if (!phone) return { phone_code: "", phone: "" };
+function getGalleryLimit(plan) {
+  if (plan === "vip") {
+    return Infinity;
+  }
 
-  const dialCodes = getDialCodes();
+  if (plan === "premium") {
+    return 5;
+  }
+
+  return 0;
+}
+
+function buildCountryOptions() {
+  const regionNames =
+    typeof Intl !== "undefined" &&
+    typeof Intl.DisplayNames === "function"
+      ? new Intl.DisplayNames(["en"], {
+          type: "region",
+        })
+      : null;
+
+  return ISO_COUNTRY_CODES.map((isoCode) => {
+    const generatedName = regionNames?.of(isoCode);
+
+    const name =
+      COUNTRY_NAME_OVERRIDES[isoCode] ||
+      (typeof generatedName === "string"
+        ? generatedName
+        : null) ||
+      FALLBACK_COUNTRY_NAMES[isoCode] ||
+      isoCode;
+
+    return {
+      isoCode,
+      name,
+      dialCode: COUNTRY_DIAL_CODE_BY_ISO[isoCode] || "",
+    };
+  })
+    .filter((country) => country.name && country.dialCode)
+    .sort((firstCountry, secondCountry) =>
+      firstCountry.name.localeCompare(secondCountry.name)
+    );
+}
+
+function getDialCodes(countryOptions) {
+  return [
+    ...new Set(
+      countryOptions
+        .map((country) => country.dialCode)
+        .filter(Boolean)
+    ),
+  ].sort((firstCode, secondCode) => {
+    const firstNumber = Number(firstCode.replace(/\D/g, ""));
+    const secondNumber = Number(secondCode.replace(/\D/g, ""));
+
+    return firstNumber - secondNumber;
+  });
+}
+
+function getDialCodeForCountry(countryName, countryOptions) {
+  if (!countryName) {
+    return "";
+  }
+
+  return (
+    countryOptions.find(
+      (country) => country.name === countryName
+    )?.dialCode || ""
+  );
+}
+
+function splitPhoneNumber(phone, dialCodes) {
+  if (!phone) {
+    return {
+      phone_code: "",
+      phone: "",
+    };
+  }
+
+  const normalizedPhone = String(phone)
+    .trim()
+    .replace(/[^\d+]/g, "");
+
   const matchedCode = [...dialCodes]
-    .sort((a, b) => b.length - a.length)
-    .find((code) => phone.startsWith(code));
+    .sort(
+      (firstCode, secondCode) =>
+        secondCode.length - firstCode.length
+    )
+    .find((code) => normalizedPhone.startsWith(code));
 
   if (!matchedCode) {
-    return { phone_code: "", phone };
+    return {
+      phone_code: "",
+      phone: normalizedPhone,
+    };
   }
 
   return {
     phone_code: matchedCode,
-    phone: phone.replace(matchedCode, "").trim(),
+    phone: normalizedPhone
+      .slice(matchedCode.length)
+      .trim(),
   };
 }
 
+function normalizeLocalPhoneNumber(phone) {
+  return String(phone || "")
+    .trim()
+    .replace(/[^\d]/g, "")
+    .replace(/^0+/, "");
+}
+
+function buildInternationalPhoneNumber(
+  phoneCode,
+  localPhone
+) {
+  const normalizedCode = String(phoneCode || "")
+    .trim()
+    .replace(/[^\d+]/g, "");
+
+  const normalizedPhone =
+    normalizeLocalPhoneNumber(localPhone);
+
+  if (!normalizedCode || !normalizedPhone) {
+    return "";
+  }
+
+  return `${normalizedCode}${normalizedPhone}`;
+}
+
 function getGallery(profile) {
-  const gallery = profile?.gallery_urls || profile?.photos || profile?.photo_urls || [];
-  return Array.isArray(gallery) ? gallery.filter(Boolean) : [];
+  const gallery =
+    profile?.gallery_urls ||
+    profile?.photos ||
+    profile?.photo_urls ||
+    [];
+
+  return Array.isArray(gallery)
+    ? gallery.filter(Boolean)
+    : [];
 }
 
 function getPostalConfig(country) {
@@ -371,7 +991,7 @@ function getPostalConfig(country) {
 }
 
 function normalizePostalCode(value) {
-  return value.trim().toUpperCase();
+  return String(value || "").trim().toUpperCase();
 }
 
 function validatePostalCode(country, postalCode) {
@@ -386,8 +1006,14 @@ function validatePostalCode(country, postalCode) {
     return `${config.label} is required for ${country}.`;
   }
 
-  if (config.regex && value && !config.regex.test(value)) {
-    return `Enter a valid ${config.label.toLowerCase()} for ${country}${config.hint ? ` (${config.hint})` : ""}.`;
+  if (
+    config.regex &&
+    value &&
+    !config.regex.test(value)
+  ) {
+    return `Enter a valid ${config.label.toLowerCase()} for ${country}${
+      config.hint ? ` (${config.hint})` : ""
+    }.`;
   }
 
   return "";
@@ -398,21 +1024,39 @@ function ProfileSetupPage() {
   const [plan, setPlan] = useState("free");
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [uploadingGallery, setUploadingGallery] =
+    useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [galleryUrls, setGalleryUrls] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [postalError, setPostalError] = useState("");
 
-  const countries = useMemo(buildCountryList, []);
-  const dialCodes = useMemo(getDialCodes, []);
-  const selectedPostalConfig = useMemo(() => getPostalConfig(form.country), [form.country]);
+  const countryOptions = useMemo(
+    buildCountryOptions,
+    []
+  );
+
+  const dialCodes = useMemo(
+    () => getDialCodes(countryOptions),
+    [countryOptions]
+  );
+
+  const selectedPostalConfig = useMemo(
+    () => getPostalConfig(form.country),
+    [form.country]
+  );
 
   const galleryLimit = getGalleryLimit(plan);
   const canUploadGallery = galleryLimit > 0;
+
   const remainingGallerySlots =
-    galleryLimit === Infinity ? Infinity : Math.max(galleryLimit - galleryUrls.length, 0);
+    galleryLimit === Infinity
+      ? Infinity
+      : Math.max(
+          galleryLimit - galleryUrls.length,
+          0
+        );
 
   useEffect(() => {
     async function getUser() {
@@ -433,8 +1077,13 @@ function ProfileSetupPage() {
         .eq("id", authUser.id)
         .single();
 
-      const metadataName = authUser.user_metadata?.full_name || "";
-      const profilePhone = splitPhoneNumber(profile?.phone || "");
+      const metadataName =
+        authUser.user_metadata?.full_name || "";
+
+      const profilePhone = splitPhoneNumber(
+        profile?.phone || "",
+        dialCodes
+      );
 
       if (profile) {
         setPlan(getPlan(profile));
@@ -442,21 +1091,33 @@ function ProfileSetupPage() {
         setGalleryUrls(getGallery(profile));
 
         setForm({
-          full_name: profile.full_name || metadataName || "",
-          email: profile.email || authUser.email || "",
+          full_name:
+            profile.full_name || metadataName || "",
+          email:
+            profile.email || authUser.email || "",
           age: profile.age || "",
           gender: profile.gender || "",
-          marital_status: profile.marital_status || "",
+          marital_status:
+            profile.marital_status || "",
           country: profile.country || "",
           postal_code: profile.postal_code || "",
-          phone_code: profilePhone.phone_code || COUNTRY_DIAL_CODES[profile.country] || "",
+          phone_code:
+            profilePhone.phone_code ||
+            getDialCodeForCountry(
+              profile.country,
+              countryOptions
+            ),
           phone: profilePhone.phone || "",
           city: profile.city || "",
           occupation: profile.occupation || "",
-          religious_background: profile.religious_background || profile.faith_background || "",
+          religious_background:
+            profile.religious_background ||
+            profile.faith_background ||
+            "",
           genotype: profile.genotype || "",
           height: profile.height || "",
-          relationship_goal: profile.relationship_goal || "",
+          relationship_goal:
+            profile.relationship_goal || "",
           interests: profile.interests || "",
           bio: profile.bio || "",
         });
@@ -471,11 +1132,14 @@ function ProfileSetupPage() {
       }));
     }
 
-    getUser();
-  }, []);
+    void getUser();
+  }, [countryOptions, dialCodes]);
 
   useEffect(() => {
-    localStorage.setItem("profile-draft", JSON.stringify(form));
+    localStorage.setItem(
+      "profile-draft",
+      JSON.stringify(form)
+    );
   }, [form]);
 
   useEffect(() => {
@@ -484,8 +1148,24 @@ function ProfileSetupPage() {
       return;
     }
 
-    setPostalError(validatePostalCode(form.country, form.postal_code));
+    setPostalError(
+      validatePostalCode(
+        form.country,
+        form.postal_code
+      )
+    );
   }, [form.country, form.postal_code]);
+
+  useEffect(() => {
+    return () => {
+      if (
+        previewUrl &&
+        previewUrl.startsWith("blob:")
+      ) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const completionPercentage = useMemo(() => {
     const baseFields = [
@@ -502,12 +1182,22 @@ function ProfileSetupPage() {
       previewUrl || avatarUrl,
     ];
 
-    const completionFields = selectedPostalConfig.required
-      ? [...baseFields, form.postal_code]
-      : baseFields;
+    const completionFields =
+      selectedPostalConfig.required
+        ? [...baseFields, form.postal_code]
+        : baseFields;
 
-    return Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100);
-  }, [form, previewUrl, avatarUrl, selectedPostalConfig.required]);
+    return Math.round(
+      (completionFields.filter(Boolean).length /
+        completionFields.length) *
+        100
+    );
+  }, [
+    form,
+    previewUrl,
+    avatarUrl,
+    selectedPostalConfig.required,
+  ]);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -517,8 +1207,13 @@ function ProfileSetupPage() {
         ...currentForm,
         country: value,
         postal_code: "",
-        phone_code: COUNTRY_DIAL_CODES[value] || currentForm.phone_code,
+        phone_code:
+          getDialCodeForCountry(
+            value,
+            countryOptions
+          ) || currentForm.phone_code,
       }));
+
       setPostalError("");
       return;
     }
@@ -530,49 +1225,78 @@ function ProfileSetupPage() {
   }
 
   async function uploadPhoto() {
-    if (!photo || !user) return null;
+    if (!photo || !user) {
+      return null;
+    }
 
-    const compressedPhoto = await compressImage(photo, {
-      maxWidth: 900,
-      maxHeight: 1200,
-      quality: 0.78,
-      outputType: "image/webp",
-    });
+    const compressedPhoto = await compressImage(
+      photo,
+      {
+        maxWidth: 900,
+        maxHeight: 1200,
+        quality: 0.78,
+        outputType: "image/webp",
+      }
+    );
 
     const fileName = `${user.id}-${Date.now()}.webp`;
     const filePath = `${user.id}/${fileName}`;
 
-    const { error } = await supabase.storage.from("profile-photos").upload(filePath, compressedPhoto, {
-      contentType: "image/webp",
-      upsert: true,
-    });
+    const { error } = await supabase.storage
+      .from("profile-photos")
+      .upload(filePath, compressedPhoto, {
+        contentType: "image/webp",
+        upsert: true,
+      });
 
     if (error) {
       throw error;
     }
 
-    const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
+    const { data } = supabase.storage
+      .from("profile-photos")
+      .getPublicUrl(filePath);
+
     return data.publicUrl;
   }
 
   async function uploadGalleryFiles(event) {
-    const selectedFiles = Array.from(event.target.files || []);
+    const selectedFiles = Array.from(
+      event.target.files || []
+    );
 
-    if (!selectedFiles.length || !user) return;
+    if (!selectedFiles.length || !user) {
+      return;
+    }
 
     if (!canUploadGallery) {
-      alert("Gallery uploads are available for Premium and VIP members only.");
+      alert(
+        "Gallery uploads are available for Premium and VIP members only."
+      );
       return;
     }
 
     const allowedFiles =
-      galleryLimit === Infinity ? selectedFiles : selectedFiles.slice(0, remainingGallerySlots);
+      galleryLimit === Infinity
+        ? selectedFiles
+        : selectedFiles.slice(
+            0,
+            remainingGallerySlots
+          );
 
-    if (galleryLimit !== Infinity && selectedFiles.length > remainingGallerySlots) {
-      alert(`Premium members can upload up to ${galleryLimit} gallery photos.`);
+    if (
+      galleryLimit !== Infinity &&
+      selectedFiles.length >
+        remainingGallerySlots
+    ) {
+      alert(
+        `Premium members can upload up to ${galleryLimit} gallery photos.`
+      );
     }
 
-    if (!allowedFiles.length) return;
+    if (!allowedFiles.length) {
+      return;
+    }
 
     setUploadingGallery(true);
 
@@ -580,14 +1304,18 @@ function ProfileSetupPage() {
       const uploadedUrls = [];
 
       for (const file of allowedFiles) {
-        const compressedFile = await compressImage(file, {
-          maxWidth: 900,
-          maxHeight: 1200,
-          quality: 0.78,
-          outputType: "image/webp",
-        });
+        const compressedFile =
+          await compressImage(file, {
+            maxWidth: 900,
+            maxHeight: 1200,
+            quality: 0.78,
+            outputType: "image/webp",
+          });
 
-        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
+        const fileName = `${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}.webp`;
+
         const filePath = `${user.id}/gallery/${fileName}`;
 
         const { error } = await supabase.storage
@@ -601,13 +1329,23 @@ function ProfileSetupPage() {
           throw error;
         }
 
-        const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
+        const { data } = supabase.storage
+          .from("profile-photos")
+          .getPublicUrl(filePath);
+
         uploadedUrls.push(data.publicUrl);
       }
 
-      setGalleryUrls((current) => [...current, ...uploadedUrls]);
+      setGalleryUrls((current) => [
+        ...current,
+        ...uploadedUrls,
+      ]);
     } catch (error) {
-      alert(error.message);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to upload gallery photos."
+      );
     } finally {
       setUploadingGallery(false);
       event.target.value = "";
@@ -615,12 +1353,19 @@ function ProfileSetupPage() {
   }
 
   function removeGalleryImage(imageUrl) {
-    setGalleryUrls((current) => current.filter((url) => url !== imageUrl));
+    setGalleryUrls((current) =>
+      current.filter((url) => url !== imageUrl)
+    );
   }
 
   function isProfileComplete(updates) {
-    const postalConfig = getPostalConfig(updates.country);
-    const hasPostal = postalConfig.required ? Boolean(updates.postal_code) : true;
+    const postalConfig = getPostalConfig(
+      updates.country
+    );
+
+    const hasPostal = postalConfig.required
+      ? Boolean(updates.postal_code)
+      : true;
 
     return Boolean(
       updates.full_name &&
@@ -646,8 +1391,14 @@ function ProfileSetupPage() {
       return;
     }
 
-    const normalizedPostalCode = normalizePostalCode(form.postal_code);
-    const postalValidationMessage = validatePostalCode(form.country, normalizedPostalCode);
+    const normalizedPostalCode =
+      normalizePostalCode(form.postal_code);
+
+    const postalValidationMessage =
+      validatePostalCode(
+        form.country,
+        normalizedPostalCode
+      );
 
     if (postalValidationMessage) {
       setPostalError(postalValidationMessage);
@@ -658,9 +1409,14 @@ function ProfileSetupPage() {
     setLoading(true);
 
     try {
-      const uploadedAvatarUrl = await uploadPhoto();
-      const cleanPhone = form.phone.replace(/^0+/, "").trim();
-      const fullPhone = form.phone_code && cleanPhone ? `${form.phone_code}${cleanPhone}` : "";
+      const uploadedAvatarUrl =
+        await uploadPhoto();
+
+      const fullPhone =
+        buildInternationalPhoneNumber(
+          form.phone_code,
+          form.phone
+        );
 
       const updates = {
         id: user.id,
@@ -670,27 +1426,39 @@ function ProfileSetupPage() {
         gender: form.gender,
         marital_status: form.marital_status,
         country: form.country,
-        postal_code: normalizedPostalCode || null,
+        postal_code:
+          normalizedPostalCode || null,
         phone: fullPhone,
         city: form.city.trim(),
         occupation: form.occupation.trim(),
-        religious_background: form.religious_background.trim(),
-        faith_background: form.religious_background.trim(),
+        religious_background:
+          form.religious_background.trim(),
+        faith_background:
+          form.religious_background.trim(),
         genotype: form.genotype,
         height: form.height.trim(),
-        relationship_goal: form.relationship_goal,
+        relationship_goal:
+          form.relationship_goal,
         interests: form.interests.trim(),
         bio: form.bio.trim(),
         gallery_urls: galleryUrls,
-        matchups_eligible: form.marital_status !== "Married",
-        is_visible: form.marital_status !== "Married",
+        matchups_eligible:
+          form.marital_status !== "Married",
+        is_visible:
+          form.marital_status !== "Married",
         updated_at: new Date().toISOString(),
-        avatar_url: uploadedAvatarUrl || avatarUrl || null,
+        avatar_url:
+          uploadedAvatarUrl ||
+          avatarUrl ||
+          null,
       };
 
-      updates.is_complete = isProfileComplete(updates);
+      updates.is_complete =
+        isProfileComplete(updates);
 
-      const { error } = await supabase.from("profiles").upsert(updates);
+      const { error } = await supabase
+        .from("profiles")
+        .upsert(updates);
 
       if (error) {
         alert(error.message);
@@ -702,10 +1470,15 @@ function ProfileSetupPage() {
       }
 
       localStorage.removeItem("profile-draft");
+
       alert("Profile saved!");
       window.location.href = "/dashboard";
     } catch (error) {
-      alert(error.message);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to save your profile."
+      );
     } finally {
       setLoading(false);
     }
@@ -718,9 +1491,17 @@ function ProfileSetupPage() {
       <main className="min-h-screen bg-[#b30018] px-6 pb-24 pt-44 text-white">
         <div className="mx-auto max-w-5xl">
           <motion.div
-            initial={{ y: 60, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8 }}
+            initial={{
+              y: 60,
+              opacity: 0,
+            }}
+            animate={{
+              y: 0,
+              opacity: 1,
+            }}
+            transition={{
+              duration: 0.8,
+            }}
             className="text-center"
           >
             <p className="text-sm font-black uppercase tracking-[0.45em] text-red-100">
@@ -732,7 +1513,8 @@ function ProfileSetupPage() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-white/80">
-              Complete your profile so Delly&apos;s Matchups can support intentional,
+              Complete your profile so Delly&apos;s
+              Matchups can support intentional,
               meaningful connections.
             </p>
           </motion.div>
@@ -746,20 +1528,33 @@ function ProfileSetupPage() {
             <div className="h-3 overflow-hidden rounded-full bg-white/20">
               <div
                 className="h-full rounded-full bg-white transition-all duration-500"
-                style={{ width: `${completionPercentage}%` }}
+                style={{
+                  width: `${completionPercentage}%`,
+                }}
               />
             </div>
           </div>
 
           <motion.form
             onSubmit={handleSubmit}
-            initial={{ y: 60, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.8 }}
+            initial={{
+              y: 60,
+              opacity: 0,
+            }}
+            animate={{
+              y: 0,
+              opacity: 1,
+            }}
+            transition={{
+              delay: 0.2,
+              duration: 0.8,
+            }}
             className="mx-auto mt-14 rounded-[3rem] bg-[#c1121f] p-8 shadow-2xl md:p-12"
           >
             <div className="rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">Profile Photo</h2>
+              <h2 className="font-display text-4xl font-bold">
+                Profile Photo
+              </h2>
 
               {(previewUrl || avatarUrl) && (
                 <div className="mt-6 flex justify-center">
@@ -776,18 +1571,37 @@ function ProfileSetupPage() {
                 accept="image/*"
                 className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-white outline-none file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-5 file:py-2 file:font-bold file:text-[#b30018]"
                 onChange={(event) => {
-                  const selectedFile = event.target.files?.[0] || null;
+                  const selectedFile =
+                    event.target.files?.[0] ||
+                    null;
+
                   setPhoto(selectedFile);
 
                   if (selectedFile) {
-                    setPreviewUrl(URL.createObjectURL(selectedFile));
+                    setPreviewUrl((currentUrl) => {
+                      if (
+                        currentUrl?.startsWith(
+                          "blob:"
+                        )
+                      ) {
+                        URL.revokeObjectURL(
+                          currentUrl
+                        );
+                      }
+
+                      return URL.createObjectURL(
+                        selectedFile
+                      );
+                    });
                   }
                 }}
               />
             </div>
 
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">Gallery Photos</h2>
+              <h2 className="font-display text-4xl font-bold">
+                Gallery Photos
+              </h2>
 
               <p className="mt-3 text-white/75">
                 {plan === "vip"
@@ -799,22 +1613,32 @@ function ProfileSetupPage() {
 
               {galleryUrls.length > 0 && (
                 <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                  {galleryUrls.map((imageUrl) => (
-                    <div key={imageUrl} className="relative overflow-hidden rounded-[2rem]">
-                      <img
-                        src={imageUrl}
-                        alt="Gallery"
-                        className="h-56 w-full object-cover object-top"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeGalleryImage(imageUrl)}
-                        className="absolute right-3 top-3 rounded-full bg-black/70 px-4 py-2 text-sm font-black text-white"
+                  {galleryUrls.map(
+                    (imageUrl) => (
+                      <div
+                        key={imageUrl}
+                        className="relative overflow-hidden rounded-[2rem]"
                       >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+                        <img
+                          src={imageUrl}
+                          alt="Gallery"
+                          className="h-56 w-full object-cover object-top"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeGalleryImage(
+                              imageUrl
+                            )
+                          }
+                          className="absolute right-3 top-3 rounded-full bg-black/70 px-4 py-2 text-sm font-black text-white"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )
+                  )}
                 </div>
               )}
 
@@ -824,7 +1648,10 @@ function ProfileSetupPage() {
                     type="file"
                     accept="image/*"
                     multiple
-                    disabled={uploadingGallery || remainingGallerySlots === 0}
+                    disabled={
+                      uploadingGallery ||
+                      remainingGallerySlots === 0
+                    }
                     onChange={uploadGalleryFiles}
                     className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-white outline-none file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-5 file:py-2 file:font-bold file:text-[#b30018] disabled:opacity-50"
                   />
@@ -848,7 +1675,9 @@ function ProfileSetupPage() {
             </div>
 
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">Personal Information</h2>
+              <h2 className="font-display text-4xl font-bold">
+                Personal Information
+              </h2>
 
               <div className="mt-6 grid gap-6 md:grid-cols-2">
                 <input
@@ -885,16 +1714,31 @@ function ProfileSetupPage() {
                   value={form.gender}
                   onChange={handleChange}
                 >
-                  <option value="" className="text-black">
+                  <option
+                    value=""
+                    className="text-black"
+                  >
                     Select your gender
                   </option>
-                  <option value="Woman" className="text-black">
+
+                  <option
+                    value="Woman"
+                    className="text-black"
+                  >
                     Woman
                   </option>
-                  <option value="Man" className="text-black">
+
+                  <option
+                    value="Man"
+                    className="text-black"
+                  >
                     Man
                   </option>
-                  <option value="Prefer not to say" className="text-black">
+
+                  <option
+                    value="Prefer not to say"
+                    className="text-black"
+                  >
                     Prefer not to say
                   </option>
                 </select>
@@ -905,14 +1749,24 @@ function ProfileSetupPage() {
                   value={form.marital_status}
                   onChange={handleChange}
                 >
-                  <option value="" className="text-black">
+                  <option
+                    value=""
+                    className="text-black"
+                  >
                     Select your relationship status
                   </option>
-                  {maritalStatuses.map((status) => (
-                    <option key={status} value={status} className="text-black">
-                      {status}
-                    </option>
-                  ))}
+
+                  {maritalStatuses.map(
+                    (status) => (
+                      <option
+                        key={status}
+                        value={status}
+                        className="text-black"
+                      >
+                        {status}
+                      </option>
+                    )
+                  )}
                 </select>
 
                 <input
@@ -930,14 +1784,31 @@ function ProfileSetupPage() {
                   value={form.country}
                   onChange={handleChange}
                 >
-                  <option value="" className="text-black">
+                  <option
+                    value=""
+                    className="text-black"
+                  >
                     Select your country
                   </option>
-                  {countries.map((country) => (
-                    <option key={country} value={country} className="text-black">
-                      {country}
-                    </option>
-                  ))}
+
+                  {countryOptions.map(
+                    (country) => (
+                      <option
+                        key={country.isoCode}
+                        value={country.name}
+                        className="text-black"
+                      >
+                        {country.name}
+                      </option>
+                    )
+                  )}
+
+                  <option
+                    value="Other"
+                    className="text-black"
+                  >
+                    Other
+                  </option>
                 </select>
 
                 <div className="md:col-span-2">
@@ -946,20 +1817,39 @@ function ProfileSetupPage() {
                     name="postal_code"
                     placeholder={
                       selectedPostalConfig.hint
-                        ? `${selectedPostalConfig.label}${selectedPostalConfig.required ? "" : " optional"} e.g. ${selectedPostalConfig.hint}`
-                        : `${selectedPostalConfig.label}${selectedPostalConfig.required ? "" : " optional"}`
+                        ? `${selectedPostalConfig.label}${
+                            selectedPostalConfig.required
+                              ? ""
+                              : " optional"
+                          } e.g. ${selectedPostalConfig.hint}`
+                        : `${selectedPostalConfig.label}${
+                            selectedPostalConfig.required
+                              ? ""
+                              : " optional"
+                          }`
                     }
                     className="h-16 w-full rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                     value={form.postal_code}
                     onChange={handleChange}
                   />
+
                   {postalError ? (
-                    <p className="mt-2 text-sm font-semibold text-red-100">{postalError}</p>
+                    <p className="mt-2 text-sm font-semibold text-red-100">
+                      {postalError}
+                    </p>
                   ) : (
                     <p className="mt-2 text-sm text-white/65">
                       {selectedPostalConfig.required
-                        ? `${selectedPostalConfig.label} is required${selectedPostalConfig.hint ? ` (${selectedPostalConfig.hint})` : ""}.`
-                        : `${selectedPostalConfig.label} is optional${selectedPostalConfig.hint ? ` (${selectedPostalConfig.hint})` : ""}.`}
+                        ? `${selectedPostalConfig.label} is required${
+                            selectedPostalConfig.hint
+                              ? ` (${selectedPostalConfig.hint})`
+                              : ""
+                          }.`
+                        : `${selectedPostalConfig.label} is optional${
+                            selectedPostalConfig.hint
+                              ? ` (${selectedPostalConfig.hint})`
+                              : ""
+                          }.`}
                     </p>
                   )}
                 </div>
@@ -969,13 +1859,21 @@ function ProfileSetupPage() {
                     name="phone_code"
                     value={form.phone_code}
                     onChange={handleChange}
-                    className="w-28 bg-white/10 px-3 text-white outline-none"
+                    className="w-32 bg-white/10 px-3 text-white outline-none"
                   >
-                    <option value="" className="text-black">
+                    <option
+                      value=""
+                      className="text-black"
+                    >
                       Code
                     </option>
+
                     {dialCodes.map((code) => (
-                      <option key={code} value={code} className="text-black">
+                      <option
+                        key={code}
+                        value={code}
+                        className="text-black"
+                      >
                         {code}
                       </option>
                     ))}
@@ -984,6 +1882,8 @@ function ProfileSetupPage() {
                   <input
                     type="tel"
                     name="phone"
+                    inputMode="tel"
+                    autoComplete="tel-national"
                     placeholder="Phone / WhatsApp number optional"
                     className="min-w-0 flex-1 bg-transparent px-4 text-white outline-none placeholder:text-white/60"
                     value={form.phone}
@@ -1015,20 +1915,32 @@ function ProfileSetupPage() {
                   value={form.genotype}
                   onChange={handleChange}
                 >
-                  <option value="" className="text-black">
+                  <option
+                    value=""
+                    className="text-black"
+                  >
                     Select genotype optional
                   </option>
-                  {genotypes.map((genotype) => (
-                    <option key={genotype} value={genotype} className="text-black">
-                      {genotype}
-                    </option>
-                  ))}
+
+                  {genotypes.map(
+                    (genotype) => (
+                      <option
+                        key={genotype}
+                        value={genotype}
+                        className="text-black"
+                      >
+                        {genotype}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
             </div>
 
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">Faith & Relationship Journey</h2>
+              <h2 className="font-display text-4xl font-bold">
+                Faith &amp; Relationship Journey
+              </h2>
 
               <div className="mt-6 grid gap-6">
                 <input
@@ -1036,7 +1948,9 @@ function ProfileSetupPage() {
                   name="religious_background"
                   placeholder="Religious background e.g. Christian, Catholic, Pentecostal, Baptist, non-denominational"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.religious_background}
+                  value={
+                    form.religious_background
+                  }
                   onChange={handleChange}
                 />
 
@@ -1046,14 +1960,24 @@ function ProfileSetupPage() {
                   value={form.relationship_goal}
                   onChange={handleChange}
                 >
-                  <option value="" className="text-black">
+                  <option
+                    value=""
+                    className="text-black"
+                  >
                     Select your relationship goal
                   </option>
-                  {relationshipGoals.map((goal) => (
-                    <option key={goal} value={goal} className="text-black">
-                      {goal}
-                    </option>
-                  ))}
+
+                  {relationshipGoals.map(
+                    (goal) => (
+                      <option
+                        key={goal}
+                        value={goal}
+                        className="text-black"
+                      >
+                        {goal}
+                      </option>
+                    )
+                  )}
                 </select>
 
                 <input
@@ -1068,7 +1992,9 @@ function ProfileSetupPage() {
             </div>
 
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
-              <h2 className="font-display text-4xl font-bold">About You</h2>
+              <h2 className="font-display text-4xl font-bold">
+                About You
+              </h2>
 
               <textarea
                 name="bio"
@@ -1082,10 +2008,14 @@ function ProfileSetupPage() {
 
             <button
               type="submit"
-              disabled={loading || uploadingGallery}
+              disabled={
+                loading || uploadingGallery
+              }
               className="mt-10 w-full rounded-full bg-white py-5 text-lg font-black text-[#b30018] transition hover:scale-105 disabled:opacity-60"
             >
-              {loading ? "Saving..." : "Save Profile"}
+              {loading
+                ? "Saving..."
+                : "Save Profile"}
             </button>
           </motion.form>
         </div>
