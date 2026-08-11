@@ -1,626 +1,17 @@
 // src/app/profile/setup/page.js
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-
 import { SiteFooter, SiteNav } from "@/app/components/SiteChrome";
 import { compressImage } from "@/lib/compressImage";
+import {
+  buildCountryOptions,
+  getDialCodeForCountry,
+  getDialCodes,
+  splitPhoneNumber,
+} from "@/lib/countries";
 import { supabase } from "@/lib/supabase";
-
-const ISO_COUNTRY_CODES = [
-  "AF",
-  "AL",
-  "DZ",
-  "AD",
-  "AO",
-  "AG",
-  "AR",
-  "AM",
-  "AU",
-  "AT",
-  "AZ",
-  "BS",
-  "BH",
-  "BD",
-  "BB",
-  "BY",
-  "BE",
-  "BZ",
-  "BJ",
-  "BT",
-  "BO",
-  "BA",
-  "BW",
-  "BR",
-  "BN",
-  "BG",
-  "BF",
-  "BI",
-  "CV",
-  "KH",
-  "CM",
-  "CA",
-  "CF",
-  "TD",
-  "CL",
-  "CN",
-  "CO",
-  "KM",
-  "CG",
-  "CD",
-  "CR",
-  "CI",
-  "HR",
-  "CU",
-  "CY",
-  "CZ",
-  "DK",
-  "DJ",
-  "DM",
-  "DO",
-  "EC",
-  "EG",
-  "SV",
-  "GQ",
-  "ER",
-  "EE",
-  "SZ",
-  "ET",
-  "FJ",
-  "FI",
-  "FR",
-  "GA",
-  "GM",
-  "GE",
-  "DE",
-  "GH",
-  "GR",
-  "GD",
-  "GT",
-  "GN",
-  "GW",
-  "GY",
-  "HT",
-  "HN",
-  "HU",
-  "IS",
-  "IN",
-  "ID",
-  "IR",
-  "IQ",
-  "IE",
-  "IL",
-  "IT",
-  "JM",
-  "JP",
-  "JO",
-  "KZ",
-  "KE",
-  "KI",
-  "KP",
-  "KR",
-  "KW",
-  "KG",
-  "LA",
-  "LV",
-  "LB",
-  "LS",
-  "LR",
-  "LY",
-  "LI",
-  "LT",
-  "LU",
-  "MG",
-  "MW",
-  "MY",
-  "MV",
-  "ML",
-  "MT",
-  "MH",
-  "MR",
-  "MU",
-  "MX",
-  "FM",
-  "MD",
-  "MC",
-  "MN",
-  "ME",
-  "MA",
-  "MZ",
-  "MM",
-  "NA",
-  "NR",
-  "NP",
-  "NL",
-  "NZ",
-  "NI",
-  "NE",
-  "NG",
-  "MK",
-  "NO",
-  "OM",
-  "PK",
-  "PW",
-  "PA",
-  "PG",
-  "PY",
-  "PE",
-  "PH",
-  "PL",
-  "PT",
-  "QA",
-  "RO",
-  "RU",
-  "RW",
-  "KN",
-  "LC",
-  "VC",
-  "WS",
-  "SM",
-  "ST",
-  "SA",
-  "SN",
-  "RS",
-  "SC",
-  "SL",
-  "SG",
-  "SK",
-  "SI",
-  "SB",
-  "SO",
-  "ZA",
-  "SS",
-  "ES",
-  "LK",
-  "SD",
-  "SR",
-  "SE",
-  "CH",
-  "SY",
-  "TJ",
-  "TZ",
-  "TH",
-  "TL",
-  "TG",
-  "TO",
-  "TT",
-  "TN",
-  "TR",
-  "TM",
-  "TV",
-  "UG",
-  "UA",
-  "AE",
-  "GB",
-  "US",
-  "UY",
-  "UZ",
-  "VU",
-  "VA",
-  "VE",
-  "VN",
-  "YE",
-  "ZM",
-  "ZW",
-];
-
-const COUNTRY_NAME_OVERRIDES = {
-  AE: "United Arab Emirates",
-  BO: "Bolivia",
-  BN: "Brunei",
-  CV: "Cape Verde",
-  CZ: "Czech Republic",
-  FM: "Micronesia",
-  GB: "United Kingdom",
-  IR: "Iran",
-  KR: "South Korea",
-  KP: "North Korea",
-  LA: "Laos",
-  MD: "Moldova",
-  MK: "North Macedonia",
-  RU: "Russia",
-  SY: "Syria",
-  TZ: "Tanzania",
-  US: "United States",
-  VE: "Venezuela",
-  VN: "Vietnam",
-};
-
-const COUNTRY_DIAL_CODE_BY_ISO = {
-  AF: "+93",
-  AL: "+355",
-  DZ: "+213",
-  AD: "+376",
-  AO: "+244",
-  AG: "+1",
-  AR: "+54",
-  AM: "+374",
-  AU: "+61",
-  AT: "+43",
-  AZ: "+994",
-  BS: "+1",
-  BH: "+973",
-  BD: "+880",
-  BB: "+1",
-  BY: "+375",
-  BE: "+32",
-  BZ: "+501",
-  BJ: "+229",
-  BT: "+975",
-  BO: "+591",
-  BA: "+387",
-  BW: "+267",
-  BR: "+55",
-  BN: "+673",
-  BG: "+359",
-  BF: "+226",
-  BI: "+257",
-  CV: "+238",
-  KH: "+855",
-  CM: "+237",
-  CA: "+1",
-  CF: "+236",
-  TD: "+235",
-  CL: "+56",
-  CN: "+86",
-  CO: "+57",
-  KM: "+269",
-  CG: "+242",
-  CD: "+243",
-  CR: "+506",
-  CI: "+225",
-  HR: "+385",
-  CU: "+53",
-  CY: "+357",
-  CZ: "+420",
-  DK: "+45",
-  DJ: "+253",
-  DM: "+1",
-  DO: "+1",
-  EC: "+593",
-  EG: "+20",
-  SV: "+503",
-  GQ: "+240",
-  ER: "+291",
-  EE: "+372",
-  SZ: "+268",
-  ET: "+251",
-  FJ: "+679",
-  FI: "+358",
-  FR: "+33",
-  GA: "+241",
-  GM: "+220",
-  GE: "+995",
-  DE: "+49",
-  GH: "+233",
-  GR: "+30",
-  GD: "+1",
-  GT: "+502",
-  GN: "+224",
-  GW: "+245",
-  GY: "+592",
-  HT: "+509",
-  HN: "+504",
-  HU: "+36",
-  IS: "+354",
-  IN: "+91",
-  ID: "+62",
-  IR: "+98",
-  IQ: "+964",
-  IE: "+353",
-  IL: "+972",
-  IT: "+39",
-  JM: "+1",
-  JP: "+81",
-  JO: "+962",
-  KZ: "+7",
-  KE: "+254",
-  KI: "+686",
-  KP: "+850",
-  KR: "+82",
-  KW: "+965",
-  KG: "+996",
-  LA: "+856",
-  LV: "+371",
-  LB: "+961",
-  LS: "+266",
-  LR: "+231",
-  LY: "+218",
-  LI: "+423",
-  LT: "+370",
-  LU: "+352",
-  MG: "+261",
-  MW: "+265",
-  MY: "+60",
-  MV: "+960",
-  ML: "+223",
-  MT: "+356",
-  MH: "+692",
-  MR: "+222",
-  MU: "+230",
-  MX: "+52",
-  FM: "+691",
-  MD: "+373",
-  MC: "+377",
-  MN: "+976",
-  ME: "+382",
-  MA: "+212",
-  MZ: "+258",
-  MM: "+95",
-  NA: "+264",
-  NR: "+674",
-  NP: "+977",
-  NL: "+31",
-  NZ: "+64",
-  NI: "+505",
-  NE: "+227",
-  NG: "+234",
-  MK: "+389",
-  NO: "+47",
-  OM: "+968",
-  PK: "+92",
-  PW: "+680",
-  PA: "+507",
-  PG: "+675",
-  PY: "+595",
-  PE: "+51",
-  PH: "+63",
-  PL: "+48",
-  PT: "+351",
-  QA: "+974",
-  RO: "+40",
-  RU: "+7",
-  RW: "+250",
-  KN: "+1",
-  LC: "+1",
-  VC: "+1",
-  WS: "+685",
-  SM: "+378",
-  ST: "+239",
-  SA: "+966",
-  SN: "+221",
-  RS: "+381",
-  SC: "+248",
-  SL: "+232",
-  SG: "+65",
-  SK: "+421",
-  SI: "+386",
-  SB: "+677",
-  SO: "+252",
-  ZA: "+27",
-  SS: "+211",
-  ES: "+34",
-  LK: "+94",
-  SD: "+249",
-  SR: "+597",
-  SE: "+46",
-  CH: "+41",
-  SY: "+963",
-  TJ: "+992",
-  TZ: "+255",
-  TH: "+66",
-  TL: "+670",
-  TG: "+228",
-  TO: "+676",
-  TT: "+1",
-  TN: "+216",
-  TR: "+90",
-  TM: "+993",
-  TV: "+688",
-  UG: "+256",
-  UA: "+380",
-  AE: "+971",
-  GB: "+44",
-  US: "+1",
-  UY: "+598",
-  UZ: "+998",
-  VU: "+678",
-  VA: "+39",
-  VE: "+58",
-  VN: "+84",
-  YE: "+967",
-  ZM: "+260",
-  ZW: "+263",
-};
-
-const FALLBACK_COUNTRY_NAMES = {
-  AF: "Afghanistan",
-  AL: "Albania",
-  DZ: "Algeria",
-  AD: "Andorra",
-  AO: "Angola",
-  AG: "Antigua and Barbuda",
-  AR: "Argentina",
-  AM: "Armenia",
-  AU: "Australia",
-  AT: "Austria",
-  AZ: "Azerbaijan",
-  BS: "Bahamas",
-  BH: "Bahrain",
-  BD: "Bangladesh",
-  BB: "Barbados",
-  BY: "Belarus",
-  BE: "Belgium",
-  BZ: "Belize",
-  BJ: "Benin",
-  BT: "Bhutan",
-  BO: "Bolivia",
-  BA: "Bosnia and Herzegovina",
-  BW: "Botswana",
-  BR: "Brazil",
-  BN: "Brunei",
-  BG: "Bulgaria",
-  BF: "Burkina Faso",
-  BI: "Burundi",
-  CV: "Cape Verde",
-  KH: "Cambodia",
-  CM: "Cameroon",
-  CA: "Canada",
-  CF: "Central African Republic",
-  TD: "Chad",
-  CL: "Chile",
-  CN: "China",
-  CO: "Colombia",
-  KM: "Comoros",
-  CG: "Congo",
-  CD: "Democratic Republic of the Congo",
-  CR: "Costa Rica",
-  CI: "Côte d’Ivoire",
-  HR: "Croatia",
-  CU: "Cuba",
-  CY: "Cyprus",
-  CZ: "Czech Republic",
-  DK: "Denmark",
-  DJ: "Djibouti",
-  DM: "Dominica",
-  DO: "Dominican Republic",
-  EC: "Ecuador",
-  EG: "Egypt",
-  SV: "El Salvador",
-  GQ: "Equatorial Guinea",
-  ER: "Eritrea",
-  EE: "Estonia",
-  SZ: "Eswatini",
-  ET: "Ethiopia",
-  FJ: "Fiji",
-  FI: "Finland",
-  FR: "France",
-  GA: "Gabon",
-  GM: "Gambia",
-  GE: "Georgia",
-  DE: "Germany",
-  GH: "Ghana",
-  GR: "Greece",
-  GD: "Grenada",
-  GT: "Guatemala",
-  GN: "Guinea",
-  GW: "Guinea-Bissau",
-  GY: "Guyana",
-  HT: "Haiti",
-  HN: "Honduras",
-  HU: "Hungary",
-  IS: "Iceland",
-  IN: "India",
-  ID: "Indonesia",
-  IR: "Iran",
-  IQ: "Iraq",
-  IE: "Ireland",
-  IL: "Israel",
-  IT: "Italy",
-  JM: "Jamaica",
-  JP: "Japan",
-  JO: "Jordan",
-  KZ: "Kazakhstan",
-  KE: "Kenya",
-  KI: "Kiribati",
-  KP: "North Korea",
-  KR: "South Korea",
-  KW: "Kuwait",
-  KG: "Kyrgyzstan",
-  LA: "Laos",
-  LV: "Latvia",
-  LB: "Lebanon",
-  LS: "Lesotho",
-  LR: "Liberia",
-  LY: "Libya",
-  LI: "Liechtenstein",
-  LT: "Lithuania",
-  LU: "Luxembourg",
-  MG: "Madagascar",
-  MW: "Malawi",
-  MY: "Malaysia",
-  MV: "Maldives",
-  ML: "Mali",
-  MT: "Malta",
-  MH: "Marshall Islands",
-  MR: "Mauritania",
-  MU: "Mauritius",
-  MX: "Mexico",
-  FM: "Micronesia",
-  MD: "Moldova",
-  MC: "Monaco",
-  MN: "Mongolia",
-  ME: "Montenegro",
-  MA: "Morocco",
-  MZ: "Mozambique",
-  MM: "Myanmar",
-  NA: "Namibia",
-  NR: "Nauru",
-  NP: "Nepal",
-  NL: "Netherlands",
-  NZ: "New Zealand",
-  NI: "Nicaragua",
-  NE: "Niger",
-  NG: "Nigeria",
-  MK: "North Macedonia",
-  NO: "Norway",
-  OM: "Oman",
-  PK: "Pakistan",
-  PW: "Palau",
-  PA: "Panama",
-  PG: "Papua New Guinea",
-  PY: "Paraguay",
-  PE: "Peru",
-  PH: "Philippines",
-  PL: "Poland",
-  PT: "Portugal",
-  QA: "Qatar",
-  RO: "Romania",
-  RU: "Russia",
-  RW: "Rwanda",
-  KN: "Saint Kitts and Nevis",
-  LC: "Saint Lucia",
-  VC: "Saint Vincent and the Grenadines",
-  WS: "Samoa",
-  SM: "San Marino",
-  ST: "São Tomé and Príncipe",
-  SA: "Saudi Arabia",
-  SN: "Senegal",
-  RS: "Serbia",
-  SC: "Seychelles",
-  SL: "Sierra Leone",
-  SG: "Singapore",
-  SK: "Slovakia",
-  SI: "Slovenia",
-  SB: "Solomon Islands",
-  SO: "Somalia",
-  ZA: "South Africa",
-  SS: "South Sudan",
-  ES: "Spain",
-  LK: "Sri Lanka",
-  SD: "Sudan",
-  SR: "Suriname",
-  SE: "Sweden",
-  CH: "Switzerland",
-  SY: "Syria",
-  TJ: "Tajikistan",
-  TZ: "Tanzania",
-  TH: "Thailand",
-  TL: "Timor-Leste",
-  TG: "Togo",
-  TO: "Tonga",
-  TT: "Trinidad and Tobago",
-  TN: "Tunisia",
-  TR: "Turkey",
-  TM: "Turkmenistan",
-  TV: "Tuvalu",
-  UG: "Uganda",
-  UA: "Ukraine",
-  AE: "United Arab Emirates",
-  GB: "United Kingdom",
-  US: "United States",
-  UY: "Uruguay",
-  UZ: "Uzbekistan",
-  VU: "Vanuatu",
-  VA: "Vatican City",
-  VE: "Venezuela",
-  VN: "Vietnam",
-  YE: "Yemen",
-  ZM: "Zambia",
-  ZW: "Zimbabwe",
-};
 
 const COUNTRY_POSTAL_RULES = {
   Australia: {
@@ -840,99 +231,6 @@ function getGalleryLimit(plan) {
   return 0;
 }
 
-function buildCountryOptions() {
-  const regionNames =
-    typeof Intl !== "undefined" &&
-    typeof Intl.DisplayNames === "function"
-      ? new Intl.DisplayNames(["en"], {
-          type: "region",
-        })
-      : null;
-
-  return ISO_COUNTRY_CODES.map((isoCode) => {
-    const generatedName = regionNames?.of(isoCode);
-
-    const name =
-      COUNTRY_NAME_OVERRIDES[isoCode] ||
-      (typeof generatedName === "string"
-        ? generatedName
-        : null) ||
-      FALLBACK_COUNTRY_NAMES[isoCode] ||
-      isoCode;
-
-    return {
-      isoCode,
-      name,
-      dialCode: COUNTRY_DIAL_CODE_BY_ISO[isoCode] || "",
-    };
-  })
-    .filter((country) => country.name && country.dialCode)
-    .sort((firstCountry, secondCountry) =>
-      firstCountry.name.localeCompare(secondCountry.name)
-    );
-}
-
-function getDialCodes(countryOptions) {
-  return [
-    ...new Set(
-      countryOptions
-        .map((country) => country.dialCode)
-        .filter(Boolean)
-    ),
-  ].sort((firstCode, secondCode) => {
-    const firstNumber = Number(firstCode.replace(/\D/g, ""));
-    const secondNumber = Number(secondCode.replace(/\D/g, ""));
-
-    return firstNumber - secondNumber;
-  });
-}
-
-function getDialCodeForCountry(countryName, countryOptions) {
-  if (!countryName) {
-    return "";
-  }
-
-  return (
-    countryOptions.find(
-      (country) => country.name === countryName
-    )?.dialCode || ""
-  );
-}
-
-function splitPhoneNumber(phone, dialCodes) {
-  if (!phone) {
-    return {
-      phone_code: "",
-      phone: "",
-    };
-  }
-
-  const normalizedPhone = String(phone)
-    .trim()
-    .replace(/[^\d+]/g, "");
-
-  const matchedCode = [...dialCodes]
-    .sort(
-      (firstCode, secondCode) =>
-        secondCode.length - firstCode.length
-    )
-    .find((code) => normalizedPhone.startsWith(code));
-
-  if (!matchedCode) {
-    return {
-      phone_code: "",
-      phone: normalizedPhone,
-    };
-  }
-
-  return {
-    phone_code: matchedCode,
-    phone: normalizedPhone
-      .slice(matchedCode.length)
-      .trim(),
-  };
-}
-
 function normalizeLocalPhoneNumber(phone) {
   return String(phone || "")
     .trim()
@@ -940,16 +238,12 @@ function normalizeLocalPhoneNumber(phone) {
     .replace(/^0+/, "");
 }
 
-function buildInternationalPhoneNumber(
-  phoneCode,
-  localPhone
-) {
+function buildInternationalPhoneNumber(phoneCode, localPhone) {
   const normalizedCode = String(phoneCode || "")
     .trim()
     .replace(/[^\d+]/g, "");
 
-  const normalizedPhone =
-    normalizeLocalPhoneNumber(localPhone);
+  const normalizedPhone = normalizeLocalPhoneNumber(localPhone);
 
   if (!normalizedCode || !normalizedPhone) {
     return "";
@@ -1006,11 +300,7 @@ function validatePostalCode(country, postalCode) {
     return `${config.label} is required for ${country}.`;
   }
 
-  if (
-    config.regex &&
-    value &&
-    !config.regex.test(value)
-  ) {
+  if (config.regex && value && !config.regex.test(value)) {
     return `Enter a valid ${config.label.toLowerCase()} for ${country}${
       config.hint ? ` (${config.hint})` : ""
     }.`;
@@ -1024,11 +314,12 @@ function ProfileSetupPage() {
   const [plan, setPlan] = useState("free");
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [uploadingGallery, setUploadingGallery] =
-    useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+
   const [avatarUrl, setAvatarUrl] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [galleryUrls, setGalleryUrls] = useState([]);
+
   const [form, setForm] = useState(emptyForm);
   const [postalError, setPostalError] = useState("");
 
@@ -1053,10 +344,7 @@ function ProfileSetupPage() {
   const remainingGallerySlots =
     galleryLimit === Infinity
       ? Infinity
-      : Math.max(
-          galleryLimit - galleryUrls.length,
-          0
-        );
+      : Math.max(galleryLimit - galleryUrls.length, 0);
 
   useEffect(() => {
     async function getUser() {
@@ -1092,34 +380,45 @@ function ProfileSetupPage() {
 
         setForm({
           full_name:
-            profile.full_name || metadataName || "",
+            profile.full_name ||
+            metadataName ||
+            "",
           email:
-            profile.email || authUser.email || "",
+            profile.email ||
+            authUser.email ||
+            "",
           age: profile.age || "",
           gender: profile.gender || "",
           marital_status:
             profile.marital_status || "",
           country: profile.country || "",
-          postal_code: profile.postal_code || "",
+          postal_code:
+            profile.postal_code || "",
           phone_code:
             profilePhone.phone_code ||
             getDialCodeForCountry(
               profile.country,
               countryOptions
             ),
-          phone: profilePhone.phone || "",
+          phone:
+            profilePhone.phone || "",
           city: profile.city || "",
-          occupation: profile.occupation || "",
+          occupation:
+            profile.occupation || "",
           religious_background:
             profile.religious_background ||
             profile.faith_background ||
             "",
-          genotype: profile.genotype || "",
-          height: profile.height || "",
+          genotype:
+            profile.genotype || "",
+          height:
+            profile.height || "",
           relationship_goal:
             profile.relationship_goal || "",
-          interests: profile.interests || "",
-          bio: profile.bio || "",
+          interests:
+            profile.interests || "",
+          bio:
+            profile.bio || "",
         });
 
         return;
@@ -1211,7 +510,8 @@ function ProfileSetupPage() {
           getDialCodeForCountry(
             value,
             countryOptions
-          ) || currentForm.phone_code,
+          ) ||
+          currentForm.phone_code,
       }));
 
       setPostalError("");
@@ -1229,33 +529,40 @@ function ProfileSetupPage() {
       return null;
     }
 
-    const compressedPhoto = await compressImage(
-      photo,
-      {
+    const compressedPhoto =
+      await compressImage(photo, {
         maxWidth: 900,
         maxHeight: 1200,
         quality: 0.78,
         outputType: "image/webp",
-      }
-    );
-
-    const fileName = `${user.id}-${Date.now()}.webp`;
-    const filePath = `${user.id}/${fileName}`;
-
-    const { error } = await supabase.storage
-      .from("profile-photos")
-      .upload(filePath, compressedPhoto, {
-        contentType: "image/webp",
-        upsert: true,
       });
+
+    const fileName =
+      `${user.id}-${Date.now()}.webp`;
+
+    const filePath =
+      `${user.id}/${fileName}`;
+
+    const { error } =
+      await supabase.storage
+        .from("profile-photos")
+        .upload(
+          filePath,
+          compressedPhoto,
+          {
+            contentType: "image/webp",
+            upsert: true,
+          }
+        );
 
     if (error) {
       throw error;
     }
 
-    const { data } = supabase.storage
-      .from("profile-photos")
-      .getPublicUrl(filePath);
+    const { data } =
+      supabase.storage
+        .from("profile-photos")
+        .getPublicUrl(filePath);
 
     return data.publicUrl;
   }
@@ -1312,28 +619,39 @@ function ProfileSetupPage() {
             outputType: "image/webp",
           });
 
-        const fileName = `${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}.webp`;
+        const fileName =
+          `${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}.webp`;
 
-        const filePath = `${user.id}/gallery/${fileName}`;
+        const filePath =
+          `${user.id}/gallery/${fileName}`;
 
-        const { error } = await supabase.storage
-          .from("profile-photos")
-          .upload(filePath, compressedFile, {
-            contentType: "image/webp",
-            upsert: true,
-          });
+        const { error } =
+          await supabase.storage
+            .from("profile-photos")
+            .upload(
+              filePath,
+              compressedFile,
+              {
+                contentType:
+                  "image/webp",
+                upsert: true,
+              }
+            );
 
         if (error) {
           throw error;
         }
 
-        const { data } = supabase.storage
-          .from("profile-photos")
-          .getPublicUrl(filePath);
+        const { data } =
+          supabase.storage
+            .from("profile-photos")
+            .getPublicUrl(filePath);
 
-        uploadedUrls.push(data.publicUrl);
+        uploadedUrls.push(
+          data.publicUrl
+        );
       }
 
       setGalleryUrls((current) => [
@@ -1354,18 +672,20 @@ function ProfileSetupPage() {
 
   function removeGalleryImage(imageUrl) {
     setGalleryUrls((current) =>
-      current.filter((url) => url !== imageUrl)
+      current.filter(
+        (url) => url !== imageUrl
+      )
     );
   }
 
   function isProfileComplete(updates) {
-    const postalConfig = getPostalConfig(
-      updates.country
-    );
+    const postalConfig =
+      getPostalConfig(updates.country);
 
-    const hasPostal = postalConfig.required
-      ? Boolean(updates.postal_code)
-      : true;
+    const hasPostal =
+      postalConfig.required
+        ? Boolean(updates.postal_code)
+        : true;
 
     return Boolean(
       updates.full_name &&
@@ -1392,7 +712,9 @@ function ProfileSetupPage() {
     }
 
     const normalizedPostalCode =
-      normalizePostalCode(form.postal_code);
+      normalizePostalCode(
+        form.postal_code
+      );
 
     const postalValidationMessage =
       validatePostalCode(
@@ -1401,8 +723,14 @@ function ProfileSetupPage() {
       );
 
     if (postalValidationMessage) {
-      setPostalError(postalValidationMessage);
-      alert(postalValidationMessage);
+      setPostalError(
+        postalValidationMessage
+      );
+
+      alert(
+        postalValidationMessage
+      );
+
       return;
     }
 
@@ -1420,17 +748,27 @@ function ProfileSetupPage() {
 
       const updates = {
         id: user.id,
-        full_name: form.full_name.trim(),
-        email: form.email.trim().toLowerCase(),
-        age: form.age ? Number(form.age) : null,
+        full_name:
+          form.full_name.trim(),
+        email:
+          form.email
+            .trim()
+            .toLowerCase(),
+        age:
+          form.age
+            ? Number(form.age)
+            : null,
         gender: form.gender,
-        marital_status: form.marital_status,
+        marital_status:
+          form.marital_status,
         country: form.country,
         postal_code:
-          normalizedPostalCode || null,
+          normalizedPostalCode ||
+          null,
         phone: fullPhone,
         city: form.city.trim(),
-        occupation: form.occupation.trim(),
+        occupation:
+          form.occupation.trim(),
         religious_background:
           form.religious_background.trim(),
         faith_background:
@@ -1439,14 +777,20 @@ function ProfileSetupPage() {
         height: form.height.trim(),
         relationship_goal:
           form.relationship_goal,
-        interests: form.interests.trim(),
-        bio: form.bio.trim(),
-        gallery_urls: galleryUrls,
+        interests:
+          form.interests.trim(),
+        bio:
+          form.bio.trim(),
+        gallery_urls:
+          galleryUrls,
         matchups_eligible:
-          form.marital_status !== "Married",
+          form.marital_status !==
+          "Married",
         is_visible:
-          form.marital_status !== "Married",
-        updated_at: new Date().toISOString(),
+          form.marital_status !==
+          "Married",
+        updated_at:
+          new Date().toISOString(),
         avatar_url:
           uploadedAvatarUrl ||
           avatarUrl ||
@@ -1456,9 +800,10 @@ function ProfileSetupPage() {
       updates.is_complete =
         isProfileComplete(updates);
 
-      const { error } = await supabase
-        .from("profiles")
-        .upsert(updates);
+      const { error } =
+        await supabase
+          .from("profiles")
+          .upsert(updates);
 
       if (error) {
         alert(error.message);
@@ -1466,13 +811,19 @@ function ProfileSetupPage() {
       }
 
       if (uploadedAvatarUrl) {
-        setAvatarUrl(uploadedAvatarUrl);
+        setAvatarUrl(
+          uploadedAvatarUrl
+        );
       }
 
-      localStorage.removeItem("profile-draft");
+      localStorage.removeItem(
+        "profile-draft"
+      );
 
       alert("Profile saved!");
-      window.location.href = "/dashboard";
+
+      window.location.href =
+        "/dashboard";
     } catch (error) {
       alert(
         error instanceof Error
@@ -1513,23 +864,30 @@ function ProfileSetupPage() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-white/80">
-              Complete your profile so Delly&apos;s
-              Matchups can support intentional,
+              Complete your profile so
+              Delly&apos;s Matchups can
+              support intentional,
               meaningful connections.
             </p>
           </motion.div>
 
           <div className="mx-auto mt-10 max-w-3xl">
             <div className="mb-3 flex items-center justify-between text-sm font-bold text-white">
-              <span>Profile Completion</span>
-              <span>{completionPercentage}%</span>
+              <span>
+                Profile Completion
+              </span>
+
+              <span>
+                {completionPercentage}%
+              </span>
             </div>
 
             <div className="h-3 overflow-hidden rounded-full bg-white/20">
               <div
                 className="h-full rounded-full bg-white transition-all duration-500"
                 style={{
-                  width: `${completionPercentage}%`,
+                  width:
+                    `${completionPercentage}%`,
                 }}
               />
             </div>
@@ -1556,10 +914,14 @@ function ProfileSetupPage() {
                 Profile Photo
               </h2>
 
-              {(previewUrl || avatarUrl) && (
+              {(previewUrl ||
+                avatarUrl) && (
                 <div className="mt-6 flex justify-center">
                   <img
-                    src={previewUrl || avatarUrl}
+                    src={
+                      previewUrl ||
+                      avatarUrl
+                    }
                     alt="Profile"
                     className="h-40 w-40 rounded-full border-4 border-white object-cover object-top shadow-xl"
                   />
@@ -1575,24 +937,28 @@ function ProfileSetupPage() {
                     event.target.files?.[0] ||
                     null;
 
-                  setPhoto(selectedFile);
+                  setPhoto(
+                    selectedFile
+                  );
 
                   if (selectedFile) {
-                    setPreviewUrl((currentUrl) => {
-                      if (
-                        currentUrl?.startsWith(
-                          "blob:"
-                        )
-                      ) {
-                        URL.revokeObjectURL(
-                          currentUrl
+                    setPreviewUrl(
+                      (currentUrl) => {
+                        if (
+                          currentUrl?.startsWith(
+                            "blob:"
+                          )
+                        ) {
+                          URL.revokeObjectURL(
+                            currentUrl
+                          );
+                        }
+
+                        return URL.createObjectURL(
+                          selectedFile
                         );
                       }
-
-                      return URL.createObjectURL(
-                        selectedFile
-                      );
-                    });
+                    );
                   }
                 }}
               />
@@ -1606,21 +972,27 @@ function ProfileSetupPage() {
               <p className="mt-3 text-white/75">
                 {plan === "vip"
                   ? "VIP members can upload unlimited gallery photos."
-                  : plan === "premium"
+                  : plan ===
+                      "premium"
                     ? "Premium members can upload up to 5 gallery photos."
                     : "Gallery uploads are available for Premium and VIP members."}
               </p>
 
-              {galleryUrls.length > 0 && (
+              {galleryUrls.length >
+                0 && (
                 <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                   {galleryUrls.map(
                     (imageUrl) => (
                       <div
-                        key={imageUrl}
+                        key={
+                          imageUrl
+                        }
                         className="relative overflow-hidden rounded-[2rem]"
                       >
                         <img
-                          src={imageUrl}
+                          src={
+                            imageUrl
+                          }
                           alt="Gallery"
                           className="h-56 w-full object-cover object-top"
                         />
@@ -1650,16 +1022,20 @@ function ProfileSetupPage() {
                     multiple
                     disabled={
                       uploadingGallery ||
-                      remainingGallerySlots === 0
+                      remainingGallerySlots ===
+                        0
                     }
-                    onChange={uploadGalleryFiles}
+                    onChange={
+                      uploadGalleryFiles
+                    }
                     className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-white outline-none file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-5 file:py-2 file:font-bold file:text-[#b30018] disabled:opacity-50"
                   />
 
                   <p className="mt-3 text-sm text-white/65">
                     {uploadingGallery
                       ? "Compressing and uploading gallery photos..."
-                      : galleryLimit === Infinity
+                      : galleryLimit ===
+                          Infinity
                         ? `${galleryUrls.length} gallery photos uploaded.`
                         : `${galleryUrls.length}/${galleryLimit} gallery photos uploaded.`}
                   </p>
@@ -1669,7 +1045,8 @@ function ProfileSetupPage() {
                   href="/matchups/checkout?plan=premium"
                   className="mt-6 inline-flex rounded-full bg-white px-8 py-4 font-black text-[#b30018] transition hover:scale-105"
                 >
-                  Upgrade to Add Gallery Photos
+                  Upgrade to Add Gallery
+                  Photos
                 </a>
               )}
             </div>
@@ -1685,8 +1062,12 @@ function ProfileSetupPage() {
                   name="full_name"
                   placeholder="Enter your full name"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.full_name}
-                  onChange={handleChange}
+                  value={
+                    form.full_name
+                  }
+                  onChange={
+                    handleChange
+                  }
                 />
 
                 <input
@@ -1695,7 +1076,9 @@ function ProfileSetupPage() {
                   placeholder="Enter your email address"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.email}
-                  onChange={handleChange}
+                  onChange={
+                    handleChange
+                  }
                 />
 
                 <input
@@ -1705,14 +1088,18 @@ function ProfileSetupPage() {
                   min="18"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.age}
-                  onChange={handleChange}
+                  onChange={
+                    handleChange
+                  }
                 />
 
                 <select
                   name="gender"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
                   value={form.gender}
-                  onChange={handleChange}
+                  onChange={
+                    handleChange
+                  }
                 >
                   <option
                     value=""
@@ -1746,21 +1133,30 @@ function ProfileSetupPage() {
                 <select
                   name="marital_status"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
-                  value={form.marital_status}
-                  onChange={handleChange}
+                  value={
+                    form.marital_status
+                  }
+                  onChange={
+                    handleChange
+                  }
                 >
                   <option
                     value=""
                     className="text-black"
                   >
-                    Select your relationship status
+                    Select your relationship
+                    status
                   </option>
 
                   {maritalStatuses.map(
                     (status) => (
                       <option
-                        key={status}
-                        value={status}
+                        key={
+                          status
+                        }
+                        value={
+                          status
+                        }
                         className="text-black"
                       >
                         {status}
@@ -1775,14 +1171,20 @@ function ProfileSetupPage() {
                   placeholder="Enter your city"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                   value={form.city}
-                  onChange={handleChange}
+                  onChange={
+                    handleChange
+                  }
                 />
 
                 <select
                   name="country"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none md:col-span-2"
-                  value={form.country}
-                  onChange={handleChange}
+                  value={
+                    form.country
+                  }
+                  onChange={
+                    handleChange
+                  }
                 >
                   <option
                     value=""
@@ -1794,8 +1196,12 @@ function ProfileSetupPage() {
                   {countryOptions.map(
                     (country) => (
                       <option
-                        key={country.isoCode}
-                        value={country.name}
+                        key={
+                          country.isoCode
+                        }
+                        value={
+                          country.name
+                        }
                         className="text-black"
                       >
                         {country.name}
@@ -1829,8 +1235,12 @@ function ProfileSetupPage() {
                           }`
                     }
                     className="h-16 w-full rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                    value={form.postal_code}
-                    onChange={handleChange}
+                    value={
+                      form.postal_code
+                    }
+                    onChange={
+                      handleChange
+                    }
                   />
 
                   {postalError ? (
@@ -1857,8 +1267,12 @@ function ProfileSetupPage() {
                 <div className="flex h-16 overflow-hidden rounded-2xl border border-white/15 bg-white/10 md:col-span-2">
                   <select
                     name="phone_code"
-                    value={form.phone_code}
-                    onChange={handleChange}
+                    value={
+                      form.phone_code
+                    }
+                    onChange={
+                      handleChange
+                    }
                     className="w-32 bg-white/10 px-3 text-white outline-none"
                   >
                     <option
@@ -1868,15 +1282,17 @@ function ProfileSetupPage() {
                       Code
                     </option>
 
-                    {dialCodes.map((code) => (
-                      <option
-                        key={code}
-                        value={code}
-                        className="text-black"
-                      >
-                        {code}
-                      </option>
-                    ))}
+                    {dialCodes.map(
+                      (code) => (
+                        <option
+                          key={code}
+                          value={code}
+                          className="text-black"
+                        >
+                          {code}
+                        </option>
+                      )
+                    )}
                   </select>
 
                   <input
@@ -1886,8 +1302,12 @@ function ProfileSetupPage() {
                     autoComplete="tel-national"
                     placeholder="Phone / WhatsApp number optional"
                     className="min-w-0 flex-1 bg-transparent px-4 text-white outline-none placeholder:text-white/60"
-                    value={form.phone}
-                    onChange={handleChange}
+                    value={
+                      form.phone
+                    }
+                    onChange={
+                      handleChange
+                    }
                   />
                 </div>
 
@@ -1896,8 +1316,12 @@ function ProfileSetupPage() {
                   name="occupation"
                   placeholder="Enter your occupation"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.occupation}
-                  onChange={handleChange}
+                  value={
+                    form.occupation
+                  }
+                  onChange={
+                    handleChange
+                  }
                 />
 
                 <input
@@ -1905,15 +1329,23 @@ function ProfileSetupPage() {
                   name="height"
                   placeholder="Enter your height e.g. 5'7 or 170cm"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.height}
-                  onChange={handleChange}
+                  value={
+                    form.height
+                  }
+                  onChange={
+                    handleChange
+                  }
                 />
 
                 <select
                   name="genotype"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
-                  value={form.genotype}
-                  onChange={handleChange}
+                  value={
+                    form.genotype
+                  }
+                  onChange={
+                    handleChange
+                  }
                 >
                   <option
                     value=""
@@ -1925,8 +1357,12 @@ function ProfileSetupPage() {
                   {genotypes.map(
                     (genotype) => (
                       <option
-                        key={genotype}
-                        value={genotype}
+                        key={
+                          genotype
+                        }
+                        value={
+                          genotype
+                        }
                         className="text-black"
                       >
                         {genotype}
@@ -1939,7 +1375,8 @@ function ProfileSetupPage() {
 
             <div className="mt-8 rounded-[2rem] border border-white/15 bg-white/10 p-6">
               <h2 className="font-display text-4xl font-bold">
-                Faith &amp; Relationship Journey
+                Faith &amp; Relationship
+                Journey
               </h2>
 
               <div className="mt-6 grid gap-6">
@@ -1951,27 +1388,38 @@ function ProfileSetupPage() {
                   value={
                     form.religious_background
                   }
-                  onChange={handleChange}
+                  onChange={
+                    handleChange
+                  }
                 />
 
                 <select
                   name="relationship_goal"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none"
-                  value={form.relationship_goal}
-                  onChange={handleChange}
+                  value={
+                    form.relationship_goal
+                  }
+                  onChange={
+                    handleChange
+                  }
                 >
                   <option
                     value=""
                     className="text-black"
                   >
-                    Select your relationship goal
+                    Select your relationship
+                    goal
                   </option>
 
                   {relationshipGoals.map(
                     (goal) => (
                       <option
-                        key={goal}
-                        value={goal}
+                        key={
+                          goal
+                        }
+                        value={
+                          goal
+                        }
                         className="text-black"
                       >
                         {goal}
@@ -1985,8 +1433,12 @@ function ProfileSetupPage() {
                   name="interests"
                   placeholder="Interests e.g. faith, family, travel, business"
                   className="h-16 rounded-2xl border border-white/15 bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                  value={form.interests}
-                  onChange={handleChange}
+                  value={
+                    form.interests
+                  }
+                  onChange={
+                    handleChange
+                  }
                 />
               </div>
             </div>
@@ -2002,14 +1454,17 @@ function ProfileSetupPage() {
                 rows="6"
                 className="mt-6 w-full rounded-2xl border border-white/15 bg-white/10 px-5 py-5 text-white outline-none placeholder:text-white/60"
                 value={form.bio}
-                onChange={handleChange}
+                onChange={
+                  handleChange
+                }
               />
             </div>
 
             <button
               type="submit"
               disabled={
-                loading || uploadingGallery
+                loading ||
+                uploadingGallery
               }
               className="mt-10 w-full rounded-full bg-white py-5 text-lg font-black text-[#b30018] transition hover:scale-105 disabled:opacity-60"
             >
