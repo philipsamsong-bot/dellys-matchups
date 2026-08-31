@@ -5,7 +5,9 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -49,9 +51,14 @@ const MANUAL_PAYMENT_METHODS = [
   "Bank Transfer",
 ];
 
-function getRequiredEnvironmentVariable(value, name) {
+function getRequiredEnvironmentVariable(
+  value,
+  name,
+) {
   if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
+    throw new Error(
+      `Missing environment variable: ${name}`,
+    );
   }
 
   return value;
@@ -61,23 +68,25 @@ function createSupabaseAdmin() {
   return createClient(
     getRequiredEnvironmentVariable(
       SUPABASE_URL,
-      "NEXT_PUBLIC_SUPABASE_URL"
+      "NEXT_PUBLIC_SUPABASE_URL",
     ),
     getRequiredEnvironmentVariable(
       SUPABASE_SERVICE_ROLE_KEY,
-      "SUPABASE_SERVICE_ROLE_KEY"
+      "SUPABASE_SERVICE_ROLE_KEY",
     ),
     {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
-    }
+    },
   );
 }
 
 function getString(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string"
+    ? value.trim()
+    : "";
 }
 
 function normalizeEmail(value) {
@@ -85,7 +94,9 @@ function normalizeEmail(value) {
 }
 
 function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    value,
+  );
 }
 
 function isAcademyCourseKey(value) {
@@ -93,7 +104,7 @@ function isAcademyCourseKey(value) {
     typeof value === "string" &&
     Object.prototype.hasOwnProperty.call(
       ACADEMY_COURSES,
-      value
+      value,
     )
   );
 }
@@ -136,92 +147,101 @@ export async function POST(request) {
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
-    if (!isManualPaymentMethod(body.paymentMethod)) {
+    if (
+      !isManualPaymentMethod(
+        body.paymentMethod,
+      )
+    ) {
       return NextResponse.json(
         {
-          error: "Invalid manual payment method.",
+          error:
+            "Invalid manual payment method.",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
     const courseKey = body.courseKey;
-    const course = ACADEMY_COURSES[courseKey];
+    const course =
+      ACADEMY_COURSES[courseKey];
 
-    const customerName = getString(body.customerName);
-    const customerEmail = normalizeEmail(body.customerEmail);
-    const country = getString(body.country);
-    const postalCode = getString(body.postalCode);
-    const phone = getString(body.phone);
+    const customerName =
+      getString(body.customerName);
 
-    const providerReference = getString(
-      body.providerReference
-    );
+    const customerEmail =
+      normalizeEmail(body.customerEmail);
 
-    const proofUrl = getOptionalHttpsUrl(
-      body.proofUrl
-    );
+    const country =
+      getString(body.country);
 
-    const notes = getString(body.notes);
+    const phone =
+      getString(body.phone);
+
+    const providerReference =
+      getString(body.providerReference);
+
+    const rawProofUrl =
+      getString(body.proofUrl);
+
+    const proofUrl =
+      getOptionalHttpsUrl(body.proofUrl);
+
+    const notes =
+      getString(body.notes);
 
     if (!customerName) {
       return NextResponse.json(
         {
-          error: "Customer name is required.",
+          error:
+            "Customer name is required.",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
-    if (!isValidEmail(customerEmail)) {
+    if (
+      !isValidEmail(customerEmail)
+    ) {
       return NextResponse.json(
         {
-          error: "A valid customer email is required.",
+          error:
+            "A valid customer email is required.",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
     if (!country) {
       return NextResponse.json(
         {
-          error: "Country is required.",
+          error:
+            "Country is required.",
         },
         {
           status: 400,
-        }
-      );
-    }
-
-    if (!postalCode) {
-      return NextResponse.json(
-        {
-          error: "Postal / ZIP code is required.",
         },
-        {
-          status: 400,
-        }
       );
     }
 
     if (!phone) {
       return NextResponse.json(
         {
-          error: "Phone number is required.",
+          error:
+            "Phone number is required.",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
@@ -233,37 +253,76 @@ export async function POST(request) {
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
-    const supabaseAdmin = createSupabaseAdmin();
+    if (rawProofUrl && !proofUrl) {
+      return NextResponse.json(
+        {
+          error:
+            "The payment proof URL is invalid.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const supabaseAdmin =
+      createSupabaseAdmin();
 
     const {
       data: existingPayment,
       error: existingPaymentError,
     } = await supabaseAdmin
       .from("payments")
-      .select("id,status")
+      .select("id,status,item_name")
       .eq("purpose", "academy")
-      .eq("customer_email", customerEmail)
-      .eq("payment_method", body.paymentMethod)
-      .eq("provider_reference", providerReference)
+      .eq(
+        "customer_email",
+        customerEmail,
+      )
+      .eq(
+        "payment_method",
+        body.paymentMethod,
+      )
+      .eq(
+        "provider_reference",
+        providerReference,
+      )
       .limit(1)
       .maybeSingle();
 
     if (existingPaymentError) {
       throw new Error(
-        existingPaymentError.message
+        existingPaymentError.message,
       );
     }
 
     if (existingPayment) {
+      if (
+        existingPayment.item_name !==
+        course.title
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "This transaction reference has already been used for a different Academy purchase.",
+          },
+          {
+            status: 409,
+          },
+        );
+      }
+
       return NextResponse.json({
         success: true,
         alreadySubmitted: true,
-        paymentId: existingPayment.id,
-        status: existingPayment.status,
+        paymentId:
+          existingPayment.id,
+        status:
+          existingPayment.status,
         courseKey,
       });
     }
@@ -271,7 +330,6 @@ export async function POST(request) {
     const paymentNotes = [
       `Course Key: ${courseKey}`,
       `Country: ${country}`,
-      `Postal / ZIP Code: ${postalCode}`,
       `Phone: ${phone}`,
       `Transaction Reference: ${providerReference}`,
       notes,
@@ -285,46 +343,63 @@ export async function POST(request) {
     } = await supabaseAdmin
       .from("payments")
       .insert({
-        customer_name: customerName,
-        customer_email: customerEmail,
-        purpose: "academy",
-        item_name: course.title,
-        amount: course.price,
-        currency: "USD",
-        payment_method: body.paymentMethod,
-        status: "pending_confirmation",
-        provider_reference: providerReference,
-        proof_url: proofUrl,
-        notes: paymentNotes,
+        customer_name:
+          customerName,
+        customer_email:
+          customerEmail,
+        purpose:
+          "academy",
+        item_name:
+          course.title,
+        amount:
+          course.price,
+        currency:
+          "USD",
+        payment_method:
+          body.paymentMethod,
+        status:
+          "pending_confirmation",
+        provider_reference:
+          providerReference,
+        proof_url:
+          proofUrl,
+        notes:
+          paymentNotes,
       })
       .select("id,status")
       .single();
 
     if (paymentError) {
-      throw new Error(paymentError.message);
+      throw new Error(
+        paymentError.message,
+      );
     }
 
     return NextResponse.json({
       success: true,
-      paymentId: payment.id,
-      status: payment.status,
+      alreadySubmitted: false,
+      paymentId:
+        payment.id,
+      status:
+        payment.status,
       courseKey,
     });
   } catch (error) {
     console.error(
       "ACADEMY MANUAL PAYMENT ERROR:",
-      error
+      error,
     );
 
     return NextResponse.json(
       {
         error:
-          error?.message ||
-          "Unable to submit manual Academy payment.",
+          error instanceof Error
+            ? error.message
+            : "Unable to submit manual Academy payment.",
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }

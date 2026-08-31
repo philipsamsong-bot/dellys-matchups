@@ -7,12 +7,18 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 
 const PAYPAL_API_BASE =
-  process.env.PAYPAL_API_BASE || "https://api-m.paypal.com";
+  process.env.PAYPAL_API_BASE ||
+  "https://api-m.paypal.com";
 
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
+const PAYPAL_CLIENT_ID =
+  process.env.PAYPAL_CLIENT_ID;
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const PAYPAL_CLIENT_SECRET =
+  process.env.PAYPAL_CLIENT_SECRET;
+
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -55,16 +61,23 @@ const ACADEMY_COURSES = {
   },
 };
 
-function getRequiredEnvironmentVariable(value, name) {
+function getRequiredEnvironmentVariable(
+  value,
+  name,
+) {
   if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
+    throw new Error(
+      `Missing environment variable: ${name}`,
+    );
   }
 
   return value;
 }
 
 function getString(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string"
+    ? value.trim()
+    : "";
 }
 
 function normalizeEmail(value) {
@@ -72,29 +85,36 @@ function normalizeEmail(value) {
 }
 
 function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    value,
+  );
 }
 
 function isAcademyCourseKey(value) {
   return (
     typeof value === "string" &&
-    Object.prototype.hasOwnProperty.call(ACADEMY_COURSES, value)
+    Object.prototype.hasOwnProperty.call(
+      ACADEMY_COURSES,
+      value,
+    )
   );
 }
 
 async function getPayPalAccessToken() {
-  const clientId = getRequiredEnvironmentVariable(
-    PAYPAL_CLIENT_ID,
-    "PAYPAL_CLIENT_ID"
-  );
+  const clientId =
+    getRequiredEnvironmentVariable(
+      PAYPAL_CLIENT_ID,
+      "PAYPAL_CLIENT_ID",
+    );
 
-  const clientSecret = getRequiredEnvironmentVariable(
-    PAYPAL_CLIENT_SECRET,
-    "PAYPAL_CLIENT_SECRET"
-  );
+  const clientSecret =
+    getRequiredEnvironmentVariable(
+      PAYPAL_CLIENT_SECRET,
+      "PAYPAL_CLIENT_SECRET",
+    );
 
   const auth = Buffer.from(
-    `${clientId}:${clientSecret}`
+    `${clientId}:${clientSecret}`,
   ).toString("base64");
 
   const response = await fetch(
@@ -103,11 +123,12 @@ async function getPayPalAccessToken() {
       method: "POST",
       headers: {
         Authorization: `Basic ${auth}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type":
+          "application/x-www-form-urlencoded",
       },
       body: "grant_type=client_credentials",
       cache: "no-store",
-    }
+    },
   );
 
   const data = await response.json();
@@ -116,12 +137,14 @@ async function getPayPalAccessToken() {
     throw new Error(
       data.error_description ||
         data.message ||
-        "Unable to authenticate with PayPal."
+        "Unable to authenticate with PayPal.",
     );
   }
 
   if (!data.access_token) {
-    throw new Error("PayPal did not return an access token.");
+    throw new Error(
+      "PayPal did not return an access token.",
+    );
   }
 
   return data.access_token;
@@ -131,18 +154,18 @@ function createSupabaseAdmin() {
   return createClient(
     getRequiredEnvironmentVariable(
       SUPABASE_URL,
-      "NEXT_PUBLIC_SUPABASE_URL"
+      "NEXT_PUBLIC_SUPABASE_URL",
     ),
     getRequiredEnvironmentVariable(
       SUPABASE_SERVICE_ROLE_KEY,
-      "SUPABASE_SERVICE_ROLE_KEY"
+      "SUPABASE_SERVICE_ROLE_KEY",
     ),
     {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
-    }
+    },
   );
 }
 
@@ -150,131 +173,156 @@ export async function POST(request) {
   try {
     const body = await request.json();
 
-    if (!isAcademyCourseKey(body.courseKey)) {
+    if (
+      !isAcademyCourseKey(body.courseKey)
+    ) {
       return NextResponse.json(
         {
-          error: "Invalid Academy course.",
+          error:
+            "Invalid Academy course.",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
     const courseKey = body.courseKey;
-    const course = ACADEMY_COURSES[courseKey];
+    const course =
+      ACADEMY_COURSES[courseKey];
 
-    const customerName = getString(body.customerName);
-    const customerEmail = normalizeEmail(body.customerEmail);
-    const country = getString(body.country);
-    const postalCode = getString(body.postalCode);
-    const phone = getString(body.phone);
+    const customerName =
+      getString(body.customerName);
+
+    const customerEmail =
+      normalizeEmail(
+        body.customerEmail,
+      );
+
+    const country =
+      getString(body.country);
+
+    const phone =
+      getString(body.phone);
 
     if (!customerName) {
       return NextResponse.json(
         {
-          error: "Customer name is required.",
+          error:
+            "Customer name is required.",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
-    if (!isValidEmail(customerEmail)) {
+    if (
+      !isValidEmail(customerEmail)
+    ) {
       return NextResponse.json(
         {
-          error: "A valid customer email is required.",
+          error:
+            "A valid customer email is required.",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
     if (!country) {
       return NextResponse.json(
         {
-          error: "Country is required.",
+          error:
+            "Country is required.",
         },
         {
           status: 400,
-        }
-      );
-    }
-
-    if (!postalCode) {
-      return NextResponse.json(
-        {
-          error: "Postal / ZIP code is required.",
         },
-        {
-          status: 400,
-        }
       );
     }
 
     if (!phone) {
       return NextResponse.json(
         {
-          error: "Phone number is required.",
+          error:
+            "Phone number is required.",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
-    const checkoutReference = randomUUID();
-    const accessToken = await getPayPalAccessToken();
+    const checkoutReference =
+      randomUUID();
 
-    const paypalResponse = await fetch(
-      `${PAYPAL_API_BASE}/v2/checkout/orders`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-          Prefer: "return=representation",
-          "PayPal-Request-Id": `academy-${checkoutReference}`,
-        },
-        body: JSON.stringify({
-          intent: "CAPTURE",
-          purchase_units: [
-            {
-              reference_id: checkoutReference,
-              description:
-                `Delly's Matchups Academy - ${course.title}`,
-              custom_id: JSON.stringify({
-                purpose: "academy",
-                checkoutReference,
-                courseKey,
-                customerEmail,
-              }),
-              amount: {
-                currency_code: "USD",
-                value: course.price.toFixed(2),
-              },
-            },
-          ],
-          payment_source: {
-            paypal: {
-              experience_context: {
-                brand_name: "Delly's Matchups",
-                user_action: "PAY_NOW",
-                return_url:
-                  `${SITE_URL}/paypal/app-return?approved=1`,
-                cancel_url:
-                  `${SITE_URL}/paypal/app-return?cancelled=1`,
-              },
-            },
+    const accessToken =
+      await getPayPalAccessToken();
+
+    const paypalResponse =
+      await fetch(
+        `${PAYPAL_API_BASE}/v2/checkout/orders`,
+        {
+          method: "POST",
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+            "Content-Type":
+              "application/json",
+            Prefer:
+              "return=representation",
+            "PayPal-Request-Id":
+              `academy-${checkoutReference}`,
           },
-        }),
-        cache: "no-store",
-      }
-    );
+          body: JSON.stringify({
+            intent: "CAPTURE",
+            purchase_units: [
+              {
+                reference_id:
+                  checkoutReference,
+                description:
+                  `Delly's Matchups Academy - ${course.title}`,
+                custom_id:
+                  JSON.stringify({
+                    purpose:
+                      "academy",
+                    checkoutReference,
+                    courseKey,
+                    customerEmail,
+                  }),
+                amount: {
+                  currency_code:
+                    "USD",
+                  value:
+                    course.price.toFixed(
+                      2,
+                    ),
+                },
+              },
+            ],
+            payment_source: {
+              paypal: {
+                experience_context: {
+                  brand_name:
+                    "Delly's Matchups",
+                  user_action:
+                    "PAY_NOW",
+                  return_url:
+                    `${SITE_URL}/paypal/app-return?approved=1`,
+                  cancel_url:
+                    `${SITE_URL}/paypal/app-return?cancelled=1`,
+                },
+              },
+            },
+          }),
+          cache: "no-store",
+        },
+      );
 
-    const paypalData = await paypalResponse.json();
+    const paypalData =
+      await paypalResponse.json();
 
     if (!paypalResponse.ok) {
       return NextResponse.json(
@@ -283,19 +331,25 @@ export async function POST(request) {
             paypalData.message ||
             paypalData.error_description ||
             "Unable to create PayPal Academy order.",
-          details: paypalData,
+          details:
+            paypalData,
         },
         {
           status: 502,
-        }
+        },
       );
     }
 
-    const approvalLink = paypalData.links?.find(
-      (link) => link.rel === "approve"
-    );
+    const approvalLink =
+      paypalData.links?.find(
+        (link) =>
+          link.rel === "approve",
+      );
 
-    if (!paypalData.id || !approvalLink?.href) {
+    if (
+      !paypalData.id ||
+      !approvalLink?.href
+    ) {
       return NextResponse.json(
         {
           error:
@@ -303,41 +357,53 @@ export async function POST(request) {
         },
         {
           status: 502,
-        }
+        },
       );
     }
 
-    const supabaseAdmin = createSupabaseAdmin();
+    const supabaseAdmin =
+      createSupabaseAdmin();
 
-    const { data: payment, error: paymentError } =
-      await supabaseAdmin
-        .from("payments")
-        .insert({
-          customer_name: customerName,
-          customer_email: customerEmail,
-          purpose: "academy",
-          item_name: course.title,
-          amount: course.price,
-          currency: "USD",
-          payment_method: "PayPal / Card",
-          status: "pending",
-          provider_reference: paypalData.id,
-          proof_url: null,
-          notes: [
-            `Course Key: ${courseKey}`,
-            `Checkout Reference: ${checkoutReference}`,
-            `Country: ${country}`,
-            `Postal / ZIP Code: ${postalCode}`,
-            `Phone: ${phone}`,
-          ].join("\n"),
-        })
-        .select("id")
-        .single();
+    const {
+      data: payment,
+      error: paymentError,
+    } = await supabaseAdmin
+      .from("payments")
+      .insert({
+        customer_name:
+          customerName,
+        customer_email:
+          customerEmail,
+        purpose:
+          "academy",
+        item_name:
+          course.title,
+        amount:
+          course.price,
+        currency:
+          "USD",
+        payment_method:
+          "PayPal / Card",
+        status:
+          "pending",
+        provider_reference:
+          paypalData.id,
+        proof_url:
+          null,
+        notes: [
+          `Course Key: ${courseKey}`,
+          `Checkout Reference: ${checkoutReference}`,
+          `Country: ${country}`,
+          `Phone: ${phone}`,
+        ].join("\n"),
+      })
+      .select("id")
+      .single();
 
     if (paymentError) {
       console.error(
         "ACADEMY PAYMENT INSERT ERROR:",
-        paymentError
+        paymentError,
       );
 
       return NextResponse.json(
@@ -347,29 +413,36 @@ export async function POST(request) {
         },
         {
           status: 500,
-        }
+        },
       );
     }
 
     return NextResponse.json({
       success: true,
-      orderId: paypalData.id,
-      approvalUrl: approvalLink.href,
-      paymentId: payment.id,
+      orderId:
+        paypalData.id,
+      approvalUrl:
+        approvalLink.href,
+      paymentId:
+        payment.id,
       courseKey,
     });
   } catch (error) {
-    console.error("ACADEMY CREATE ORDER ERROR:", error);
+    console.error(
+      "ACADEMY CREATE ORDER ERROR:",
+      error,
+    );
 
     return NextResponse.json(
       {
         error:
-          error?.message ||
-          "Unable to create Academy PayPal order.",
+          error instanceof Error
+            ? error.message
+            : "Unable to create Academy PayPal order.",
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }
