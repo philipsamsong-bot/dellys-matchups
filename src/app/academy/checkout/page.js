@@ -24,6 +24,9 @@ const PAYPAL_CAPTURE_ORDER_URL =
 const MANUAL_PAYMENT_URL =
   "/api/academy/manual-payment";
 
+const PAYPAL_SDK_URL =
+  "https://www.paypal.com/web-sdk/v6/core";
+
 const mobileMoney = {
   name: "Victorine Ncham",
   number: "+237 676 25 71 87",
@@ -107,9 +110,7 @@ const countryDialCodes = {
 
 const dialCodes = [
   ...new Set(
-    Object.values(
-      countryDialCodes,
-    ).filter(Boolean),
+    Object.values(countryDialCodes).filter(Boolean),
   ),
 ].sort(
   (left, right) =>
@@ -171,8 +172,7 @@ const courses = {
 
 const moduleOptions =
   Object.entries(courses).filter(
-    ([key]) =>
-      key !== "full-academy",
+    ([key]) => key !== "full-academy",
   );
 
 const emptyForm = {
@@ -219,20 +219,18 @@ function splitPhoneNumber(phone) {
   };
 }
 
-function parseJsonResponse(response) {
-  return response
-    .text()
-    .then((text) => {
-      if (!text) {
-        return {};
-      }
+async function parseJsonResponse(response) {
+  const text = await response.text();
 
-      try {
-        return JSON.parse(text);
-      } catch {
-        return {};
-      }
-    });
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
 }
 
 function getApiError(
@@ -243,6 +241,50 @@ function getApiError(
     result?.error ||
     result?.message ||
     fallback
+  );
+}
+
+function getPayPalErrorMessage(error) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error || "");
+
+  if (
+    message.includes(
+      "INSUFFICIENT_FUNDS",
+    )
+  ) {
+    return "Payment declined due to insufficient funds.";
+  }
+
+  if (
+    message.includes(
+      "INSTRUMENT_DECLINED",
+    )
+  ) {
+    return "Your payment method was declined. Please try another payment method.";
+  }
+
+  if (
+    message.includes(
+      "TRANSACTION_REFUSED",
+    )
+  ) {
+    return "The transaction was refused. Please try another payment method or contact support.";
+  }
+
+  if (
+    message.includes(
+      "DUPLICATE_INVOICE",
+    )
+  ) {
+    return "This payment has already been processed.";
+  }
+
+  return (
+    message ||
+    "PayPal payment failed. Please try again."
   );
 }
 
@@ -278,6 +320,9 @@ function AcademyCheckoutContent() {
 
   const [uploading, setUploading] =
     useState(false);
+
+  const [paypalError, setPayPalError] =
+    useState("");
 
   const selectedCourse =
     courses[selectedCourseKey];
@@ -355,10 +400,8 @@ function AcademyCheckoutContent() {
           custom_country:
             current.custom_country ||
             (
-              profileCountry ===
-              "Other"
-                ? profile?.country ||
-                  ""
+              profileCountry === "Other"
+                ? profile?.country || ""
                 : ""
             ),
           phone_code:
@@ -366,8 +409,7 @@ function AcademyCheckoutContent() {
             phoneParts.phone_code ||
             (
               profileCountry &&
-              profileCountry !==
-                "Other"
+              profileCountry !== "Other"
                 ? countryDialCodes[
                     profileCountry
                   ] || ""
@@ -540,6 +582,8 @@ function AcademyCheckoutContent() {
       );
     }
 
+    setPayPalError("");
+
     const response = await fetch(
       PAYPAL_CREATE_ORDER_URL,
       {
@@ -583,7 +627,10 @@ function AcademyCheckoutContent() {
       );
     }
 
-    return result.orderId;
+    return {
+      orderId:
+        result.orderId,
+    };
   }
 
   async function capturePayPalOrder(
@@ -631,12 +678,13 @@ function AcademyCheckoutContent() {
       !paypalClientId ||
       !paypalRef.current
     ) {
-      return;
+      return undefined;
     }
 
     let cancelled = false;
+    let paypalButton = null;
 
-    function renderButtons() {
+    async function setupPayPal() {
       if (
         cancelled ||
         !window.paypal ||
@@ -645,97 +693,189 @@ function AcademyCheckoutContent() {
         return;
       }
 
-      paypalRef.current.innerHTML =
-        "";
+      try {
+        setPayPalError("");
 
-      window.paypal
-        .Buttons({
-          style: {
-            layout: "vertical",
-            color: "gold",
-            shape: "pill",
-            label: "paypal",
-          },
+        paypalRef.current.innerHTML =
+          "";
 
-          async createOrder() {
-            try {
-              setSaving(true);
+        const sdkInstance =
+          await window.paypal.createInstance({
+            clientId:
+              paypalClientId,
+            components: [
+              "paypal-payments",
+            ],
+          });
 
-              return await createPayPalOrder();
-            } catch (error) {
-              alert(
-                error instanceof Error
-                  ? error.message
-                  : "Unable to start PayPal payment.",
-              );
+        if (cancelled) {
+          return;
+        }
 
-              throw error;
-            } finally {
-              setSaving(false);
-            }
-          },
+        const eligibility =
+          await sdkInstance.findEligibleMethods();
 
-          async onApprove(data) {
-            try {
-              setSaving(true);
+        if (
+          !eligibility.isEligible(
+            "paypal",
+          )
+        ) {
+          setPayPalError(
+            "PayPal is not currently available for this checkout.",
+          );
+          return;
+        }
 
-              const result =
-                await capturePayPalOrder(
-                  data.orderID,
+        paypalButton =
+          document.createElement(
+            "paypal-button",
+          );
+
+        paypalRef.current.append(
+          paypalButton,
+        );
+
+        const paypalCheckoutSession =
+          await sdkInstance.createPayPalOneTimePaymentSession(
+            {
+              async onApprove(data) {
+                try {
+                  setSaving(true);
+                  setPayPalError("");
+
+                  const result =
+                    await capturePayPalOrder(
+                      data.orderId,
+                    );
+
+                  alert(
+                    "Payment successful. Your Academy access has been activated.",
+                  );
+
+                  window.location.href =
+                    `/academy/payment-success?course=${
+                      result.courseKey ||
+                      selectedCourseKey
+                    }`;
+                } catch (error) {
+                  const message =
+                    getPayPalErrorMessage(
+                      error,
+                    );
+
+                  console.error(
+                    "ACADEMY PAYPAL CAPTURE ERROR:",
+                    error,
+                  );
+
+                  setPayPalError(
+                    message,
+                  );
+
+                  alert(message);
+                } finally {
+                  setSaving(false);
+                }
+              },
+
+              onCancel() {
+                setSaving(false);
+
+                setPayPalError(
+                  "Payment cancelled. No Academy access has been activated.",
+                );
+              },
+
+              onError(error) {
+                setSaving(false);
+
+                const message =
+                  getPayPalErrorMessage(
+                    error,
+                  );
+
+                console.error(
+                  "ACADEMY PAYPAL ERROR:",
+                  error,
                 );
 
-              alert(
-                "Payment successful. Your Academy access has been activated.",
+                setPayPalError(
+                  message,
+                );
+              },
+            },
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        paypalButton.addEventListener(
+          "click",
+          async () => {
+            try {
+              setSaving(true);
+              setPayPalError("");
+
+              // PayPal v6 requires preserving the user activation.
+              const createOrderPromise =
+                createPayPalOrder();
+
+              await paypalCheckoutSession.start(
+                {
+                  presentationMode:
+                    "auto",
+                },
+                createOrderPromise,
+              );
+            } catch (error) {
+              const message =
+                getPayPalErrorMessage(
+                  error,
+                );
+
+              console.error(
+                "ACADEMY PAYPAL START ERROR:",
+                error,
               );
 
-              window.location.href =
-                `/academy/payment-success?course=${
-                  result.courseKey ||
-                  selectedCourseKey
-                }`;
-            } catch (error) {
-              alert(
-                error instanceof Error
-                  ? error.message
-                  : "Unable to confirm PayPal payment.",
+              setPayPalError(
+                message,
               );
             } finally {
               setSaving(false);
             }
           },
+        );
+      } catch (error) {
+        const message =
+          getPayPalErrorMessage(
+            error,
+          );
 
-          onCancel() {
-            alert(
-              "Payment cancelled. No Academy access has been activated.",
-            );
-          },
+        console.error(
+          "ACADEMY PAYPAL SETUP ERROR:",
+          error,
+        );
 
-          onError(error) {
-            console.error(
-              "ACADEMY PAYPAL ERROR:",
-              error,
-            );
-
-            alert(
-              "PayPal payment failed. Please try again.",
-            );
-          },
-        })
-        .render(paypalRef.current);
+        setPayPalError(
+          message,
+        );
+      }
     }
 
     const existingScript =
       document.querySelector(
-        "#academy-paypal-sdk",
+        "#academy-paypal-sdk-v6",
       );
 
     if (existingScript) {
       if (window.paypal) {
-        renderButtons();
+        void setupPayPal();
       } else {
         existingScript.addEventListener(
           "load",
-          renderButtons,
+          setupPayPal,
           {
             once: true,
           },
@@ -747,8 +887,15 @@ function AcademyCheckoutContent() {
 
         existingScript.removeEventListener(
           "load",
-          renderButtons,
+          setupPayPal,
         );
+
+        if (
+          paypalRef.current
+        ) {
+          paypalRef.current.innerHTML =
+            "";
+        }
       };
     }
 
@@ -758,20 +905,20 @@ function AcademyCheckoutContent() {
       );
 
     script.id =
-      "academy-paypal-sdk";
+      "academy-paypal-sdk-v6";
 
     script.src =
-      `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(
-        paypalClientId,
-      )}&currency=USD&intent=capture`;
+      PAYPAL_SDK_URL;
 
     script.async = true;
-    script.onload =
-      renderButtons;
+
+    script.onload = () => {
+      void setupPayPal();
+    };
 
     script.onerror = () => {
-      alert(
-        "Unable to load PayPal. Please refresh the page and try again.",
+      setPayPalError(
+        "Unable to load PayPal Checkout. Please refresh the page and try again.",
       );
     };
 
@@ -781,13 +928,18 @@ function AcademyCheckoutContent() {
 
     return () => {
       cancelled = true;
+
+      if (
+        paypalRef.current
+      ) {
+        paypalRef.current.innerHTML =
+          "";
+      }
     };
   }, [
     paypalClientId,
     form.payment_method,
     selectedCourseKey,
-    selectedCourse.title,
-    selectedCourse.price,
     form.customer_name,
     form.customer_email,
     form.country,
@@ -1021,6 +1173,8 @@ function AcademyCheckoutContent() {
   function selectPaymentMethod(
     method,
   ) {
+    setPayPalError("");
+
     setForm((current) => ({
       ...current,
       payment_method: method,
@@ -1042,14 +1196,12 @@ function AcademyCheckoutContent() {
         }}
       >
         <div className="absolute inset-0 bg-[#5a000a]/75" />
-
         <div className="absolute inset-0 bg-gradient-to-br from-[#b30018]/90 via-[#b30018]/65 to-black/75" />
 
         <section className="relative z-10 mx-auto max-w-6xl">
           <div className="mx-auto max-w-5xl rounded-[3rem] border border-yellow-300/30 bg-black/35 p-8 shadow-2xl backdrop-blur-xl md:p-12">
             <p className="font-black uppercase tracking-[0.35em] text-yellow-300">
-              Delly&apos;s Matchups
-              Academy
+              Delly&apos;s Matchups Academy
             </p>
 
             <h1 className="font-display mt-5 text-6xl font-bold leading-none md:text-7xl">
@@ -1057,30 +1209,22 @@ function AcademyCheckoutContent() {
             </h1>
 
             <p className="mt-6 max-w-3xl text-lg leading-8 text-white/85">
-              Choose between enrolling
-              in the complete Academy
-              Programme or purchasing an
-              individual module.
+              Choose between enrolling in the
+              complete Academy Programme or
+              purchasing an individual module.
             </p>
 
             <div className="mt-10 rounded-[2rem] border border-yellow-300/40 bg-white p-7 text-[#b30018] shadow-2xl">
               <h2 className="font-display text-4xl font-bold">
-                {
-                  selectedCourse.title
-                }
+                {selectedCourse.title}
               </h2>
 
               <p className="mt-3 text-black/70">
-                {
-                  selectedCourse.description
-                }
+                {selectedCourse.description}
               </p>
 
               <p className="mt-5 text-5xl font-black">
-                $
-                {
-                  selectedCourse.price
-                }
+                ${selectedCourse.price}
 
                 <span className="ml-2 text-lg uppercase tracking-[0.2em]">
                   USD
@@ -1107,16 +1251,12 @@ function AcademyCheckoutContent() {
                     : "border-white/15 bg-white/10 text-white hover:bg-white/20"
                 }`}
               >
-                Full Academy Programme
-                — $500 USD
+                Full Academy Programme — $500 USD
               </button>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 {moduleOptions.map(
-                  ([
-                    key,
-                    course,
-                  ]) => (
+                  ([key, course]) => (
                     <button
                       key={key}
                       type="button"
@@ -1132,8 +1272,7 @@ function AcademyCheckoutContent() {
                           : "border-white/15 bg-white/10 text-white hover:bg-white/20"
                       }`}
                     >
-                      {course.title} —
-                      ${course.price} USD
+                      {course.title} — ${course.price} USD
                     </button>
                   ),
                 )}
@@ -1144,12 +1283,8 @@ function AcademyCheckoutContent() {
               <input
                 type="text"
                 name="customer_name"
-                value={
-                  form.customer_name
-                }
-                onChange={
-                  handleChange
-                }
+                value={form.customer_name}
+                onChange={handleChange}
                 placeholder="Enter your full name"
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                 required
@@ -1158,12 +1293,8 @@ function AcademyCheckoutContent() {
               <input
                 type="email"
                 name="customer_email"
-                value={
-                  form.customer_email
-                }
-                onChange={
-                  handleChange
-                }
+                value={form.customer_email}
+                onChange={handleChange}
                 placeholder="Enter your email address"
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                 required
@@ -1172,9 +1303,7 @@ function AcademyCheckoutContent() {
               <select
                 name="country"
                 value={form.country}
-                onChange={
-                  handleChange
-                }
+                onChange={handleChange}
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none md:col-span-2"
                 required
               >
@@ -1203,12 +1332,8 @@ function AcademyCheckoutContent() {
                 <input
                   type="text"
                   name="custom_country"
-                  value={
-                    form.custom_country
-                  }
-                  onChange={
-                    handleChange
-                  }
+                  value={form.custom_country}
+                  onChange={handleChange}
                   placeholder="Enter your country"
                   className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60 md:col-span-2"
                   required
@@ -1220,12 +1345,8 @@ function AcademyCheckoutContent() {
                 "Other" ? (
                   <input
                     name="phone_code"
-                    value={
-                      form.phone_code
-                    }
-                    onChange={
-                      handleChange
-                    }
+                    value={form.phone_code}
+                    onChange={handleChange}
                     placeholder="+Code"
                     className="w-28 bg-white/10 px-3 text-white outline-none placeholder:text-white/60"
                     required
@@ -1233,12 +1354,8 @@ function AcademyCheckoutContent() {
                 ) : (
                   <select
                     name="phone_code"
-                    value={
-                      form.phone_code
-                    }
-                    onChange={
-                      handleChange
-                    }
+                    value={form.phone_code}
+                    onChange={handleChange}
                     className="w-28 bg-white/10 px-3 text-white outline-none"
                     required
                   >
@@ -1266,9 +1383,7 @@ function AcademyCheckoutContent() {
                 <input
                   name="phone"
                   value={form.phone}
-                  onChange={
-                    handleChange
-                  }
+                  onChange={handleChange}
                   placeholder="Phone / WhatsApp number"
                   className="min-w-0 flex-1 bg-transparent px-4 text-white outline-none placeholder:text-white/60"
                   required
@@ -1316,22 +1431,17 @@ function AcademyCheckoutContent() {
                 </h3>
 
                 <p className="mt-3 leading-7 text-black/70">
-                  Complete your payment
-                  securely with PayPal.
-                  Academy access is
-                  activated only after
-                  the server verifies the
-                  completed PayPal
-                  payment.
+                  Complete your payment securely
+                  with PayPal. Academy access is
+                  activated only after the server
+                  verifies the completed payment.
                 </p>
 
                 {!paypalClientId ? (
                   <p className="mt-5 font-bold">
-                    Missing PayPal Client
-                    ID. Add
-                    NEXT_PUBLIC_PAYPAL_CLIENT_ID
-                    to the production
-                    environment.
+                    Missing PayPal Client ID.
+                    Add NEXT_PUBLIC_PAYPAL_CLIENT_ID
+                    to the production environment.
                   </p>
                 ) : (
                   <div
@@ -1342,10 +1452,15 @@ function AcademyCheckoutContent() {
 
                 {saving && (
                   <p className="mt-4 text-center font-bold text-black/60">
-                    Processing
-                    payment...
+                    Processing payment...
                   </p>
                 )}
+
+                {paypalError ? (
+                  <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 font-bold text-red-700">
+                    {paypalError}
+                  </p>
+                ) : null}
               </div>
             )}
 
@@ -1354,22 +1469,12 @@ function AcademyCheckoutContent() {
               <ManualPaymentBox
                 type="momo"
                 form={form}
-                selectedCourse={
-                  selectedCourse
-                }
-                mobileMoney={
-                  mobileMoney
-                }
-                bankDetails={
-                  bankDetails
-                }
+                selectedCourse={selectedCourse}
+                mobileMoney={mobileMoney}
+                bankDetails={bankDetails}
                 saving={saving}
-                uploading={
-                  uploading
-                }
-                handleChange={
-                  handleChange
-                }
+                uploading={uploading}
+                handleChange={handleChange}
                 handleProofUpload={
                   handleProofUpload
                 }
@@ -1384,22 +1489,12 @@ function AcademyCheckoutContent() {
               <ManualPaymentBox
                 type="bank"
                 form={form}
-                selectedCourse={
-                  selectedCourse
-                }
-                mobileMoney={
-                  mobileMoney
-                }
-                bankDetails={
-                  bankDetails
-                }
+                selectedCourse={selectedCourse}
+                mobileMoney={mobileMoney}
+                bankDetails={bankDetails}
                 saving={saving}
-                uploading={
-                  uploading
-                }
-                handleChange={
-                  handleChange
-                }
+                uploading={uploading}
+                handleChange={handleChange}
                 handleProofUpload={
                   handleProofUpload
                 }
@@ -1489,10 +1584,9 @@ function ManualPaymentBox({
       </h3>
 
       <p className="mt-4 text-lg leading-8 text-white/80">
-        Send the exact amount using
-        the details below. Once the
-        payment is complete, enter
-        the transaction reference and
+        Send the exact amount using the details
+        below. Once the payment is complete,
+        enter the transaction reference and
         submit it for verification.
       </p>
 
@@ -1501,60 +1595,44 @@ function ManualPaymentBox({
           <>
             <DetailRow
               label="Account Name"
-              value={
-                mobileMoney.name
-              }
+              value={mobileMoney.name}
             />
 
             <DetailRow
               label="Mobile Money Number"
-              value={
-                mobileMoney.number
-              }
+              value={mobileMoney.number}
             />
           </>
         ) : (
           <>
             <DetailRow
               label="Account Name"
-              value={
-                bankDetails.accountName
-              }
+              value={bankDetails.accountName}
             />
 
             <DetailRow
               label="Bank"
-              value={
-                bankDetails.bankName
-              }
+              value={bankDetails.bankName}
             />
 
             <DetailRow
               label="Sort Code"
-              value={
-                bankDetails.sortCode
-              }
+              value={bankDetails.sortCode}
             />
 
             <DetailRow
               label="Account Number"
-              value={
-                bankDetails.accountNumber
-              }
+              value={bankDetails.accountNumber}
             />
 
             <DetailRow
               label="IBAN"
-              value={
-                bankDetails.iban
-              }
+              value={bankDetails.iban}
             />
 
             <DetailRow
               label="BIC"
-              value={
-                bankDetails.bic
-              }
+              value={bankDetails.bic}
             />
           </>
         )}
@@ -1572,9 +1650,7 @@ function ManualPaymentBox({
       <input
         type="text"
         name="provider_reference"
-        value={
-          form.provider_reference
-        }
+        value={form.provider_reference}
         onChange={handleChange}
         placeholder="Enter your payment reference"
         className="mt-2 h-16 w-full rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
@@ -1582,9 +1658,8 @@ function ManualPaymentBox({
       />
 
       <p className="mt-2 text-sm leading-6 text-white/60">
-        Required. Use the
-        transaction ID/reference
-        supplied by your bank or
+        Required. Use the transaction
+        ID/reference supplied by your bank or
         Mobile Money provider.
       </p>
 
@@ -1608,16 +1683,13 @@ function ManualPaymentBox({
       <input
         type="file"
         accept="image/*,.pdf"
-        onChange={
-          handleProofUpload
-        }
+        onChange={handleProofUpload}
         className="mt-2 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
       />
 
       <p className="mt-2 text-sm leading-6 text-white/60">
-        Optional but recommended.
-        Upload a receipt image or PDF
-        up to 10 MB.
+        Optional but recommended. Upload a
+        receipt image or PDF up to 10 MB.
       </p>
 
       {uploading && (
@@ -1644,9 +1716,7 @@ function ManualPaymentBox({
 
         <button
           type="button"
-          onClick={
-            handleManualSubmit
-          }
+          onClick={handleManualSubmit}
           disabled={
             saving || uploading
           }
@@ -1659,13 +1729,11 @@ function ManualPaymentBox({
       </div>
 
       <p className="mt-5 text-center text-sm leading-6 text-white/65">
-        Only submit after making the
-        payment. Manual payments
-        remain pending until
-        Delly&apos;s Matchups verifies
-        the transaction. Academy
-        access is not activated
-        automatically.
+        Only submit after making the payment.
+        Manual payments remain pending until
+        Delly&apos;s Matchups verifies the
+        transaction. Academy access is not
+        activated automatically.
       </p>
     </div>
   );
