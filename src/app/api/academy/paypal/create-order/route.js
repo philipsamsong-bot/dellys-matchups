@@ -1,4 +1,5 @@
 // src/app/api/academy/paypal/create-order/route.js
+// ============================================================
 
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -7,18 +8,20 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 
 const PAYPAL_API_BASE =
-  process.env.PAYPAL_API_BASE || "https://api-m.paypal.com";
+  process.env.PAYPAL_API_BASE ||
+  "https://api-m.paypal.com";
 
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
+const PAYPAL_CLIENT_ID =
+  process.env.PAYPAL_CLIENT_ID;
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const PAYPAL_CLIENT_SECRET =
+  process.env.PAYPAL_CLIENT_SECRET;
+
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  "https://www.dellysmatchups.org";
 
 const ACADEMY_COURSES = {
   "full-academy": {
@@ -38,41 +41,56 @@ const ACADEMY_COURSES = {
     price: 100,
   },
   "module-4": {
-    title: "Module 4: Leadership & Influence",
+    title:
+      "Module 4: Leadership & Influence",
     price: 100,
   },
   "module-5": {
-    title: "Module 5: Healing & Restoration",
+    title:
+      "Module 5: Healing & Restoration",
     price: 100,
   },
   "module-6": {
-    title: "Module 6: Master Classes",
+    title:
+      "Module 6: Master Classes",
     price: 100,
   },
   "module-7": {
-    title: "Module 7: Virginity 101",
+    title:
+      "Module 7: Virginity 101",
     price: 100,
   },
 };
 
-function getRequiredEnvironmentVariable(value, name) {
+function getRequiredEnvironmentVariable(
+  value,
+  name,
+) {
   if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
+    throw new Error(
+      `Missing environment variable: ${name}`,
+    );
   }
 
   return value;
 }
 
 function getString(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string"
+    ? value.trim()
+    : "";
 }
 
 function normalizeEmail(value) {
-  return getString(value).toLowerCase();
+  return getString(
+    value,
+  ).toLowerCase();
 }
 
 function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    value,
+  );
 }
 
 function isAcademyCourseKey(value) {
@@ -85,38 +103,73 @@ function isAcademyCourseKey(value) {
   );
 }
 
+async function parsePayPalResponse(
+  response,
+) {
+  const text =
+    await response.text();
+
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      message:
+        "PayPal returned an invalid response.",
+    };
+  }
+}
+
 async function getPayPalAccessToken() {
-  const clientId = getRequiredEnvironmentVariable(
-    PAYPAL_CLIENT_ID,
-    "PAYPAL_CLIENT_ID",
-  );
+  const clientId =
+    getRequiredEnvironmentVariable(
+      PAYPAL_CLIENT_ID,
+      "PAYPAL_CLIENT_ID",
+    );
 
-  const clientSecret = getRequiredEnvironmentVariable(
-    PAYPAL_CLIENT_SECRET,
-    "PAYPAL_CLIENT_SECRET",
-  );
+  const clientSecret =
+    getRequiredEnvironmentVariable(
+      PAYPAL_CLIENT_SECRET,
+      "PAYPAL_CLIENT_SECRET",
+    );
 
-  const auth = Buffer.from(
-    `${clientId}:${clientSecret}`,
-  ).toString("base64");
+  const auth =
+    Buffer.from(
+      `${clientId}:${clientSecret}`,
+    ).toString("base64");
 
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v1/oauth2/token`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type":
-          "application/x-www-form-urlencoded",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v1/oauth2/token`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Basic ${auth}`,
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+        body:
+          "grant_type=client_credentials",
+        cache:
+          "no-store",
       },
-      body: "grant_type=client_credentials",
-      cache: "no-store",
-    },
-  );
+    );
 
-  const data = await response.json();
+  const data =
+    await parsePayPalResponse(
+      response,
+    );
 
   if (!response.ok) {
+    console.error(
+      "ACADEMY PAYPAL AUTH ERROR:",
+      data,
+    );
+
     throw new Error(
       data.error_description ||
         data.message ||
@@ -145,8 +198,10 @@ function createSupabaseAdmin() {
     ),
     {
       auth: {
-        autoRefreshToken: false,
-        persistSession: false,
+        autoRefreshToken:
+          false,
+        persistSession:
+          false,
       },
     },
   );
@@ -154,12 +209,18 @@ function createSupabaseAdmin() {
 
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
 
-    if (!isAcademyCourseKey(body.courseKey)) {
+    if (
+      !isAcademyCourseKey(
+        body.courseKey,
+      )
+    ) {
       return NextResponse.json(
         {
-          error: "Invalid Academy course.",
+          error:
+            "Invalid Academy course.",
         },
         {
           status: 400,
@@ -167,24 +228,39 @@ export async function POST(request) {
       );
     }
 
-    const courseKey = body.courseKey;
-    const course = ACADEMY_COURSES[courseKey];
+    const courseKey =
+      body.courseKey;
 
-    const customerName = getString(
-      body.customerName,
-    );
+    const course =
+      ACADEMY_COURSES[
+        courseKey
+      ];
 
-    const customerEmail = normalizeEmail(
-      body.customerEmail,
-    );
+    const customerName =
+      getString(
+        body.customerName,
+      );
 
-    const country = getString(body.country);
-    const phone = getString(body.phone);
+    const customerEmail =
+      normalizeEmail(
+        body.customerEmail,
+      );
+
+    const country =
+      getString(
+        body.country,
+      );
+
+    const phone =
+      getString(
+        body.phone,
+      );
 
     if (!customerName) {
       return NextResponse.json(
         {
-          error: "Customer name is required.",
+          error:
+            "Customer name is required.",
         },
         {
           status: 400,
@@ -192,7 +268,11 @@ export async function POST(request) {
       );
     }
 
-    if (!isValidEmail(customerEmail)) {
+    if (
+      !isValidEmail(
+        customerEmail,
+      )
+    ) {
       return NextResponse.json(
         {
           error:
@@ -207,7 +287,8 @@ export async function POST(request) {
     if (!country) {
       return NextResponse.json(
         {
-          error: "Country is required.",
+          error:
+            "Country is required.",
         },
         {
           status: 400,
@@ -218,7 +299,8 @@ export async function POST(request) {
     if (!phone) {
       return NextResponse.json(
         {
-          error: "Phone number is required.",
+          error:
+            "Phone number is required.",
         },
         {
           status: 400,
@@ -226,70 +308,79 @@ export async function POST(request) {
       );
     }
 
-    const checkoutReference = randomUUID();
+    const checkoutReference =
+      randomUUID();
+
     const accessToken =
       await getPayPalAccessToken();
 
-    const paypalResponse = await fetch(
-      `${PAYPAL_API_BASE}/v2/checkout/orders`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-          Prefer: "return=representation",
-          "PayPal-Request-Id":
-            `academy-${checkoutReference}`,
-        },
-        body: JSON.stringify({
-          intent: "CAPTURE",
-          purchase_units: [
-            {
-              reference_id:
-                checkoutReference,
-              description:
-                `Delly's Matchups Academy - ${course.title}`,
-              custom_id: JSON.stringify({
-                purpose: "academy",
-                checkoutReference,
-                courseKey,
-                customerEmail,
-              }),
-              amount: {
-                currency_code: "USD",
-                value: course.price.toFixed(2),
-              },
-            },
-          ],
-          payment_source: {
-            paypal: {
-              experience_context: {
-                brand_name:
-                  "Delly's Matchups",
-                user_action: "PAY_NOW",
-                return_url:
-                  `${SITE_URL}/paypal/app-return?approved=1`,
-                cancel_url:
-                  `${SITE_URL}/paypal/app-return?cancelled=1`,
-              },
-            },
+    const paypalResponse =
+      await fetch(
+        `${PAYPAL_API_BASE}/v2/checkout/orders`,
+        {
+          method: "POST",
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+            "Content-Type":
+              "application/json",
+            Prefer:
+              "return=representation",
+            "PayPal-Request-Id":
+              `academy-${checkoutReference}`,
           },
-        }),
-        cache: "no-store",
-      },
-    );
+          body: JSON.stringify({
+            intent:
+              "CAPTURE",
+            purchase_units: [
+              {
+                reference_id:
+                  checkoutReference,
+                description:
+                  `Delly's Matchups Academy - ${course.title}`,
+                custom_id:
+                  JSON.stringify({
+                    purpose:
+                      "academy",
+                    checkoutReference,
+                    courseKey,
+                    customerEmail,
+                  }),
+                amount: {
+                  currency_code:
+                    "USD",
+                  value:
+                    course.price.toFixed(
+                      2,
+                    ),
+                },
+              },
+            ],
+          }),
+          cache:
+            "no-store",
+        },
+      );
 
     const paypalData =
-      await paypalResponse.json();
+      await parsePayPalResponse(
+        paypalResponse,
+      );
 
-    if (!paypalResponse.ok) {
+    if (
+      !paypalResponse.ok
+    ) {
+      console.error(
+        "ACADEMY PAYPAL CREATE RESPONSE ERROR:",
+        paypalData,
+      );
+
       return NextResponse.json(
         {
           error:
             paypalData.message ||
             paypalData.error_description ||
             "Unable to create PayPal Academy order.",
-          details: paypalData,
         },
         {
           status: 502,
@@ -297,25 +388,29 @@ export async function POST(request) {
       );
     }
 
-    const approvalLink =
-      paypalData.links?.find(
-        (link) => link.rel === "approve",
+    if (
+      typeof paypalData.id !==
+        "string" ||
+      !paypalData.id.trim()
+    ) {
+      console.error(
+        "ACADEMY PAYPAL CREATE MISSING ID:",
+        paypalData,
       );
 
-    if (
-      !paypalData.id ||
-      !approvalLink?.href
-    ) {
       return NextResponse.json(
         {
           error:
-            "PayPal did not return an order ID and approval URL.",
+            "PayPal did not return an order ID.",
         },
         {
           status: 502,
         },
       );
     }
+
+    const orderId =
+      paypalData.id.trim();
 
     const supabaseAdmin =
       createSupabaseAdmin();
@@ -326,17 +421,26 @@ export async function POST(request) {
     } = await supabaseAdmin
       .from("payments")
       .insert({
-        customer_name: customerName,
-        customer_email: customerEmail,
-        purpose: "academy",
-        item_name: course.title,
-        amount: course.price,
-        currency: "USD",
-        payment_method: "PayPal / Card",
-        status: "pending",
+        customer_name:
+          customerName,
+        customer_email:
+          customerEmail,
+        purpose:
+          "academy",
+        item_name:
+          course.title,
+        amount:
+          course.price,
+        currency:
+          "USD",
+        payment_method:
+          "PayPal / Card",
+        status:
+          "pending",
         provider_reference:
-          paypalData.id,
-        proof_url: null,
+          orderId,
+        proof_url:
+          null,
         notes: [
           `Course Key: ${courseKey}`,
           `Checkout Reference: ${checkoutReference}`,
@@ -347,7 +451,9 @@ export async function POST(request) {
       .select("id")
       .single();
 
-    if (paymentError) {
+    if (
+      paymentError
+    ) {
       console.error(
         "ACADEMY PAYMENT INSERT ERROR:",
         paymentError,
@@ -364,13 +470,33 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      orderId: paypalData.id,
-      approvalUrl: approvalLink.href,
-      paymentId: payment.id,
-      courseKey,
-    });
+    if (
+      !payment?.id
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Academy payment record was not returned.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success:
+          true,
+        orderId,
+        paymentId:
+          payment.id,
+        courseKey,
+      },
+      {
+        status: 201,
+      },
+    );
   } catch (error) {
     console.error(
       "ACADEMY CREATE ORDER ERROR:",

@@ -1,4 +1,5 @@
 // src/app/academy/checkout/page.js
+// ============================================================
 
 "use client";
 
@@ -10,8 +11,8 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  SiteNav,
   SiteFooter,
+  SiteNav,
 } from "@/app/components/SiteChrome";
 import { supabase } from "@/lib/supabase";
 
@@ -110,7 +111,9 @@ const countryDialCodes = {
 
 const dialCodes = [
   ...new Set(
-    Object.values(countryDialCodes).filter(Boolean),
+    Object.values(
+      countryDialCodes,
+    ).filter(Boolean),
   ),
 ].sort(
   (left, right) =>
@@ -157,13 +160,15 @@ const courses = {
       "Enroll in this academy module.",
   },
   "module-6": {
-    title: "Module 6: Master Classes",
+    title:
+      "Module 6: Master Classes",
     price: 100,
     description:
       "Enroll in this academy module.",
   },
   "module-7": {
-    title: "Module 7: Virginity 101",
+    title:
+      "Module 7: Virginity 101",
     price: 100,
     description:
       "Enroll in this academy module.",
@@ -172,7 +177,8 @@ const courses = {
 
 const moduleOptions =
   Object.entries(courses).filter(
-    ([key]) => key !== "full-academy",
+    ([key]) =>
+      key !== "full-academy",
   );
 
 const emptyForm = {
@@ -219,8 +225,11 @@ function splitPhoneNumber(phone) {
   };
 }
 
-async function parseJsonResponse(response) {
-  const text = await response.text();
+async function parseJsonResponse(
+  response,
+) {
+  const text =
+    await response.text();
 
   if (!text) {
     return {};
@@ -244,7 +253,9 @@ function getApiError(
   );
 }
 
-function getPayPalErrorMessage(error) {
+function getPayPalErrorMessage(
+  error,
+) {
   const message =
     error instanceof Error
       ? error.message
@@ -255,7 +266,7 @@ function getPayPalErrorMessage(error) {
       "INSUFFICIENT_FUNDS",
     )
   ) {
-    return "Payment declined due to insufficient funds.";
+    return "Payment declined because there are insufficient funds.";
   }
 
   if (
@@ -292,8 +303,17 @@ function AcademyCheckoutContent() {
   const searchParams =
     useSearchParams();
 
-  const paypalRef =
+  const paypalContainerRef =
     useRef(null);
+
+  const formRef =
+    useRef(emptyForm);
+
+  const courseKeyRef =
+    useRef("full-academy");
+
+  const paypalGenerationRef =
+    useRef(0);
 
   const paypalClientId =
     process.env
@@ -321,11 +341,17 @@ function AcademyCheckoutContent() {
   const [uploading, setUploading] =
     useState(false);
 
-  const [paypalError, setPayPalError] =
-    useState("");
+  const [
+    paypalError,
+    setPayPalError,
+  ] = useState("");
 
   const selectedCourse =
     courses[selectedCourseKey];
+
+  formRef.current = form;
+  courseKeyRef.current =
+    selectedCourseKey;
 
   useEffect(() => {
     let mounted = true;
@@ -400,8 +426,10 @@ function AcademyCheckoutContent() {
           custom_country:
             current.custom_country ||
             (
-              profileCountry === "Other"
-                ? profile?.country || ""
+              profileCountry ===
+              "Other"
+                ? profile?.country ||
+                  ""
                 : ""
             ),
           phone_code:
@@ -409,7 +437,8 @@ function AcademyCheckoutContent() {
             phoneParts.phone_code ||
             (
               profileCountry &&
-              profileCountry !== "Other"
+              profileCountry !==
+                "Other"
                 ? countryDialCodes[
                     profileCountry
                   ] || ""
@@ -466,43 +495,60 @@ function AcademyCheckoutContent() {
     }));
   }
 
-  function getCountryName() {
+  function getCountryName(
+    currentForm =
+      formRef.current,
+  ) {
     if (
-      form.country === "Other"
+      currentForm.country ===
+      "Other"
     ) {
-      return form.custom_country.trim();
+      return currentForm
+        .custom_country
+        .trim();
     }
 
-    return form.country;
+    return currentForm.country;
   }
 
-  function getFullPhone() {
+  function getFullPhone(
+    currentForm =
+      formRef.current,
+  ) {
     const phoneCode =
       String(
-        form.phone_code || "",
+        currentForm.phone_code ||
+          "",
       ).trim();
 
     const phone =
-      String(form.phone || "")
+      String(
+        currentForm.phone ||
+          "",
+      )
         .replace(/\D/g, "")
         .replace(/^0+/, "");
 
     return `${phoneCode}${phone}`;
   }
 
-  function validateForm() {
+  function validateForm(
+    currentForm =
+      formRef.current,
+  ) {
     if (
-      !form.customer_name.trim()
+      !currentForm.customer_name.trim()
     ) {
       alert(
         "Please enter your full name.",
       );
+
       return false;
     }
 
     if (
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        form.customer_email
+        currentForm.customer_email
           .trim()
           .toLowerCase(),
       )
@@ -510,38 +556,45 @@ function AcademyCheckoutContent() {
       alert(
         "Please enter a valid email address.",
       );
+
       return false;
     }
 
-    if (!form.country) {
+    if (!currentForm.country) {
       alert(
         "Please select your country.",
       );
+
       return false;
     }
 
     if (
-      form.country === "Other" &&
-      !form.custom_country.trim()
+      currentForm.country ===
+        "Other" &&
+      !currentForm.custom_country.trim()
     ) {
       alert(
         "Please enter your country name.",
       );
+
       return false;
     }
 
     if (
-      !form.phone_code ||
-      !form.phone.trim()
+      !currentForm.phone_code ||
+      !currentForm.phone.trim()
     ) {
       alert(
         "Please enter your phone number.",
       );
+
       return false;
     }
 
     const fullPhone =
-      getFullPhone();
+      getFullPhone(
+        currentForm,
+      );
 
     if (
       fullPhone.replace(
@@ -552,6 +605,7 @@ function AcademyCheckoutContent() {
       alert(
         "Please enter a valid phone or WhatsApp number.",
       );
+
       return false;
     }
 
@@ -559,16 +613,26 @@ function AcademyCheckoutContent() {
   }
 
   function validateManualPayment() {
-    if (!validateForm()) {
+    const currentForm =
+      formRef.current;
+
+    if (
+      !validateForm(
+        currentForm,
+      )
+    ) {
       return false;
     }
 
     if (
-      !form.provider_reference.trim()
+      !currentForm
+        .provider_reference
+        .trim()
     ) {
       alert(
         "Please enter the transaction ID or payment reference you received after making the payment.",
       );
+
       return false;
     }
 
@@ -576,7 +640,17 @@ function AcademyCheckoutContent() {
   }
 
   async function createPayPalOrder() {
-    if (!validateForm()) {
+    const currentForm =
+      formRef.current;
+
+    const currentCourseKey =
+      courseKeyRef.current;
+
+    if (
+      !validateForm(
+        currentForm,
+      )
+    ) {
       throw new Error(
         "Please complete your details before continuing to PayPal.",
       );
@@ -584,30 +658,35 @@ function AcademyCheckoutContent() {
 
     setPayPalError("");
 
-    const response = await fetch(
-      PAYPAL_CREATE_ORDER_URL,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
+    const response =
+      await fetch(
+        PAYPAL_CREATE_ORDER_URL,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            courseKey:
+              currentCourseKey,
+            customerName:
+              currentForm.customer_name.trim(),
+            customerEmail:
+              currentForm.customer_email
+                .trim()
+                .toLowerCase(),
+            country:
+              getCountryName(
+                currentForm,
+              ),
+            phone:
+              getFullPhone(
+                currentForm,
+              ),
+          }),
         },
-        body: JSON.stringify({
-          courseKey:
-            selectedCourseKey,
-          customerName:
-            form.customer_name.trim(),
-          customerEmail:
-            form.customer_email
-              .trim()
-              .toLowerCase(),
-          country:
-            getCountryName(),
-          phone:
-            getFullPhone(),
-        }),
-      },
-    );
+      );
 
     const result =
       await parseJsonResponse(
@@ -636,19 +715,26 @@ function AcademyCheckoutContent() {
   async function capturePayPalOrder(
     orderId,
   ) {
-    const response = await fetch(
-      PAYPAL_CAPTURE_ORDER_URL,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
+    if (!orderId) {
+      throw new Error(
+        "PayPal did not return an order ID.",
+      );
+    }
+
+    const response =
+      await fetch(
+        PAYPAL_CAPTURE_ORDER_URL,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            orderId,
+          }),
         },
-        body: JSON.stringify({
-          orderId,
-        }),
-      },
-    );
+      );
 
     const result =
       await parseJsonResponse(
@@ -676,44 +762,87 @@ function AcademyCheckoutContent() {
       form.payment_method !==
         "PayPal / Card" ||
       !paypalClientId ||
-      !paypalRef.current
+      !paypalContainerRef.current
     ) {
       return undefined;
     }
 
+    const generation =
+      paypalGenerationRef.current +
+      1;
+
+    paypalGenerationRef.current =
+      generation;
+
     let cancelled = false;
-    let paypalButton = null;
+
+    function isCurrentGeneration() {
+      return (
+        !cancelled &&
+        paypalGenerationRef.current ===
+          generation
+      );
+    }
+
+    function clearContainer() {
+      if (
+        paypalContainerRef.current
+      ) {
+        paypalContainerRef.current.innerHTML =
+          "";
+      }
+    }
 
     async function setupPayPal() {
       if (
-        cancelled ||
-        !window.paypal ||
-        !paypalRef.current
+        !isCurrentGeneration() ||
+        !paypalContainerRef.current
       ) {
+        return;
+      }
+
+      if (
+        !window.paypal ||
+        typeof window.paypal
+          .createInstance !==
+          "function"
+      ) {
+        setPayPalError(
+          "PayPal Checkout did not initialize correctly. Please refresh the page and try again.",
+        );
         return;
       }
 
       try {
         setPayPalError("");
 
-        paypalRef.current.innerHTML =
-          "";
+        clearContainer();
 
         const sdkInstance =
-          await window.paypal.createInstance({
-            clientId:
-              paypalClientId,
-            components: [
-              "paypal-payments",
-            ],
-          });
+          await window.paypal.createInstance(
+            {
+              clientId:
+                paypalClientId,
+              components: [
+                "paypal-payments",
+              ],
+            },
+          );
 
-        if (cancelled) {
+        if (
+          !isCurrentGeneration()
+        ) {
           return;
         }
 
         const eligibility =
           await sdkInstance.findEligibleMethods();
+
+        if (
+          !isCurrentGeneration()
+        ) {
+          return;
+        }
 
         if (
           !eligibility.isEligible(
@@ -726,16 +855,7 @@ function AcademyCheckoutContent() {
           return;
         }
 
-        paypalButton =
-          document.createElement(
-            "paypal-button",
-          );
-
-        paypalRef.current.append(
-          paypalButton,
-        );
-
-        const paypalCheckoutSession =
+        const checkoutSession =
           await sdkInstance.createPayPalOneTimePaymentSession(
             {
               async onApprove(data) {
@@ -755,7 +875,7 @@ function AcademyCheckoutContent() {
                   window.location.href =
                     `/academy/payment-success?course=${
                       result.courseKey ||
-                      selectedCourseKey
+                      courseKeyRef.current
                     }`;
                 } catch (error) {
                   const message =
@@ -806,9 +926,19 @@ function AcademyCheckoutContent() {
             },
           );
 
-        if (cancelled) {
+        if (
+          !isCurrentGeneration() ||
+          !paypalContainerRef.current
+        ) {
           return;
         }
+
+        clearContainer();
+
+        const paypalButton =
+          document.createElement(
+            "paypal-button",
+          );
 
         paypalButton.addEventListener(
           "click",
@@ -817,11 +947,10 @@ function AcademyCheckoutContent() {
               setSaving(true);
               setPayPalError("");
 
-              // PayPal v6 requires preserving the user activation.
               const createOrderPromise =
                 createPayPalOrder();
 
-              await paypalCheckoutSession.start(
+              await checkoutSession.start(
                 {
                   presentationMode:
                     "auto",
@@ -847,7 +976,17 @@ function AcademyCheckoutContent() {
             }
           },
         );
+
+        paypalContainerRef.current.appendChild(
+          paypalButton,
+        );
       } catch (error) {
+        if (
+          !isCurrentGeneration()
+        ) {
+          return;
+        }
+
         const message =
           getPayPalErrorMessage(
             error,
@@ -864,18 +1003,27 @@ function AcademyCheckoutContent() {
       }
     }
 
+    function handleSdkLoad() {
+      void setupPayPal();
+    }
+
     const existingScript =
       document.querySelector(
         "#academy-paypal-sdk-v6",
       );
 
     if (existingScript) {
-      if (window.paypal) {
+      if (
+        window.paypal &&
+        typeof window.paypal
+          .createInstance ===
+          "function"
+      ) {
         void setupPayPal();
       } else {
         existingScript.addEventListener(
           "load",
-          setupPayPal,
+          handleSdkLoad,
           {
             once: true,
           },
@@ -885,17 +1033,15 @@ function AcademyCheckoutContent() {
       return () => {
         cancelled = true;
 
+        paypalGenerationRef.current +=
+          1;
+
         existingScript.removeEventListener(
           "load",
-          setupPayPal,
+          handleSdkLoad,
         );
 
-        if (
-          paypalRef.current
-        ) {
-          paypalRef.current.innerHTML =
-            "";
-        }
+        clearContainer();
       };
     }
 
@@ -912,15 +1058,29 @@ function AcademyCheckoutContent() {
 
     script.async = true;
 
-    script.onload = () => {
-      void setupPayPal();
-    };
+    script.addEventListener(
+      "load",
+      handleSdkLoad,
+      {
+        once: true,
+      },
+    );
 
-    script.onerror = () => {
-      setPayPalError(
-        "Unable to load PayPal Checkout. Please refresh the page and try again.",
-      );
-    };
+    script.addEventListener(
+      "error",
+      () => {
+        if (
+          isCurrentGeneration()
+        ) {
+          setPayPalError(
+            "Unable to load PayPal Checkout. Please refresh the page and try again.",
+          );
+        }
+      },
+      {
+        once: true,
+      },
+    );
 
     document.body.appendChild(
       script,
@@ -929,23 +1089,19 @@ function AcademyCheckoutContent() {
     return () => {
       cancelled = true;
 
-      if (
-        paypalRef.current
-      ) {
-        paypalRef.current.innerHTML =
-          "";
-      }
+      paypalGenerationRef.current +=
+        1;
+
+      script.removeEventListener(
+        "load",
+        handleSdkLoad,
+      );
+
+      clearContainer();
     };
   }, [
     paypalClientId,
     form.payment_method,
-    selectedCourseKey,
-    form.customer_name,
-    form.customer_email,
-    form.country,
-    form.custom_country,
-    form.phone_code,
-    form.phone,
   ]);
 
   async function handleProofUpload(
@@ -993,7 +1149,7 @@ function AcademyCheckoutContent() {
     try {
       setUploading(true);
 
-      const fileExt =
+      const fileExtension =
         file.name
           .split(".")
           .pop()
@@ -1002,7 +1158,7 @@ function AcademyCheckoutContent() {
             "",
           ) || "jpg";
 
-      const randomPart =
+      const uniqueId =
         globalThis.crypto
           ?.randomUUID?.() ||
         `${Date.now()}-${Math.random()
@@ -1011,11 +1167,13 @@ function AcademyCheckoutContent() {
 
       const fileName =
         `payment-proofs/academy/` +
-        `${randomPart}.${fileExt}`;
+        `${uniqueId}.${fileExtension}`;
 
       const { error } =
         await supabase.storage
-          .from("content-images")
+          .from(
+            "content-images",
+          )
           .upload(
             fileName,
             file,
@@ -1033,7 +1191,9 @@ function AcademyCheckoutContent() {
 
       const { data } =
         supabase.storage
-          .from("content-images")
+          .from(
+            "content-images",
+          )
           .getPublicUrl(
             fileName,
           );
@@ -1069,10 +1229,16 @@ function AcademyCheckoutContent() {
       return;
     }
 
+    const currentForm =
+      formRef.current;
+
+    const currentCourseKey =
+      courseKeyRef.current;
+
     if (
-      form.payment_method !==
+      currentForm.payment_method !==
         "Mobile Money" &&
-      form.payment_method !==
+      currentForm.payment_method !==
         "Bank Transfer"
     ) {
       return;
@@ -1101,26 +1267,30 @@ function AcademyCheckoutContent() {
             },
             body: JSON.stringify({
               courseKey:
-                selectedCourseKey,
+                currentCourseKey,
               customerName:
-                form.customer_name.trim(),
+                currentForm.customer_name.trim(),
               customerEmail:
-                form.customer_email
+                currentForm.customer_email
                   .trim()
                   .toLowerCase(),
               country:
-                getCountryName(),
+                getCountryName(
+                  currentForm,
+                ),
               phone:
-                getFullPhone(),
+                getFullPhone(
+                  currentForm,
+                ),
               paymentMethod:
-                form.payment_method,
+                currentForm.payment_method,
               providerReference:
-                form.provider_reference.trim(),
+                currentForm.provider_reference.trim(),
               proofUrl:
-                form.proof_url ||
+                currentForm.proof_url ||
                 null,
               notes:
-                form.notes.trim(),
+                currentForm.notes.trim(),
             }),
           },
         );
@@ -1157,7 +1327,7 @@ function AcademyCheckoutContent() {
       window.location.href =
         `/academy/payment-pending?course=${
           result.courseKey ||
-          selectedCourseKey
+          currentCourseKey
         }`;
     } catch (error) {
       alert(
@@ -1225,8 +1395,8 @@ function AcademyCheckoutContent() {
 
               <p className="mt-5 text-5xl font-black">
                 ${selectedCourse.price}
-
                 <span className="ml-2 text-lg uppercase tracking-[0.2em]">
+                  {" "}
                   USD
                 </span>
               </p>
@@ -1283,8 +1453,12 @@ function AcademyCheckoutContent() {
               <input
                 type="text"
                 name="customer_name"
-                value={form.customer_name}
-                onChange={handleChange}
+                value={
+                  form.customer_name
+                }
+                onChange={
+                  handleChange
+                }
                 placeholder="Enter your full name"
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                 required
@@ -1293,8 +1467,12 @@ function AcademyCheckoutContent() {
               <input
                 type="email"
                 name="customer_email"
-                value={form.customer_email}
-                onChange={handleChange}
+                value={
+                  form.customer_email
+                }
+                onChange={
+                  handleChange
+                }
                 placeholder="Enter your email address"
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                 required
@@ -1303,7 +1481,9 @@ function AcademyCheckoutContent() {
               <select
                 name="country"
                 value={form.country}
-                onChange={handleChange}
+                onChange={
+                  handleChange
+                }
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none md:col-span-2"
                 required
               >
@@ -1317,8 +1497,12 @@ function AcademyCheckoutContent() {
                 {countries.map(
                   (country) => (
                     <option
-                      key={country}
-                      value={country}
+                      key={
+                        country
+                      }
+                      value={
+                        country
+                      }
                       className="text-black"
                     >
                       {country}
@@ -1332,8 +1516,12 @@ function AcademyCheckoutContent() {
                 <input
                   type="text"
                   name="custom_country"
-                  value={form.custom_country}
-                  onChange={handleChange}
+                  value={
+                    form.custom_country
+                  }
+                  onChange={
+                    handleChange
+                  }
                   placeholder="Enter your country"
                   className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60 md:col-span-2"
                   required
@@ -1345,8 +1533,12 @@ function AcademyCheckoutContent() {
                 "Other" ? (
                   <input
                     name="phone_code"
-                    value={form.phone_code}
-                    onChange={handleChange}
+                    value={
+                      form.phone_code
+                    }
+                    onChange={
+                      handleChange
+                    }
                     placeholder="+Code"
                     className="w-28 bg-white/10 px-3 text-white outline-none placeholder:text-white/60"
                     required
@@ -1354,8 +1546,12 @@ function AcademyCheckoutContent() {
                 ) : (
                   <select
                     name="phone_code"
-                    value={form.phone_code}
-                    onChange={handleChange}
+                    value={
+                      form.phone_code
+                    }
+                    onChange={
+                      handleChange
+                    }
                     className="w-28 bg-white/10 px-3 text-white outline-none"
                     required
                   >
@@ -1383,7 +1579,9 @@ function AcademyCheckoutContent() {
                 <input
                   name="phone"
                   value={form.phone}
-                  onChange={handleChange}
+                  onChange={
+                    handleChange
+                  }
                   placeholder="Phone / WhatsApp number"
                   className="min-w-0 flex-1 bg-transparent px-4 text-white outline-none placeholder:text-white/60"
                   required
@@ -1401,25 +1599,27 @@ function AcademyCheckoutContent() {
                   "PayPal / Card",
                   "Mobile Money",
                   "Bank Transfer",
-                ].map((method) => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() =>
-                      selectPaymentMethod(
-                        method,
-                      )
-                    }
-                    className={`rounded-2xl p-6 font-black transition hover:scale-105 ${
-                      form.payment_method ===
-                      method
-                        ? "bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 text-black"
-                        : "bg-white text-[#b30018]"
-                    }`}
-                  >
-                    {method}
-                  </button>
-                ))}
+                ].map(
+                  (method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() =>
+                        selectPaymentMethod(
+                          method,
+                        )
+                      }
+                      className={`rounded-2xl p-6 font-black transition hover:scale-105 ${
+                        form.payment_method ===
+                        method
+                          ? "bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 text-black"
+                          : "bg-white text-[#b30018]"
+                      }`}
+                    >
+                      {method}
+                    </button>
+                  ),
+                )}
               </div>
             </div>
 
@@ -1445,16 +1645,18 @@ function AcademyCheckoutContent() {
                   </p>
                 ) : (
                   <div
-                    ref={paypalRef}
+                    ref={
+                      paypalContainerRef
+                    }
                     className="mt-6"
                   />
                 )}
 
-                {saving && (
+                {saving ? (
                   <p className="mt-4 text-center font-bold text-black/60">
                     Processing payment...
                   </p>
-                )}
+                ) : null}
 
                 {paypalError ? (
                   <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 font-bold text-red-700">
@@ -1469,12 +1671,22 @@ function AcademyCheckoutContent() {
               <ManualPaymentBox
                 type="momo"
                 form={form}
-                selectedCourse={selectedCourse}
-                mobileMoney={mobileMoney}
-                bankDetails={bankDetails}
+                selectedCourse={
+                  selectedCourse
+                }
+                mobileMoney={
+                  mobileMoney
+                }
+                bankDetails={
+                  bankDetails
+                }
                 saving={saving}
-                uploading={uploading}
-                handleChange={handleChange}
+                uploading={
+                  uploading
+                }
+                handleChange={
+                  handleChange
+                }
                 handleProofUpload={
                   handleProofUpload
                 }
@@ -1489,12 +1701,22 @@ function AcademyCheckoutContent() {
               <ManualPaymentBox
                 type="bank"
                 form={form}
-                selectedCourse={selectedCourse}
-                mobileMoney={mobileMoney}
-                bankDetails={bankDetails}
+                selectedCourse={
+                  selectedCourse
+                }
+                mobileMoney={
+                  mobileMoney
+                }
+                bankDetails={
+                  bankDetails
+                }
                 saving={saving}
-                uploading={uploading}
-                handleChange={handleChange}
+                uploading={
+                  uploading
+                }
+                handleChange={
+                  handleChange
+                }
                 handleProofUpload={
                   handleProofUpload
                 }
@@ -1595,44 +1817,60 @@ function ManualPaymentBox({
           <>
             <DetailRow
               label="Account Name"
-              value={mobileMoney.name}
+              value={
+                mobileMoney.name
+              }
             />
 
             <DetailRow
               label="Mobile Money Number"
-              value={mobileMoney.number}
+              value={
+                mobileMoney.number
+              }
             />
           </>
         ) : (
           <>
             <DetailRow
               label="Account Name"
-              value={bankDetails.accountName}
+              value={
+                bankDetails.accountName
+              }
             />
 
             <DetailRow
               label="Bank"
-              value={bankDetails.bankName}
+              value={
+                bankDetails.bankName
+              }
             />
 
             <DetailRow
               label="Sort Code"
-              value={bankDetails.sortCode}
+              value={
+                bankDetails.sortCode
+              }
             />
 
             <DetailRow
               label="Account Number"
-              value={bankDetails.accountNumber}
+              value={
+                bankDetails.accountNumber
+              }
             />
 
             <DetailRow
               label="IBAN"
-              value={bankDetails.iban}
+              value={
+                bankDetails.iban
+              }
             />
 
             <DetailRow
               label="BIC"
-              value={bankDetails.bic}
+              value={
+                bankDetails.bic
+              }
             />
           </>
         )}
@@ -1650,8 +1888,12 @@ function ManualPaymentBox({
       <input
         type="text"
         name="provider_reference"
-        value={form.provider_reference}
-        onChange={handleChange}
+        value={
+          form.provider_reference
+        }
+        onChange={
+          handleChange
+        }
         placeholder="Enter your payment reference"
         className="mt-2 h-16 w-full rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
         required
@@ -1669,8 +1911,12 @@ function ManualPaymentBox({
 
       <textarea
         name="notes"
-        value={form.notes}
-        onChange={handleChange}
+        value={
+          form.notes
+        }
+        onChange={
+          handleChange
+        }
         rows={4}
         placeholder="Anything we should know?"
         className="mt-2 w-full rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/60"
@@ -1683,7 +1929,9 @@ function ManualPaymentBox({
       <input
         type="file"
         accept="image/*,.pdf"
-        onChange={handleProofUpload}
+        onChange={
+          handleProofUpload
+        }
         className="mt-2 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
       />
 
@@ -1692,21 +1940,23 @@ function ManualPaymentBox({
         receipt image or PDF up to 10 MB.
       </p>
 
-      {uploading && (
+      {uploading ? (
         <p className="mt-3 text-sm text-white/70">
           Uploading proof...
         </p>
-      )}
+      ) : null}
 
-      {form.proof_url && (
+      {form.proof_url ? (
         <p className="mt-3 font-bold text-yellow-200">
           ✓ Payment proof uploaded
         </p>
-      )}
+      ) : null}
 
       <div className="mt-6 flex flex-col gap-4 sm:flex-row">
         <a
-          href={whatsappUrl}
+          href={
+            whatsappUrl
+          }
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
@@ -1716,9 +1966,12 @@ function ManualPaymentBox({
 
         <button
           type="button"
-          onClick={handleManualSubmit}
+          onClick={
+            handleManualSubmit
+          }
           disabled={
-            saving || uploading
+            saving ||
+            uploading
           }
           className="rounded-full border border-white/20 bg-[#b30018] px-8 py-4 font-black text-white transition hover:bg-[#8f0013] disabled:opacity-60"
         >
@@ -1752,3 +2005,4 @@ export default function AcademyCheckoutPage() {
     </Suspense>
   );
 }
+
