@@ -1,14 +1,42 @@
+// src/app/academy/checkout/page.js
+
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useSearchParams } from "next/navigation";
-import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
+import {
+  SiteNav,
+  SiteFooter,
+} from "@/app/components/SiteChrome";
 import { supabase } from "@/lib/supabase";
+
+const PAYPAL_CREATE_ORDER_URL =
+  "/api/academy/paypal/create-order";
+
+const PAYPAL_CAPTURE_ORDER_URL =
+  "/api/academy/paypal/capture-order";
+
+const MANUAL_PAYMENT_URL =
+  "/api/academy/manual-payment";
 
 const mobileMoney = {
   name: "Victorine Ncham",
   number: "+237 676 25 71 87",
   whatsapp: "https://wa.me/237676257187",
+};
+
+const bankDetails = {
+  accountName: "DELLY'S MATCHUPS LTD",
+  bankName: "Lloyds Bank",
+  sortCode: "30-54-66",
+  accountNumber: "22464963",
+  iban: "GB23LOYD30546622464963",
+  bic: "LOYDGB21F95",
 };
 
 const countries = [
@@ -77,211 +105,548 @@ const countryDialCodes = {
   Other: "",
 };
 
-const dialCodes = [...new Set(Object.values(countryDialCodes).filter(Boolean))];
+const dialCodes = [
+  ...new Set(
+    Object.values(
+      countryDialCodes,
+    ).filter(Boolean),
+  ),
+].sort(
+  (left, right) =>
+    right.length - left.length,
+);
 
 const courses = {
   "full-academy": {
     title: "Full Academy Programme",
     price: 500,
-    description: "Access all 7 academy modules.",
+    description:
+      "Access all 7 academy modules.",
   },
-  "module-1": { title: "Module 1: Counselling 101", price: 100 },
-  "module-2": { title: "Module 2: Counselling 102", price: 100 },
-  "module-3": { title: "Module 3: Counselling 103", price: 100 },
-  "module-4": { title: "Module 4: Leadership & Influence", price: 100 },
-  "module-5": { title: "Module 5: Healing & Restoration", price: 100 },
-  "module-6": { title: "Module 6: Master Classes", price: 100 },
-  "module-7": { title: "Module 7: Virginity 101", price: 100 },
+  "module-1": {
+    title: "Module 1: Counselling 101",
+    price: 100,
+    description:
+      "Enroll in this academy module.",
+  },
+  "module-2": {
+    title: "Module 2: Counselling 102",
+    price: 100,
+    description:
+      "Enroll in this academy module.",
+  },
+  "module-3": {
+    title: "Module 3: Counselling 103",
+    price: 100,
+    description:
+      "Enroll in this academy module.",
+  },
+  "module-4": {
+    title:
+      "Module 4: Leadership & Influence",
+    price: 100,
+    description:
+      "Enroll in this academy module.",
+  },
+  "module-5": {
+    title:
+      "Module 5: Healing & Restoration",
+    price: 100,
+    description:
+      "Enroll in this academy module.",
+  },
+  "module-6": {
+    title: "Module 6: Master Classes",
+    price: 100,
+    description:
+      "Enroll in this academy module.",
+  },
+  "module-7": {
+    title: "Module 7: Virginity 101",
+    price: 100,
+    description:
+      "Enroll in this academy module.",
+  },
 };
 
-const moduleOptions = Object.entries(courses).filter(
-  ([key]) => key !== "full-academy"
-);
+const moduleOptions =
+  Object.entries(courses).filter(
+    ([key]) =>
+      key !== "full-academy",
+  );
 
 const emptyForm = {
   customer_name: "",
   customer_email: "",
   country: "",
-  postal_code: "",
+  custom_country: "",
   phone_code: "",
   phone: "",
   payment_method: "PayPal / Card",
+  provider_reference: "",
   proof_url: "",
   notes: "",
 };
 
 function splitPhoneNumber(phone) {
-  if (!phone) return { phone_code: "", phone: "" };
+  if (!phone) {
+    return {
+      phone_code: "",
+      phone: "",
+    };
+  }
 
-  const matchedCode = dialCodes
-    .sort((a, b) => b.length - a.length)
-    .find((code) => phone.startsWith(code));
+  const cleaned =
+    String(phone).trim();
 
-  if (!matchedCode) return { phone_code: "", phone };
+  const matchedCode =
+    dialCodes.find((code) =>
+      cleaned.startsWith(code),
+    );
+
+  if (!matchedCode) {
+    return {
+      phone_code: "",
+      phone: cleaned,
+    };
+  }
 
   return {
     phone_code: matchedCode,
-    phone: phone.replace(matchedCode, "").trim(),
+    phone: cleaned
+      .slice(matchedCode.length)
+      .trim(),
   };
 }
 
-function AcademyCheckoutContent() {
-  const searchParams = useSearchParams();
-  const paypalRef = useRef(null);
-  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-  const initialCourse = searchParams.get("course") || "full-academy";
+function parseJsonResponse(response) {
+  return response
+    .text()
+    .then((text) => {
+      if (!text) {
+        return {};
+      }
 
-  const [selectedCourseKey, setSelectedCourseKey] = useState(
-    courses[initialCourse] ? initialCourse : "full-academy"
+      try {
+        return JSON.parse(text);
+      } catch {
+        return {};
+      }
+    });
+}
+
+function getApiError(
+  result,
+  fallback,
+) {
+  return (
+    result?.error ||
+    result?.message ||
+    fallback
   );
-  const [form, setForm] = useState(emptyForm);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+}
 
-  const selectedCourse = courses[selectedCourseKey];
+function AcademyCheckoutContent() {
+  const searchParams =
+    useSearchParams();
+
+  const paypalRef =
+    useRef(null);
+
+  const paypalClientId =
+    process.env
+      .NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+
+  const initialCourse =
+    searchParams.get("course") ||
+    "full-academy";
+
+  const [
+    selectedCourseKey,
+    setSelectedCourseKey,
+  ] = useState(
+    courses[initialCourse]
+      ? initialCourse
+      : "full-academy",
+  );
+
+  const [form, setForm] =
+    useState(emptyForm);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [uploading, setUploading] =
+    useState(false);
+
+  const selectedCourse =
+    courses[selectedCourseKey];
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadUserProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } =
+          await supabase.auth.getUser();
 
-      if (!user) return;
+        if (userError) {
+          throw userError;
+        }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name,email,phone,country,postal_code")
-        .eq("id", user.id)
-        .single();
+        if (!user) {
+          return;
+        }
 
-      if (!profile) return;
+        const {
+          data: profile,
+          error: profileError,
+        } = await supabase
+          .from("profiles")
+          .select(
+            "full_name,email,phone,country",
+          )
+          .eq("id", user.id)
+          .maybeSingle();
 
-      const phoneParts = splitPhoneNumber(profile.phone || "");
+        if (profileError) {
+          console.error(
+            "ACADEMY PROFILE LOAD ERROR:",
+            profileError,
+          );
+          return;
+        }
 
-      setForm((current) => ({
-        ...current,
-        customer_name: current.customer_name || profile.full_name || "",
-        customer_email: current.customer_email || profile.email || user.email || "",
-        country: current.country || profile.country || "",
-        postal_code: current.postal_code || profile.postal_code || "",
-        phone_code:
-          current.phone_code ||
-          phoneParts.phone_code ||
-          countryDialCodes[profile.country] ||
-          "",
-        phone: current.phone || phoneParts.phone || "",
-      }));
+        if (!mounted) {
+          return;
+        }
+
+        const phoneParts =
+          splitPhoneNumber(
+            profile?.phone || "",
+          );
+
+        const profileCountry =
+          countries.includes(
+            profile?.country,
+          )
+            ? profile.country
+            : profile?.country
+              ? "Other"
+              : "";
+
+        setForm((current) => ({
+          ...current,
+          customer_name:
+            current.customer_name ||
+            profile?.full_name ||
+            "",
+          customer_email:
+            current.customer_email ||
+            profile?.email ||
+            user.email ||
+            "",
+          country:
+            current.country ||
+            profileCountry,
+          custom_country:
+            current.custom_country ||
+            (
+              profileCountry ===
+              "Other"
+                ? profile?.country ||
+                  ""
+                : ""
+            ),
+          phone_code:
+            current.phone_code ||
+            phoneParts.phone_code ||
+            (
+              profileCountry &&
+              profileCountry !==
+                "Other"
+                ? countryDialCodes[
+                    profileCountry
+                  ] || ""
+                : ""
+            ),
+          phone:
+            current.phone ||
+            phoneParts.phone ||
+            "",
+        }));
+      } catch (error) {
+        console.error(
+          "ACADEMY PROFILE LOAD ERROR:",
+          error,
+        );
+      }
     }
 
-    loadUserProfile();
+    void loadUserProfile();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   function handleChange(event) {
-    const { name, value } = event.target;
+    const {
+      name,
+      value,
+    } = event.target;
 
     if (name === "country") {
       setForm((current) => ({
         ...current,
         country: value,
-        phone_code: countryDialCodes[value] || current.phone_code,
+        custom_country:
+          value === "Other"
+            ? current.custom_country
+            : "",
+        phone_code:
+          value === "Other"
+            ? ""
+            : countryDialCodes[
+                value
+              ] || "",
       }));
+
       return;
     }
 
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
+  function getCountryName() {
+    if (
+      form.country === "Other"
+    ) {
+      return form.custom_country.trim();
+    }
+
+    return form.country;
   }
 
   function getFullPhone() {
-    return `${form.phone_code}${form.phone.replace(/^0+/, "").trim()}`;
+    const phoneCode =
+      String(
+        form.phone_code || "",
+      ).trim();
+
+    const phone =
+      String(form.phone || "")
+        .replace(/\D/g, "")
+        .replace(/^0+/, "");
+
+    return `${phoneCode}${phone}`;
   }
 
   function validateForm() {
-    if (!form.customer_name.trim() || !form.customer_email.trim()) {
-      alert("Please enter your full name and email address.");
+    if (
+      !form.customer_name.trim()
+    ) {
+      alert(
+        "Please enter your full name.",
+      );
+      return false;
+    }
+
+    if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        form.customer_email
+          .trim()
+          .toLowerCase(),
+      )
+    ) {
+      alert(
+        "Please enter a valid email address.",
+      );
       return false;
     }
 
     if (!form.country) {
-      alert("Please select your country.");
+      alert(
+        "Please select your country.",
+      );
       return false;
     }
 
-    if (!form.postal_code.trim()) {
-      alert("Please enter your postal / ZIP code.");
+    if (
+      form.country === "Other" &&
+      !form.custom_country.trim()
+    ) {
+      alert(
+        "Please enter your country name.",
+      );
       return false;
     }
 
-    if (!form.phone_code || !form.phone.trim()) {
-      alert("Please enter your phone number.");
+    if (
+      !form.phone_code ||
+      !form.phone.trim()
+    ) {
+      alert(
+        "Please enter your phone number.",
+      );
+      return false;
+    }
+
+    const fullPhone =
+      getFullPhone();
+
+    if (
+      fullPhone.replace(
+        /\D/g,
+        "",
+      ).length < 7
+    ) {
+      alert(
+        "Please enter a valid phone or WhatsApp number.",
+      );
       return false;
     }
 
     return true;
   }
 
-  async function activateAcademyEnrollment(paymentId) {
-    const { error } = await supabase.from("academy_enrollments").upsert(
-      {
-        user_email: form.customer_email.trim().toLowerCase(),
-        customer_name: form.customer_name.trim(),
-        course_key: selectedCourseKey,
-        course_title: selectedCourse.title,
-        access_type: selectedCourseKey === "full-academy" ? "full" : "single",
-        payment_id: paymentId,
-        status: "active",
-      },
-      {
-        onConflict: "user_email,course_key",
-      }
-    );
+  function validateManualPayment() {
+    if (!validateForm()) {
+      return false;
+    }
 
-    if (error) throw new Error(error.message);
+    if (
+      !form.provider_reference.trim()
+    ) {
+      alert(
+        "Please enter the transaction ID or payment reference you received after making the payment.",
+      );
+      return false;
+    }
+
+    return true;
   }
 
-  async function savePayment(status, providerReference = null) {
-    const fullPhone = getFullPhone();
+  async function createPayPalOrder() {
+    if (!validateForm()) {
+      throw new Error(
+        "Please complete your details before continuing to PayPal.",
+      );
+    }
 
-    const { data, error } = await supabase
-      .from("payments")
-      .insert({
-        customer_name: form.customer_name.trim(),
-        customer_email: form.customer_email.trim().toLowerCase(),
-        purpose: "academy",
-        item_name: selectedCourse.title,
-        amount: selectedCourse.price,
-        currency: "USD",
-        payment_method: form.payment_method,
-        status,
-        provider_reference: providerReference,
-        proof_url: form.proof_url,
-        notes: `Course Key: ${selectedCourseKey}
-Country: ${form.country}
-Postal / ZIP Code: ${form.postal_code}
-Phone: ${fullPhone}
+    const response = await fetch(
+      PAYPAL_CREATE_ORDER_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          courseKey:
+            selectedCourseKey,
+          customerName:
+            form.customer_name.trim(),
+          customerEmail:
+            form.customer_email
+              .trim()
+              .toLowerCase(),
+          country:
+            getCountryName(),
+          phone:
+            getFullPhone(),
+        }),
+      },
+    );
 
-${form.notes || ""}`,
-      })
-      .select("id")
-      .single();
+    const result =
+      await parseJsonResponse(
+        response,
+      );
 
-    if (error) throw new Error(error.message);
+    if (
+      !response.ok ||
+      !result.success ||
+      !result.orderId
+    ) {
+      throw new Error(
+        getApiError(
+          result,
+          "Unable to create PayPal Academy order.",
+        ),
+      );
+    }
 
-    return data.id;
+    return result.orderId;
+  }
+
+  async function capturePayPalOrder(
+    orderId,
+  ) {
+    const response = await fetch(
+      PAYPAL_CAPTURE_ORDER_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          orderId,
+        }),
+      },
+    );
+
+    const result =
+      await parseJsonResponse(
+        response,
+      );
+
+    if (
+      !response.ok ||
+      !result.success ||
+      result.status !== "paid"
+    ) {
+      throw new Error(
+        getApiError(
+          result,
+          "Your PayPal payment could not be confirmed. Please check your PayPal activity before attempting another payment.",
+        ),
+      );
+    }
+
+    return result;
   }
 
   useEffect(() => {
     if (
-      form.payment_method !== "PayPal / Card" ||
+      form.payment_method !==
+        "PayPal / Card" ||
       !paypalClientId ||
       !paypalRef.current
     ) {
       return;
     }
 
-    function renderButtons() {
-      if (!window.paypal || !paypalRef.current) return;
+    let cancelled = false;
 
-      paypalRef.current.innerHTML = "";
+    function renderButtons() {
+      if (
+        cancelled ||
+        !window.paypal ||
+        !paypalRef.current
+      ) {
+        return;
+      }
+
+      paypalRef.current.innerHTML =
+        "";
 
       window.paypal
         .Buttons({
@@ -291,118 +656,378 @@ ${form.notes || ""}`,
             shape: "pill",
             label: "paypal",
           },
-          createOrder(data, actions) {
-            if (!validateForm()) {
-              return actions.reject();
-            }
 
-            return actions.order.create({
-              purchase_units: [
-                {
-                  description: `Delly's Matchups Academy - ${selectedCourse.title}`,
-                  amount: {
-                    currency_code: "USD",
-                    value: selectedCourse.price.toFixed(2),
-                  },
-                },
-              ],
-            });
+          async createOrder() {
+            try {
+              setSaving(true);
+
+              return await createPayPalOrder();
+            } catch (error) {
+              alert(
+                error instanceof Error
+                  ? error.message
+                  : "Unable to start PayPal payment.",
+              );
+
+              throw error;
+            } finally {
+              setSaving(false);
+            }
           },
-          onApprove(data, actions) {
-            return actions.order.capture().then(async () => {
-              try {
-                setSaving(true);
-                const paymentId = await savePayment("paid", data.orderID);
-                await activateAcademyEnrollment(paymentId);
-                alert("Payment successful. Your academy access has been unlocked.");
-                window.location.href = `/academy/payment-success?course=${selectedCourseKey}`;
-              } catch (error) {
-                alert(error.message);
-              } finally {
-                setSaving(false);
-              }
-            });
+
+          async onApprove(data) {
+            try {
+              setSaving(true);
+
+              const result =
+                await capturePayPalOrder(
+                  data.orderID,
+                );
+
+              alert(
+                "Payment successful. Your Academy access has been activated.",
+              );
+
+              window.location.href =
+                `/academy/payment-success?course=${
+                  result.courseKey ||
+                  selectedCourseKey
+                }`;
+            } catch (error) {
+              alert(
+                error instanceof Error
+                  ? error.message
+                  : "Unable to confirm PayPal payment.",
+              );
+            } finally {
+              setSaving(false);
+            }
           },
+
           onCancel() {
-            alert("Payment cancelled.");
+            alert(
+              "Payment cancelled. No Academy access has been activated.",
+            );
           },
+
           onError(error) {
-            console.error("PayPal payment failed:", error);
-            alert("PayPal payment failed. Please try again.");
+            console.error(
+              "ACADEMY PAYPAL ERROR:",
+              error,
+            );
+
+            alert(
+              "PayPal payment failed. Please try again.",
+            );
           },
         })
         .render(paypalRef.current);
     }
 
-    const existingScript = document.querySelector("#paypal-sdk");
+    const existingScript =
+      document.querySelector(
+        "#academy-paypal-sdk",
+      );
 
     if (existingScript) {
-      renderButtons();
-      return;
+      if (window.paypal) {
+        renderButtons();
+      } else {
+        existingScript.addEventListener(
+          "load",
+          renderButtons,
+          {
+            once: true,
+          },
+        );
+      }
+
+      return () => {
+        cancelled = true;
+
+        existingScript.removeEventListener(
+          "load",
+          renderButtons,
+        );
+      };
     }
 
-    const script = document.createElement("script");
-    script.id = "paypal-sdk";
-    script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD&intent=capture`;
+    const script =
+      document.createElement(
+        "script",
+      );
+
+    script.id =
+      "academy-paypal-sdk";
+
+    script.src =
+      `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(
+        paypalClientId,
+      )}&currency=USD&intent=capture`;
+
     script.async = true;
-    script.onload = renderButtons;
-    document.body.appendChild(script);
+    script.onload =
+      renderButtons;
+
+    script.onerror = () => {
+      alert(
+        "Unable to load PayPal. Please refresh the page and try again.",
+      );
+    };
+
+    document.body.appendChild(
+      script,
+    );
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     paypalClientId,
     form.payment_method,
     selectedCourseKey,
-    selectedCourse.price,
     selectedCourse.title,
+    selectedCourse.price,
     form.customer_name,
     form.customer_email,
     form.country,
-    form.postal_code,
+    form.custom_country,
     form.phone_code,
     form.phone,
   ]);
 
-  async function handleProofUpload(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  async function handleProofUpload(
+    event,
+  ) {
+    const file =
+      event.target.files?.[0];
 
-    setUploading(true);
-
-    const fileExt = file.name.split(".").pop();
-    const fileName = `payment-proofs/${Date.now()}.${fileExt}`;
-
-    const { error } = await supabase.storage
-      .from("content-images")
-      .upload(fileName, file, { upsert: true });
-
-    if (error) {
-      setUploading(false);
-      alert(error.message);
+    if (!file) {
       return;
     }
 
-    const { data } = supabase.storage
-      .from("content-images")
-      .getPublicUrl(fileName);
+    if (
+      file.size >
+      10 * 1024 * 1024
+    ) {
+      alert(
+        "Payment proof must be 10 MB or smaller.",
+      );
+      return;
+    }
 
-    setForm((current) => ({ ...current, proof_url: data.publicUrl }));
-    setUploading(false);
+    const validMimeTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/heic",
+      "image/heif",
+    ];
+
+    if (
+      file.type &&
+      !validMimeTypes.includes(
+        file.type,
+      )
+    ) {
+      alert(
+        "Please upload an image or PDF payment proof.",
+      );
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      const fileExt =
+        file.name
+          .split(".")
+          .pop()
+          ?.replace(
+            /[^a-zA-Z0-9]/g,
+            "",
+          ) || "jpg";
+
+      const randomPart =
+        globalThis.crypto
+          ?.randomUUID?.() ||
+        `${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}`;
+
+      const fileName =
+        `payment-proofs/academy/` +
+        `${randomPart}.${fileExt}`;
+
+      const { error } =
+        await supabase.storage
+          .from("content-images")
+          .upload(
+            fileName,
+            file,
+            {
+              upsert: false,
+              contentType:
+                file.type ||
+                "application/octet-stream",
+            },
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      const { data } =
+        supabase.storage
+          .from("content-images")
+          .getPublicUrl(
+            fileName,
+          );
+
+      if (!data.publicUrl) {
+        throw new Error(
+          "Payment proof URL was not returned.",
+        );
+      }
+
+      setForm((current) => ({
+        ...current,
+        proof_url:
+          data.publicUrl,
+      }));
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to upload payment proof.",
+      );
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function handleManualSubmit() {
-    if (!validateForm()) return;
+    if (
+      saving ||
+      uploading ||
+      !validateManualPayment()
+    ) {
+      return;
+    }
+
+    if (
+      form.payment_method !==
+        "Mobile Money" &&
+      form.payment_method !==
+        "Bank Transfer"
+    ) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        "Only submit if you have already made the payment. Academy access remains pending until Delly's Matchups verifies the transaction.",
+      );
+
+    if (!confirmed) {
+      return;
+    }
 
     try {
       setSaving(true);
-      await savePayment("pending_confirmation");
-      alert(
-        "Your payment has been submitted and is pending admin confirmation."
-      );
-      window.location.href = `/academy/payment-pending?course=${selectedCourseKey}`;
+
+      const response =
+        await fetch(
+          MANUAL_PAYMENT_URL,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              courseKey:
+                selectedCourseKey,
+              customerName:
+                form.customer_name.trim(),
+              customerEmail:
+                form.customer_email
+                  .trim()
+                  .toLowerCase(),
+              country:
+                getCountryName(),
+              phone:
+                getFullPhone(),
+              paymentMethod:
+                form.payment_method,
+              providerReference:
+                form.provider_reference.trim(),
+              proofUrl:
+                form.proof_url ||
+                null,
+              notes:
+                form.notes.trim(),
+            }),
+          },
+        );
+
+      const result =
+        await parseJsonResponse(
+          response,
+        );
+
+      if (
+        !response.ok ||
+        !result.success
+      ) {
+        throw new Error(
+          getApiError(
+            result,
+            "Unable to submit your payment for verification.",
+          ),
+        );
+      }
+
+      if (
+        result.alreadySubmitted
+      ) {
+        alert(
+          "This payment was already submitted. We have kept the existing payment record.",
+        );
+      } else {
+        alert(
+          "Your payment has been submitted and is pending verification.",
+        );
+      }
+
+      window.location.href =
+        `/academy/payment-pending?course=${
+          result.courseKey ||
+          selectedCourseKey
+        }`;
     } catch (error) {
-      alert(error.message);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to submit your payment for verification.",
+      );
     } finally {
       setSaving(false);
     }
+  }
+
+  function selectPaymentMethod(
+    method,
+  ) {
+    setForm((current) => ({
+      ...current,
+      payment_method: method,
+      provider_reference: "",
+      proof_url: "",
+      notes: "",
+    }));
   }
 
   return (
@@ -411,15 +1036,20 @@ ${form.notes || ""}`,
 
       <main
         className="relative min-h-screen bg-[#b30018] bg-cover bg-center bg-no-repeat px-6 pb-24 pt-44 text-white"
-        style={{ backgroundImage: "url('/delly-usa.jpg')" }}
+        style={{
+          backgroundImage:
+            "url('/delly-usa.jpg')",
+        }}
       >
         <div className="absolute inset-0 bg-[#5a000a]/75" />
+
         <div className="absolute inset-0 bg-gradient-to-br from-[#b30018]/90 via-[#b30018]/65 to-black/75" />
 
         <section className="relative z-10 mx-auto max-w-6xl">
           <div className="mx-auto max-w-5xl rounded-[3rem] border border-yellow-300/30 bg-black/35 p-8 shadow-2xl backdrop-blur-xl md:p-12">
             <p className="font-black uppercase tracking-[0.35em] text-yellow-300">
-              Delly&apos;s Matchups Academy
+              Delly&apos;s Matchups
+              Academy
             </p>
 
             <h1 className="font-display mt-5 text-6xl font-bold leading-none md:text-7xl">
@@ -427,19 +1057,31 @@ ${form.notes || ""}`,
             </h1>
 
             <p className="mt-6 max-w-3xl text-lg leading-8 text-white/85">
-              Choose between enrolling in the complete Academy Programme or
-              purchasing an individual module.
+              Choose between enrolling
+              in the complete Academy
+              Programme or purchasing an
+              individual module.
             </p>
 
             <div className="mt-10 rounded-[2rem] border border-yellow-300/40 bg-white p-7 text-[#b30018] shadow-2xl">
               <h2 className="font-display text-4xl font-bold">
-                {selectedCourse.title}
+                {
+                  selectedCourse.title
+                }
               </h2>
+
               <p className="mt-3 text-black/70">
-                {selectedCourse.description || "Enroll in this academy module."}
+                {
+                  selectedCourse.description
+                }
               </p>
+
               <p className="mt-5 text-5xl font-black">
-                ${selectedCourse.price}
+                $
+                {
+                  selectedCourse.price
+                }
+
                 <span className="ml-2 text-lg uppercase tracking-[0.2em]">
                   USD
                 </span>
@@ -453,31 +1095,48 @@ ${form.notes || ""}`,
 
               <button
                 type="button"
-                onClick={() => setSelectedCourseKey("full-academy")}
+                onClick={() =>
+                  setSelectedCourseKey(
+                    "full-academy",
+                  )
+                }
                 className={`mt-6 w-full rounded-2xl border p-5 text-left font-black transition hover:scale-[1.01] ${
-                  selectedCourseKey === "full-academy"
+                  selectedCourseKey ===
+                  "full-academy"
                     ? "border-yellow-300 bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 text-black shadow-xl"
                     : "border-white/15 bg-white/10 text-white hover:bg-white/20"
                 }`}
               >
-                Full Academy Programme — $500 USD
+                Full Academy Programme
+                — $500 USD
               </button>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                {moduleOptions.map(([key, course]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSelectedCourseKey(key)}
-                    className={`rounded-2xl border p-5 text-left font-black transition hover:scale-[1.01] ${
-                      selectedCourseKey === key
-                        ? "border-yellow-300 bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 text-black shadow-xl"
-                        : "border-white/15 bg-white/10 text-white hover:bg-white/20"
-                    }`}
-                  >
-                    {course.title} — ${course.price} USD
-                  </button>
-                ))}
+                {moduleOptions.map(
+                  ([
+                    key,
+                    course,
+                  ]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() =>
+                        setSelectedCourseKey(
+                          key,
+                        )
+                      }
+                      className={`rounded-2xl border p-5 text-left font-black transition hover:scale-[1.01] ${
+                        selectedCourseKey ===
+                        key
+                          ? "border-yellow-300 bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 text-black shadow-xl"
+                          : "border-white/15 bg-white/10 text-white hover:bg-white/20"
+                      }`}
+                    >
+                      {course.title} —
+                      ${course.price} USD
+                    </button>
+                  ),
+                )}
               </div>
             </div>
 
@@ -485,8 +1144,12 @@ ${form.notes || ""}`,
               <input
                 type="text"
                 name="customer_name"
-                value={form.customer_name}
-                onChange={handleChange}
+                value={
+                  form.customer_name
+                }
+                onChange={
+                  handleChange
+                }
                 placeholder="Enter your full name"
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                 required
@@ -495,8 +1158,12 @@ ${form.notes || ""}`,
               <input
                 type="email"
                 name="customer_email"
-                value={form.customer_email}
-                onChange={handleChange}
+                value={
+                  form.customer_email
+                }
+                onChange={
+                  handleChange
+                }
                 placeholder="Enter your email address"
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
                 required
@@ -505,51 +1172,103 @@ ${form.notes || ""}`,
               <select
                 name="country"
                 value={form.country}
-                onChange={handleChange}
+                onChange={
+                  handleChange
+                }
                 className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none md:col-span-2"
                 required
               >
-                <option value="" className="text-black">
+                <option
+                  value=""
+                  className="text-black"
+                >
                   Select your country
                 </option>
-                {countries.map((country) => (
-                  <option key={country} value={country} className="text-black">
-                    {country}
-                  </option>
-                ))}
+
+                {countries.map(
+                  (country) => (
+                    <option
+                      key={country}
+                      value={country}
+                      className="text-black"
+                    >
+                      {country}
+                    </option>
+                  ),
+                )}
               </select>
 
-              <input
-                name="postal_code"
-                value={form.postal_code}
-                onChange={handleChange}
-                placeholder="Enter postal / ZIP code"
-                className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
-                required
-              />
-
-              <div className="flex h-16 overflow-hidden rounded-2xl bg-white/10">
-                <select
-                  name="phone_code"
-                  value={form.phone_code}
-                  onChange={handleChange}
-                  className="w-28 bg-white/10 px-3 text-white outline-none"
+              {form.country ===
+              "Other" ? (
+                <input
+                  type="text"
+                  name="custom_country"
+                  value={
+                    form.custom_country
+                  }
+                  onChange={
+                    handleChange
+                  }
+                  placeholder="Enter your country"
+                  className="h-16 rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60 md:col-span-2"
                   required
-                >
-                  <option value="" className="text-black">
-                    Code
-                  </option>
-                  {dialCodes.map((code) => (
-                    <option key={code} value={code} className="text-black">
-                      {code}
+                />
+              ) : null}
+
+              <div className="flex h-16 overflow-hidden rounded-2xl bg-white/10 md:col-span-2">
+                {form.country ===
+                "Other" ? (
+                  <input
+                    name="phone_code"
+                    value={
+                      form.phone_code
+                    }
+                    onChange={
+                      handleChange
+                    }
+                    placeholder="+Code"
+                    className="w-28 bg-white/10 px-3 text-white outline-none placeholder:text-white/60"
+                    required
+                  />
+                ) : (
+                  <select
+                    name="phone_code"
+                    value={
+                      form.phone_code
+                    }
+                    onChange={
+                      handleChange
+                    }
+                    className="w-28 bg-white/10 px-3 text-white outline-none"
+                    required
+                  >
+                    <option
+                      value=""
+                      className="text-black"
+                    >
+                      Code
                     </option>
-                  ))}
-                </select>
+
+                    {dialCodes.map(
+                      (code) => (
+                        <option
+                          key={code}
+                          value={code}
+                          className="text-black"
+                        >
+                          {code}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                )}
 
                 <input
                   name="phone"
                   value={form.phone}
-                  onChange={handleChange}
+                  onChange={
+                    handleChange
+                  }
                   placeholder="Phone / WhatsApp number"
                   className="min-w-0 flex-1 bg-transparent px-4 text-white outline-none placeholder:text-white/60"
                   required
@@ -563,66 +1282,130 @@ ${form.notes || ""}`,
               </h3>
 
               <div className="mt-6 grid gap-5 md:grid-cols-3">
-                {["PayPal / Card", "Mobile Money", "Bank Transfer"].map(
-                  (method) => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() =>
-                        setForm((current) => ({
-                          ...current,
-                          payment_method: method,
-                        }))
-                      }
-                      className={`rounded-2xl p-6 font-black transition hover:scale-105 ${
-                        form.payment_method === method
-                          ? "bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 text-black"
-                          : "bg-white text-[#b30018]"
-                      }`}
-                    >
-                      {method}
-                    </button>
-                  )
-                )}
+                {[
+                  "PayPal / Card",
+                  "Mobile Money",
+                  "Bank Transfer",
+                ].map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() =>
+                      selectPaymentMethod(
+                        method,
+                      )
+                    }
+                    className={`rounded-2xl p-6 font-black transition hover:scale-105 ${
+                      form.payment_method ===
+                      method
+                        ? "bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 text-black"
+                        : "bg-white text-[#b30018]"
+                    }`}
+                  >
+                    {method}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {form.payment_method === "PayPal / Card" && (
+            {form.payment_method ===
+              "PayPal / Card" && (
               <div className="mt-8 rounded-[2rem] bg-white p-6 text-[#b30018]">
+                <h3 className="font-display text-3xl font-bold">
+                  PayPal / Card
+                </h3>
+
+                <p className="mt-3 leading-7 text-black/70">
+                  Complete your payment
+                  securely with PayPal.
+                  Academy access is
+                  activated only after
+                  the server verifies the
+                  completed PayPal
+                  payment.
+                </p>
+
                 {!paypalClientId ? (
-                  <p className="font-bold">
-                    Missing PayPal Client ID. Add NEXT_PUBLIC_PAYPAL_CLIENT_ID
-                    to .env.local.
+                  <p className="mt-5 font-bold">
+                    Missing PayPal Client
+                    ID. Add
+                    NEXT_PUBLIC_PAYPAL_CLIENT_ID
+                    to the production
+                    environment.
                   </p>
                 ) : (
-                  <div ref={paypalRef} />
+                  <div
+                    ref={paypalRef}
+                    className="mt-6"
+                  />
+                )}
+
+                {saving && (
+                  <p className="mt-4 text-center font-bold text-black/60">
+                    Processing
+                    payment...
+                  </p>
                 )}
               </div>
             )}
 
-            {form.payment_method === "Mobile Money" && (
+            {form.payment_method ===
+              "Mobile Money" && (
               <ManualPaymentBox
                 type="momo"
                 form={form}
-                mobileMoney={mobileMoney}
+                selectedCourse={
+                  selectedCourse
+                }
+                mobileMoney={
+                  mobileMoney
+                }
+                bankDetails={
+                  bankDetails
+                }
                 saving={saving}
-                uploading={uploading}
-                handleChange={handleChange}
-                handleProofUpload={handleProofUpload}
-                handleManualSubmit={handleManualSubmit}
+                uploading={
+                  uploading
+                }
+                handleChange={
+                  handleChange
+                }
+                handleProofUpload={
+                  handleProofUpload
+                }
+                handleManualSubmit={
+                  handleManualSubmit
+                }
               />
             )}
 
-            {form.payment_method === "Bank Transfer" && (
+            {form.payment_method ===
+              "Bank Transfer" && (
               <ManualPaymentBox
                 type="bank"
                 form={form}
-                mobileMoney={mobileMoney}
+                selectedCourse={
+                  selectedCourse
+                }
+                mobileMoney={
+                  mobileMoney
+                }
+                bankDetails={
+                  bankDetails
+                }
                 saving={saving}
-                uploading={uploading}
-                handleChange={handleChange}
-                handleProofUpload={handleProofUpload}
-                handleManualSubmit={handleManualSubmit}
+                uploading={
+                  uploading
+                }
+                handleChange={
+                  handleChange
+                }
+                handleProofUpload={
+                  handleProofUpload
+                }
+                handleManualSubmit={
+                  handleManualSubmit
+                }
               />
             )}
           </div>
@@ -634,102 +1417,269 @@ ${form.notes || ""}`,
   );
 }
 
+function DetailRow({
+  label,
+  value,
+}) {
+  return (
+    <div className="border-b border-white/10 py-3 last:border-b-0">
+      <p className="text-sm text-white/60">
+        {label}
+      </p>
+
+      <p className="mt-1 break-words text-lg font-black text-white">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function ManualPaymentBox({
   type,
   form,
+  selectedCourse,
   mobileMoney,
+  bankDetails,
   saving,
   uploading,
   handleChange,
   handleProofUpload,
   handleManualSubmit,
 }) {
-  const isMomo = type === "momo";
+  const isMomo =
+    type === "momo";
+
+  const whatsappMessage =
+    encodeURIComponent(
+      [
+        "Hello Delly's Matchups,",
+        "",
+        "I need help with my Academy payment.",
+        `Course: ${selectedCourse.title}`,
+        `Amount: $${selectedCourse.price} USD`,
+        `Payment Method: ${
+          isMomo
+            ? "Mobile Money"
+            : "Bank Transfer"
+        }`,
+        form.provider_reference.trim()
+          ? `Reference: ${form.provider_reference.trim()}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+
+  const whatsappUrl =
+    `${mobileMoney.whatsapp}` +
+    `?text=${whatsappMessage}`;
 
   return (
     <div className="mt-10 rounded-[2rem] border border-white/15 bg-white/10 p-6">
       <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
-        {isMomo ? "MTN Mobile Money" : "Bank Transfer"}
+        {isMomo
+          ? "MTN Mobile Money"
+          : "Bank Transfer"}
       </p>
 
-      {isMomo ? (
-        <>
-          <p className="mt-4 text-lg leading-8 text-white/80">
-            Send your payment using the Mobile Money details below.
-          </p>
+      <h3 className="font-display mt-3 text-4xl font-bold">
+        {isMomo
+          ? "Mobile Money"
+          : "Lloyds Bank"}
+      </h3>
 
-          <div className="mt-5 rounded-2xl bg-black/20 p-5">
-            <p className="text-white/70">Account Name</p>
-            <p className="mt-1 text-2xl font-black">{mobileMoney.name}</p>
-
-            <p className="mt-5 text-white/70">Mobile Money Number</p>
-            <p className="mt-1 text-3xl font-black">{mobileMoney.number}</p>
-          </div>
-        </>
-      ) : (
-        <p className="mt-4 text-lg leading-8 text-white/80">
-          Bank transfer details will be provided by Delly&apos;s Matchups. After
-          payment, send your transaction proof on WhatsApp for confirmation.
-        </p>
-      )}
-
-      <p className="mt-5 text-white/70">
-        After payment, send your transaction ID or screenshot on WhatsApp for
-        manual confirmation.
+      <p className="mt-4 text-lg leading-8 text-white/80">
+        Send the exact amount using
+        the details below. Once the
+        payment is complete, enter
+        the transaction reference and
+        submit it for verification.
       </p>
+
+      <div className="mt-5 rounded-2xl bg-black/20 p-5">
+        {isMomo ? (
+          <>
+            <DetailRow
+              label="Account Name"
+              value={
+                mobileMoney.name
+              }
+            />
+
+            <DetailRow
+              label="Mobile Money Number"
+              value={
+                mobileMoney.number
+              }
+            />
+          </>
+        ) : (
+          <>
+            <DetailRow
+              label="Account Name"
+              value={
+                bankDetails.accountName
+              }
+            />
+
+            <DetailRow
+              label="Bank"
+              value={
+                bankDetails.bankName
+              }
+            />
+
+            <DetailRow
+              label="Sort Code"
+              value={
+                bankDetails.sortCode
+              }
+            />
+
+            <DetailRow
+              label="Account Number"
+              value={
+                bankDetails.accountNumber
+              }
+            />
+
+            <DetailRow
+              label="IBAN"
+              value={
+                bankDetails.iban
+              }
+            />
+
+            <DetailRow
+              label="BIC"
+              value={
+                bankDetails.bic
+              }
+            />
+          </>
+        )}
+
+        <DetailRow
+          label="Amount"
+          value={`$${selectedCourse.price} USD`}
+        />
+      </div>
+
+      <label className="mt-6 block text-sm font-black uppercase tracking-[0.15em] text-yellow-200">
+        Transaction ID / Reference
+      </label>
+
+      <input
+        type="text"
+        name="provider_reference"
+        value={
+          form.provider_reference
+        }
+        onChange={handleChange}
+        placeholder="Enter your payment reference"
+        className="mt-2 h-16 w-full rounded-2xl bg-white/10 px-5 text-white outline-none placeholder:text-white/60"
+        required
+      />
+
+      <p className="mt-2 text-sm leading-6 text-white/60">
+        Required. Use the
+        transaction ID/reference
+        supplied by your bank or
+        Mobile Money provider.
+      </p>
+
+      <label className="mt-6 block text-sm font-black uppercase tracking-[0.15em] text-yellow-200">
+        Note (Optional)
+      </label>
 
       <textarea
         name="notes"
         value={form.notes}
         onChange={handleChange}
-        rows="4"
-        placeholder="Optional note or transaction reference"
-        className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/60"
+        rows={4}
+        placeholder="Anything we should know?"
+        className="mt-2 w-full rounded-2xl bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/60"
       />
+
+      <label className="mt-6 block text-sm font-black uppercase tracking-[0.15em] text-yellow-200">
+        Payment Proof (Optional)
+      </label>
 
       <input
         type="file"
         accept="image/*,.pdf"
-        onChange={handleProofUpload}
-        className="mt-6 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
+        onChange={
+          handleProofUpload
+        }
+        className="mt-2 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
       />
 
+      <p className="mt-2 text-sm leading-6 text-white/60">
+        Optional but recommended.
+        Upload a receipt image or PDF
+        up to 10 MB.
+      </p>
+
       {uploading && (
-        <p className="mt-3 text-sm text-white/70">Uploading proof...</p>
+        <p className="mt-3 text-sm text-white/70">
+          Uploading proof...
+        </p>
       )}
 
       {form.proof_url && (
-        <p className="mt-3 text-sm font-bold text-white">
-          Payment proof uploaded.
+        <p className="mt-3 font-bold text-yellow-200">
+          ✓ Payment proof uploaded
         </p>
       )}
 
       <div className="mt-6 flex flex-col gap-4 sm:flex-row">
         <a
-          href={mobileMoney.whatsapp}
+          href={whatsappUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
         >
-          {isMomo ? "Send MoMo Proof" : "Send Bank Proof"}
+          Contact Us on WhatsApp
         </a>
 
         <button
           type="button"
-          onClick={handleManualSubmit}
-          disabled={saving || uploading}
-          className="rounded-full border border-white/20 bg-white/10 px-8 py-4 font-black text-white transition hover:bg-white/20 disabled:opacity-60"
+          onClick={
+            handleManualSubmit
+          }
+          disabled={
+            saving || uploading
+          }
+          className="rounded-full border border-white/20 bg-[#b30018] px-8 py-4 font-black text-white transition hover:bg-[#8f0013] disabled:opacity-60"
         >
-          {saving ? "Submitting..." : "I Have Paid"}
+          {saving
+            ? "Submitting..."
+            : "Submit Payment for Verification"}
         </button>
       </div>
+
+      <p className="mt-5 text-center text-sm leading-6 text-white/65">
+        Only submit after making the
+        payment. Manual payments
+        remain pending until
+        Delly&apos;s Matchups verifies
+        the transaction. Academy
+        access is not activated
+        automatically.
+      </p>
     </div>
   );
 }
 
 export default function AcademyCheckoutPage() {
   return (
-    <Suspense fallback={<main className="p-10">Loading...</main>}>
+    <Suspense
+      fallback={
+        <main className="p-10">
+          Loading...
+        </main>
+      }
+    >
       <AcademyCheckoutContent />
     </Suspense>
   );

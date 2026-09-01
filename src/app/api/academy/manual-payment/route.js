@@ -207,9 +207,7 @@ export async function POST(request) {
       );
     }
 
-    if (
-      !isValidEmail(customerEmail)
-    ) {
+    if (!isValidEmail(customerEmail)) {
       return NextResponse.json(
         {
           error:
@@ -224,8 +222,7 @@ export async function POST(request) {
     if (!country) {
       return NextResponse.json(
         {
-          error:
-            "Country is required.",
+          error: "Country is required.",
         },
         {
           status: 400,
@@ -277,12 +274,17 @@ export async function POST(request) {
       error: existingPaymentError,
     } = await supabaseAdmin
       .from("payments")
-      .select("id,status,item_name")
-      .eq("purpose", "academy")
-      .eq(
-        "customer_email",
-        customerEmail,
+      .select(
+        [
+          "id",
+          "customer_email",
+          "status",
+          "item_name",
+          "payment_method",
+          "provider_reference",
+        ].join(","),
       )
+      .eq("purpose", "academy")
       .eq(
         "payment_method",
         body.paymentMethod,
@@ -301,6 +303,25 @@ export async function POST(request) {
     }
 
     if (existingPayment) {
+      const existingEmail =
+        normalizeEmail(
+          existingPayment.customer_email,
+        );
+
+      if (
+        existingEmail !== customerEmail
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "This transaction reference has already been submitted for another customer.",
+          },
+          {
+            status: 409,
+          },
+        );
+      }
+
       if (
         existingPayment.item_name !==
         course.title
@@ -378,10 +399,8 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       alreadySubmitted: false,
-      paymentId:
-        payment.id,
-      status:
-        payment.status,
+      paymentId: payment.id,
+      status: payment.status,
       courseKey,
     });
   } catch (error) {
