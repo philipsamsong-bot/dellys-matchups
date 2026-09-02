@@ -26,16 +26,26 @@ const SUPABASE_URL =
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const APP_RETURN_URL =
+  "dellysmatchups://paypal/shop-return";
+
+const APP_CANCEL_URL =
+  "dellysmatchups://paypal/shop-cancel";
+
 function getRequiredEnvironmentVariable(value, name) {
   if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
+    throw new Error(
+      `Missing environment variable: ${name}`,
+    );
   }
 
   return value;
 }
 
 function getString(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string"
+    ? value.trim()
+    : "";
 }
 
 function normalizeEmail(value) {
@@ -43,7 +53,9 @@ function normalizeEmail(value) {
 }
 
 function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    value,
+  );
 }
 
 function createSupabaseAdmin() {
@@ -76,7 +88,8 @@ async function parsePayPalResponse(response) {
     return JSON.parse(text);
   } catch {
     return {
-      message: "PayPal returned an invalid response.",
+      message:
+        "PayPal returned an invalid response.",
     };
   }
 }
@@ -103,7 +116,8 @@ async function getPayPalAccessToken() {
     {
       method: "POST",
       headers: {
-        Authorization: `Basic ${authorization}`,
+        Authorization:
+          `Basic ${authorization}`,
         "Content-Type":
           "application/x-www-form-urlencoded",
       },
@@ -144,35 +158,161 @@ function createOrderNumber() {
 }
 
 function buildOrderItems(calculatedCart) {
-  return calculatedCart.items.map((item) => ({
-    id: item.id,
-    type: item.type,
-    category: item.category,
-    title: item.title,
-    image: item.image,
-    price: item.unitPrice,
-    quantity: item.quantity,
-    subtotal: item.subtotal,
-    currency: item.currency,
-  }));
+  return calculatedCart.items.map(
+    (item) => ({
+      id: item.id,
+      type: item.type,
+      category: item.category,
+      title: item.title,
+      image: item.image,
+      price: item.unitPrice,
+      quantity: item.quantity,
+      subtotal: item.subtotal,
+      currency: item.currency,
+    }),
+  );
+}
+
+function findPayPalApprovalUrl(paypalData) {
+  const links =
+    Array.isArray(paypalData?.links)
+      ? paypalData.links
+      : [];
+
+  const approvalLink = links.find(
+    (link) =>
+      link?.rel === "approve" &&
+      typeof link?.href === "string",
+  );
+
+  return approvalLink?.href?.trim() || "";
+}
+
+function createPayPalOrderPayload({
+  calculatedCart,
+  trustedItems,
+  checkoutReference,
+  orderNumber,
+  shopOrderId,
+  customerEmail,
+  isNativeApp,
+}) {
+  const payload = {
+    intent: "CAPTURE",
+    purchase_units: [
+      {
+        reference_id:
+          checkoutReference,
+        description:
+          `Delly's Matchups Shop - ${orderNumber}`,
+        custom_id:
+          JSON.stringify({
+            purpose: "shop",
+            shopOrderId,
+            orderNumber,
+            checkoutReference,
+            customerEmail,
+          }),
+        amount: {
+          currency_code:
+            SHOP_CURRENCY,
+          value:
+            calculatedCart.total.toFixed(
+              2,
+            ),
+          breakdown: {
+            item_total: {
+              currency_code:
+                SHOP_CURRENCY,
+              value:
+                calculatedCart.subtotal.toFixed(
+                  2,
+                ),
+            },
+            shipping: {
+              currency_code:
+                SHOP_CURRENCY,
+              value:
+                calculatedCart.shipping.toFixed(
+                  2,
+                ),
+            },
+          },
+        },
+        items: trustedItems.map(
+          (item) => ({
+            name:
+              item.title.slice(
+                0,
+                127,
+              ),
+            quantity:
+              String(
+                item.quantity,
+              ),
+            unit_amount: {
+              currency_code:
+                SHOP_CURRENCY,
+              value:
+                Number(
+                  item.price,
+                ).toFixed(2),
+            },
+            category:
+              "PHYSICAL_GOODS",
+          }),
+        ),
+      },
+    ],
+  };
+
+  if (isNativeApp) {
+    payload.payment_source = {
+      paypal: {
+        experience_context: {
+          user_action:
+            "PAY_NOW",
+          return_url:
+            APP_RETURN_URL,
+          cancel_url:
+            APP_CANCEL_URL,
+        },
+      },
+    };
+  }
+
+  return payload;
 }
 
 export async function POST(request) {
   let createdShopOrderId = null;
 
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const cart = body.cart;
 
+    const channel =
+      getString(body.channel);
+
+    const isNativeApp =
+      channel === "app";
+
     const customerName =
-      getString(body.customerName);
+      getString(
+        body.customerName,
+      );
 
     const customerEmail =
-      normalizeEmail(body.customerEmail);
+      normalizeEmail(
+        body.customerEmail,
+      );
 
     const customerPhone =
-      getString(body.customerPhone);
+      getString(
+        body.customerPhone,
+      );
 
     const address =
       getString(body.address);
@@ -184,7 +324,9 @@ export async function POST(request) {
       getString(body.country);
 
     const postalCode =
-      getString(body.postalCode);
+      getString(
+        body.postalCode,
+      );
 
     const customerNote =
       getString(body.note);
@@ -192,7 +334,8 @@ export async function POST(request) {
     if (!customerName) {
       return NextResponse.json(
         {
-          error: "Customer name is required.",
+          error:
+            "Customer name is required.",
         },
         {
           status: 400,
@@ -200,10 +343,15 @@ export async function POST(request) {
       );
     }
 
-    if (!isValidEmail(customerEmail)) {
+    if (
+      !isValidEmail(
+        customerEmail,
+      )
+    ) {
       return NextResponse.json(
         {
-          error: "A valid customer email is required.",
+          error:
+            "A valid customer email is required.",
         },
         {
           status: 400,
@@ -214,7 +362,8 @@ export async function POST(request) {
     if (!customerPhone) {
       return NextResponse.json(
         {
-          error: "Customer phone number is required.",
+          error:
+            "Customer phone number is required.",
         },
         {
           status: 400,
@@ -225,7 +374,8 @@ export async function POST(request) {
     if (!country) {
       return NextResponse.json(
         {
-          error: "Shipping country is required.",
+          error:
+            "Shipping country is required.",
         },
         {
           status: 400,
@@ -236,7 +386,8 @@ export async function POST(request) {
     if (!address) {
       return NextResponse.json(
         {
-          error: "Shipping address is required.",
+          error:
+            "Shipping address is required.",
         },
         {
           status: 400,
@@ -247,7 +398,8 @@ export async function POST(request) {
     if (!city) {
       return NextResponse.json(
         {
-          error: "Shipping city is required.",
+          error:
+            "Shipping city is required.",
         },
         {
           status: 400,
@@ -258,7 +410,8 @@ export async function POST(request) {
     if (!postalCode) {
       return NextResponse.json(
         {
-          error: "Postal / ZIP code is required.",
+          error:
+            "Postal / ZIP code is required.",
         },
         {
           status: 400,
@@ -266,10 +419,14 @@ export async function POST(request) {
       );
     }
 
-    if (customerNote.length > 1000) {
+    if (
+      customerNote.length >
+      1000
+    ) {
       return NextResponse.json(
         {
-          error: "Order note is too long.",
+          error:
+            "Order note is too long.",
         },
         {
           status: 400,
@@ -281,7 +438,9 @@ export async function POST(request) {
 
     try {
       calculatedCart =
-        calculateShopCart(cart);
+        calculateShopCart(
+          cart,
+        );
     } catch (error) {
       return NextResponse.json(
         {
@@ -298,11 +457,13 @@ export async function POST(request) {
 
     if (
       calculatedCart.total <= 0 ||
-      calculatedCart.currency !== SHOP_CURRENCY
+      calculatedCart.currency !==
+        SHOP_CURRENCY
     ) {
       return NextResponse.json(
         {
-          error: "Invalid Shop order total.",
+          error:
+            "Invalid Shop order total.",
         },
         {
           status: 400,
@@ -327,6 +488,9 @@ export async function POST(request) {
         : "",
       customerNote
         ? `Customer Note: ${customerNote}`
+        : "",
+      isNativeApp
+        ? "Checkout Channel: Native App"
         : "",
     ]
       .filter(Boolean)
@@ -409,6 +573,18 @@ export async function POST(request) {
     const accessToken =
       await getPayPalAccessToken();
 
+    const paypalPayload =
+      createPayPalOrderPayload({
+        calculatedCart,
+        trustedItems,
+        checkoutReference,
+        orderNumber,
+        shopOrderId:
+          shopOrder.id,
+        customerEmail,
+        isNativeApp,
+      });
+
     const paypalResponse =
       await fetch(
         `${PAYPAL_API_BASE}/v2/checkout/orders`,
@@ -424,79 +600,10 @@ export async function POST(request) {
             "PayPal-Request-Id":
               `shop-${checkoutReference}`,
           },
-          body: JSON.stringify({
-            intent: "CAPTURE",
-            purchase_units: [
-              {
-                reference_id:
-                  checkoutReference,
-                description:
-                  `Delly's Matchups Shop - ${orderNumber}`,
-                custom_id:
-                  JSON.stringify({
-                    purpose:
-                      "shop",
-                    shopOrderId:
-                      shopOrder.id,
-                    orderNumber,
-                    checkoutReference,
-                    customerEmail,
-                  }),
-                amount: {
-                  currency_code:
-                    SHOP_CURRENCY,
-                  value:
-                    calculatedCart.total.toFixed(
-                      2,
-                    ),
-                  breakdown: {
-                    item_total: {
-                      currency_code:
-                        SHOP_CURRENCY,
-                      value:
-                        calculatedCart.subtotal.toFixed(
-                          2,
-                        ),
-                    },
-                    shipping: {
-                      currency_code:
-                        SHOP_CURRENCY,
-                      value:
-                        calculatedCart.shipping.toFixed(
-                          2,
-                        ),
-                    },
-                  },
-                },
-                items:
-                  trustedItems.map(
-                    (item) => ({
-                      name:
-                        item.title.slice(
-                          0,
-                          127,
-                        ),
-                      quantity:
-                        String(
-                          item.quantity,
-                        ),
-                      unit_amount: {
-                        currency_code:
-                          SHOP_CURRENCY,
-                        value:
-                          Number(
-                            item.price,
-                          ).toFixed(
-                            2,
-                          ),
-                      },
-                      category:
-                        "PHYSICAL_GOODS",
-                    }),
-                  ),
-              },
-            ],
-          }),
+          body:
+            JSON.stringify(
+              paypalPayload,
+            ),
           cache: "no-store",
         },
       );
@@ -537,7 +644,8 @@ export async function POST(request) {
     }
 
     if (
-      typeof paypalData.id !== "string" ||
+      typeof paypalData.id !==
+        "string" ||
       !paypalData.id.trim()
     ) {
       console.error(
@@ -569,6 +677,31 @@ export async function POST(request) {
 
     const paypalOrderId =
       paypalData.id.trim();
+
+    const approvalUrl =
+      findPayPalApprovalUrl(
+        paypalData,
+      );
+
+    if (
+      isNativeApp &&
+      !approvalUrl
+    ) {
+      console.error(
+        "SHOP PAYPAL APPROVAL URL MISSING:",
+        paypalData,
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "PayPal did not return an approval URL for the app.",
+        },
+        {
+          status: 502,
+        },
+      );
+    }
 
     const {
       error:
@@ -617,7 +750,8 @@ export async function POST(request) {
           "shop",
         item_name:
           `${calculatedCart.itemCount} Shop Item${
-            calculatedCart.itemCount === 1
+            calculatedCart.itemCount ===
+            1
               ? ""
               : "s"
           }`,
@@ -638,7 +772,12 @@ export async function POST(request) {
           `Order Number: ${orderNumber}`,
           `Checkout Reference: ${checkoutReference}`,
           `Item Count: ${calculatedCart.itemCount}`,
-        ].join("\n"),
+          isNativeApp
+            ? "Checkout Channel: Native App"
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
       })
       .select("id")
       .single();
@@ -687,6 +826,8 @@ export async function POST(request) {
           calculatedCart.total,
         currency:
           SHOP_CURRENCY,
+        approvalUrl:
+          approvalUrl || null,
       },
       {
         status: 201,
