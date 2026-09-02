@@ -1,3 +1,5 @@
+// src/app/shop/merch/page.js
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,63 +9,78 @@ import { SiteNav, SiteFooter } from "@/app/components/SiteChrome";
 
 const merch = [
   {
-    type:"merch",
+    id: "merch-receive-sense-tshirt",
+    type: "merch",
     title: "Receive Sense T-Shirt",
     price: "$25",
-    image:
-     "/receivesense2.webp",
+    image: "/receivesense2.webp",
     category: "T-Shirts",
   },
   {
-    type:"merch",
+    id: "merch-receive-sense-hoodie",
+    type: "merch",
     title: "Receive Sense Hoodie",
     price: "$100",
-    image:
-      "/receivesense1.webp",
+    image: "/receivesense1.webp",
     category: "Hoodies",
   },
   {
-    type:"merch",
+    id: "merch-receive-sense-cap",
+    type: "merch",
     title: "Receive Sense Cap",
     price: "$50",
-    image:
-      "/receivesense-cap.webp",
+    image: "/receivesense-cap.webp",
     category: "Caps",
   },
   {
-    type:"merch",
+    id: "merch-customised-hoodie",
+    type: "merch",
     title: "Customised Hoodie",
     price: "$100",
-    image:
-     "/customisedhoodie.webp",
+    image: "/customisedhoodie.webp",
     category: "Custom",
   },
   {
-    type:"merch",
+    id: "merch-favourite-scriptures-tshirt",
+    type: "merch",
     title: "Favourite Scriptures T-Shirt",
     price: "$30",
-    image:
-     "/customised-tshirt.webp",
+    image: "/customised-tshirt.webp",
     category: "Faith Collection",
   },
   {
-    type:"merch",
+    id: "merch-customised-tshirt",
+    type: "merch",
     title: "Customised T-Shirt",
     price: "$30",
-    image:
-      "/customisedt-shirt1.webp",
+    image: "/customisedt-shirt1.webp",
     category: "Custom",
   },
 ];
 
 function addToCart(product) {
-  const existingCart = JSON.parse(localStorage.getItem("dm-cart") || "[]");
+  const existingCart = JSON.parse(
+    localStorage.getItem("dm-cart") || "[]",
+  );
 
-  existingCart.push(product);
+  existingCart.push({
+    id: product.id,
+    type: product.type,
+    category: product.category,
+    title: product.title,
+    price: product.price,
+    image: product.image,
+    quantity: 1,
+  });
 
-  localStorage.setItem("dm-cart", JSON.stringify(existingCart));
+  localStorage.setItem(
+    "dm-cart",
+    JSON.stringify(existingCart),
+  );
 
-  window.dispatchEvent(new Event("cartUpdated"));
+  window.dispatchEvent(
+    new Event("cartUpdated"),
+  );
 }
 
 export default function MerchPage() {
@@ -71,7 +88,10 @@ export default function MerchPage() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setActiveIndex((currentIndex) => (currentIndex + 1) % merch.length);
+      setActiveIndex(
+        (currentIndex) =>
+          (currentIndex + 1) % merch.length,
+      );
     }, 3500);
 
     return () => clearInterval(timer);
@@ -168,7 +188,10 @@ export default function MerchPage() {
           </div>
         </section>
 
-        <section id="collection" className="px-6 pb-32">
+        <section
+          id="collection"
+          className="px-6 pb-32"
+        >
           <div className="mx-auto max-w-7xl">
             <div className="flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-end">
               <div>
@@ -190,7 +213,7 @@ export default function MerchPage() {
             <div className="mt-20 grid gap-10 md:grid-cols-2 xl:grid-cols-3">
               {merch.map((item) => (
                 <motion.div
-                  key={item.title}
+                  key={item.id}
                   whileHover={{ y: -12 }}
                   transition={{ duration: 0.3 }}
                   className="overflow-hidden rounded-[3rem] border border-white/10 bg-[#c1121f] shadow-2xl"
@@ -210,7 +233,9 @@ export default function MerchPage() {
                   <div className="p-8">
                     <div className="flex items-start justify-between gap-6">
                       <div>
-                        <h3 className="text-3xl font-bold">{item.title}</h3>
+                        <h3 className="text-3xl font-bold">
+                          {item.title}
+                        </h3>
 
                         <p className="mt-3 text-lg text-white/75">
                           Delly’s Matchups Merch Collection
@@ -225,11 +250,7 @@ export default function MerchPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        addToCart({
-                          title: item.title,
-                          price: item.price,
-                          image: item.image,
-                        })
+                        addToCart(item)
                       }
                       className="mt-10 w-full rounded-full bg-white py-5 text-lg font-black text-[#b30018] transition hover:scale-105"
                     >
@@ -259,7 +280,6 @@ export default function MerchPage() {
       </main>
 
       <FloatingCart />
-
       <SiteFooter />
     </>
   );

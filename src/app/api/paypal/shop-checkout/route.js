@@ -1,12 +1,32 @@
+// src/app/api/paypal/shop-checkout/route.js
+
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import {
+  calculateShopCart,
+  SHOP_CURRENCY,
+} from "@/lib/shop-catalog";
+
+export const runtime = "nodejs";
 
 const PAYPAL_API_BASE =
-  process.env.PAYPAL_API_BASE || "https://api-m.paypal.com";
+  process.env.PAYPAL_API_BASE ||
+  "https://api-m.paypal.com";
 
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
+const PAYPAL_CLIENT_ID =
+  process.env.PAYPAL_CLIENT_ID;
 
-function getRequiredEnv(value, name) {
+const PAYPAL_CLIENT_SECRET =
+  process.env.PAYPAL_CLIENT_SECRET;
+
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+function getRequiredEnvironmentVariable(value, name) {
   if (!value) {
     throw new Error(`Missing environment variable: ${name}`);
   }
@@ -14,127 +34,682 @@ function getRequiredEnv(value, name) {
   return value;
 }
 
+function getString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeEmail(value) {
+  return getString(value).toLowerCase();
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function createSupabaseAdmin() {
+  return createClient(
+    getRequiredEnvironmentVariable(
+      SUPABASE_URL,
+      "NEXT_PUBLIC_SUPABASE_URL",
+    ),
+    getRequiredEnvironmentVariable(
+      SUPABASE_SERVICE_ROLE_KEY,
+      "SUPABASE_SERVICE_ROLE_KEY",
+    ),
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    },
+  );
+}
+
+async function parsePayPalResponse(response) {
+  const text = await response.text();
+
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      message: "PayPal returned an invalid response.",
+    };
+  }
+}
+
 async function getPayPalAccessToken() {
-  const clientId = getRequiredEnv(PAYPAL_CLIENT_ID, "PAYPAL_CLIENT_ID");
-  const clientSecret = getRequiredEnv(
-    PAYPAL_CLIENT_SECRET,
-    "PAYPAL_CLIENT_SECRET"
+  const clientId =
+    getRequiredEnvironmentVariable(
+      PAYPAL_CLIENT_ID,
+      "PAYPAL_CLIENT_ID",
+    );
+
+  const clientSecret =
+    getRequiredEnvironmentVariable(
+      PAYPAL_CLIENT_SECRET,
+      "PAYPAL_CLIENT_SECRET",
+    );
+
+  const authorization = Buffer.from(
+    `${clientId}:${clientSecret}`,
+  ).toString("base64");
+
+  const response = await fetch(
+    `${PAYPAL_API_BASE}/v1/oauth2/token`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${authorization}`,
+        "Content-Type":
+          "application/x-www-form-urlencoded",
+      },
+      body: "grant_type=client_credentials",
+      cache: "no-store",
+    },
   );
 
-  const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-
-  const response = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${auth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-  });
-
-  const data = await response.json();
+  const data =
+    await parsePayPalResponse(response);
 
   if (!response.ok) {
+    console.error(
+      "SHOP PAYPAL AUTH ERROR:",
+      data,
+    );
+
     throw new Error(
-      data.error_description || data.message || "Unable to authenticate PayPal."
+      data.error_description ||
+        data.message ||
+        "Unable to authenticate with PayPal.",
+    );
+  }
+
+  if (!data.access_token) {
+    throw new Error(
+      "PayPal did not return an access token.",
     );
   }
 
   return data.access_token;
 }
 
-export async function POST(request) {
-  try {
-    const {
-      orderId,
-      customerName,
-      customerEmail,
-      items,
-      amount,
-      currency = "USD",
-    } = await request.json();
+function createOrderNumber() {
+  return `DM-${Date.now()}-${randomUUID()
+    .slice(0, 8)
+    .toUpperCase()}`;
+}
 
-    if (!customerName || !customerEmail || !amount || Number(amount) <= 0) {
+function buildOrderItems(calculatedCart) {
+  return calculatedCart.items.map((item) => ({
+    id: item.id,
+    type: item.type,
+    category: item.category,
+    title: item.title,
+    image: item.image,
+    price: item.unitPrice,
+    quantity: item.quantity,
+    subtotal: item.subtotal,
+    currency: item.currency,
+  }));
+}
+
+export async function POST(request) {
+  let createdShopOrderId = null;
+
+  try {
+    const body = await request.json();
+
+    const cart = body.cart;
+
+    const customerName =
+      getString(body.customerName);
+
+    const customerEmail =
+      normalizeEmail(body.customerEmail);
+
+    const customerPhone =
+      getString(body.customerPhone);
+
+    const address =
+      getString(body.address);
+
+    const city =
+      getString(body.city);
+
+    const country =
+      getString(body.country);
+
+    const postalCode =
+      getString(body.postalCode);
+
+    const customerNote =
+      getString(body.note);
+
+    if (!customerName) {
       return NextResponse.json(
-        { error: "Missing customer details or invalid amount." },
-        { status: 400 }
+        {
+          error: "Customer name is required.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
-    const origin =
-      request.headers.get("origin") ||
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      "http://localhost:3000";
-
-    const accessToken = await getPayPalAccessToken();
-
-    const response = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify({
-        intent: "CAPTURE",
-        purchase_units: [
-          {
-            reference_id: orderId || `shop-${Date.now()}`,
-            description: "Delly's Matchups Shop Order",
-            custom_id: JSON.stringify({
-              orderId: orderId || null,
-              customerName,
-              customerEmail,
-              items: items || [],
-            }),
-            amount: {
-              currency_code: currency,
-              value: Number(amount).toFixed(2),
-            },
-          },
-        ],
-        payment_source: {
-          paypal: {
-            experience_context: {
-              brand_name: "Delly's Matchups",
-              user_action: "PAY_NOW",
-              return_url: `${origin}/shop/payment-success`,
-              cancel_url: `${origin}/shop/payment-cancelled`,
-            },
-          },
+    if (!isValidEmail(customerEmail)) {
+      return NextResponse.json(
+        {
+          error: "A valid customer email is required.",
         },
-      }),
-    });
+        {
+          status: 400,
+        },
+      );
+    }
 
-    const data = await response.json();
+    if (!customerPhone) {
+      return NextResponse.json(
+        {
+          error: "Customer phone number is required.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
 
-    if (!response.ok) {
+    if (!country) {
+      return NextResponse.json(
+        {
+          error: "Shipping country is required.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (!address) {
+      return NextResponse.json(
+        {
+          error: "Shipping address is required.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (!city) {
+      return NextResponse.json(
+        {
+          error: "Shipping city is required.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (!postalCode) {
+      return NextResponse.json(
+        {
+          error: "Postal / ZIP code is required.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (customerNote.length > 1000) {
+      return NextResponse.json(
+        {
+          error: "Order note is too long.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    let calculatedCart;
+
+    try {
+      calculatedCart =
+        calculateShopCart(cart);
+    } catch (error) {
       return NextResponse.json(
         {
           error:
-            data.message ||
-            data.error_description ||
-            "Unable to create PayPal shop order.",
-          details: data,
+            error instanceof Error
+              ? error.message
+              : "Invalid Shop cart.",
         },
-        { status: 500 }
+        {
+          status: 400,
+        },
       );
     }
 
-    const approveLink = data.links?.find((link) => link.rel === "approve");
-
-    if (!approveLink?.href) {
+    if (
+      calculatedCart.total <= 0 ||
+      calculatedCart.currency !== SHOP_CURRENCY
+    ) {
       return NextResponse.json(
-        { error: "PayPal approval URL was not returned." },
-        { status: 500 }
+        {
+          error: "Invalid Shop order total.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
-    return NextResponse.json({
-      url: approveLink.href,
-      paypalOrderId: data.id,
-    });
+    const orderNumber =
+      createOrderNumber();
+
+    const trustedItems =
+      buildOrderItems(
+        calculatedCart,
+      );
+
+    const supabaseAdmin =
+      createSupabaseAdmin();
+
+    const orderNote = [
+      postalCode
+        ? `Postal / ZIP Code: ${postalCode}`
+        : "",
+      customerNote
+        ? `Customer Note: ${customerNote}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const {
+      data: shopOrder,
+      error: shopOrderError,
+    } = await supabaseAdmin
+      .from("shop_orders")
+      .insert({
+        order_number:
+          orderNumber,
+        shipping_amount:
+          calculatedCart.shipping,
+        status:
+          "pending",
+        customer_name:
+          customerName,
+        customer_email:
+          customerEmail,
+        customer_phone:
+          customerPhone,
+        address,
+        city,
+        country,
+        note:
+          orderNote || null,
+        items:
+          trustedItems,
+        total_amount:
+          calculatedCart.total,
+        payment_method:
+          "PayPal / Card",
+        payment_status:
+          "pending",
+        paypal_order_id:
+          null,
+      })
+      .select(
+        "id,order_number",
+      )
+      .single();
+
+    if (shopOrderError) {
+      console.error(
+        "SHOP ORDER INSERT ERROR:",
+        shopOrderError,
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Unable to create the Shop order.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    if (!shopOrder?.id) {
+      return NextResponse.json(
+        {
+          error:
+            "Shop order record was not returned.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    createdShopOrderId =
+      shopOrder.id;
+
+    const checkoutReference =
+      randomUUID();
+
+    const accessToken =
+      await getPayPalAccessToken();
+
+    const paypalResponse =
+      await fetch(
+        `${PAYPAL_API_BASE}/v2/checkout/orders`,
+        {
+          method: "POST",
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+            "Content-Type":
+              "application/json",
+            Prefer:
+              "return=representation",
+            "PayPal-Request-Id":
+              `shop-${checkoutReference}`,
+          },
+          body: JSON.stringify({
+            intent: "CAPTURE",
+            purchase_units: [
+              {
+                reference_id:
+                  checkoutReference,
+                description:
+                  `Delly's Matchups Shop - ${orderNumber}`,
+                custom_id:
+                  JSON.stringify({
+                    purpose:
+                      "shop",
+                    shopOrderId:
+                      shopOrder.id,
+                    orderNumber,
+                    checkoutReference,
+                    customerEmail,
+                  }),
+                amount: {
+                  currency_code:
+                    SHOP_CURRENCY,
+                  value:
+                    calculatedCart.total.toFixed(
+                      2,
+                    ),
+                  breakdown: {
+                    item_total: {
+                      currency_code:
+                        SHOP_CURRENCY,
+                      value:
+                        calculatedCart.subtotal.toFixed(
+                          2,
+                        ),
+                    },
+                    shipping: {
+                      currency_code:
+                        SHOP_CURRENCY,
+                      value:
+                        calculatedCart.shipping.toFixed(
+                          2,
+                        ),
+                    },
+                  },
+                },
+                items:
+                  trustedItems.map(
+                    (item) => ({
+                      name:
+                        item.title.slice(
+                          0,
+                          127,
+                        ),
+                      quantity:
+                        String(
+                          item.quantity,
+                        ),
+                      unit_amount: {
+                        currency_code:
+                          SHOP_CURRENCY,
+                        value:
+                          Number(
+                            item.price,
+                          ).toFixed(
+                            2,
+                          ),
+                      },
+                      category:
+                        "PHYSICAL_GOODS",
+                    }),
+                  ),
+              },
+            ],
+          }),
+          cache: "no-store",
+        },
+      );
+
+    const paypalData =
+      await parsePayPalResponse(
+        paypalResponse,
+      );
+
+    if (!paypalResponse.ok) {
+      console.error(
+        "SHOP PAYPAL CREATE ERROR:",
+        paypalData,
+      );
+
+      await supabaseAdmin
+        .from("shop_orders")
+        .delete()
+        .eq(
+          "id",
+          shopOrder.id,
+        );
+
+      createdShopOrderId =
+        null;
+
+      return NextResponse.json(
+        {
+          error:
+            paypalData.message ||
+            paypalData.error_description ||
+            "Unable to create PayPal Shop order.",
+        },
+        {
+          status: 502,
+        },
+      );
+    }
+
+    if (
+      typeof paypalData.id !== "string" ||
+      !paypalData.id.trim()
+    ) {
+      console.error(
+        "SHOP PAYPAL ORDER MISSING ID:",
+        paypalData,
+      );
+
+      await supabaseAdmin
+        .from("shop_orders")
+        .delete()
+        .eq(
+          "id",
+          shopOrder.id,
+        );
+
+      createdShopOrderId =
+        null;
+
+      return NextResponse.json(
+        {
+          error:
+            "PayPal did not return an order ID.",
+        },
+        {
+          status: 502,
+        },
+      );
+    }
+
+    const paypalOrderId =
+      paypalData.id.trim();
+
+    const {
+      error:
+        shopOrderUpdateError,
+    } = await supabaseAdmin
+      .from("shop_orders")
+      .update({
+        paypal_order_id:
+          paypalOrderId,
+      })
+      .eq(
+        "id",
+        shopOrder.id,
+      );
+
+    if (
+      shopOrderUpdateError
+    ) {
+      console.error(
+        "SHOP ORDER PAYPAL UPDATE ERROR:",
+        shopOrderUpdateError,
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "PayPal order was created, but the Shop order could not be linked. Please do not retry payment and contact support.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    const {
+      data: payment,
+      error: paymentError,
+    } = await supabaseAdmin
+      .from("payments")
+      .insert({
+        customer_name:
+          customerName,
+        customer_email:
+          customerEmail,
+        purpose:
+          "shop",
+        item_name:
+          `${calculatedCart.itemCount} Shop Item${
+            calculatedCart.itemCount === 1
+              ? ""
+              : "s"
+          }`,
+        amount:
+          calculatedCart.total,
+        currency:
+          SHOP_CURRENCY,
+        payment_method:
+          "PayPal / Card",
+        status:
+          "pending",
+        provider_reference:
+          paypalOrderId,
+        proof_url:
+          null,
+        notes: [
+          `Shop Order ID: ${shopOrder.id}`,
+          `Order Number: ${orderNumber}`,
+          `Checkout Reference: ${checkoutReference}`,
+          `Item Count: ${calculatedCart.itemCount}`,
+        ].join("\n"),
+      })
+      .select("id")
+      .single();
+
+    if (paymentError) {
+      console.error(
+        "SHOP PAYMENT INSERT ERROR:",
+        paymentError,
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "PayPal order was created, but the payment record could not be created. Please do not retry payment and contact support.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    if (!payment?.id) {
+      return NextResponse.json(
+        {
+          error:
+            "Shop payment record was not returned.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        orderId:
+          paypalOrderId,
+        paypalOrderId,
+        shopOrderId:
+          shopOrder.id,
+        orderNumber,
+        paymentId:
+          payment.id,
+        amount:
+          calculatedCart.total,
+        currency:
+          SHOP_CURRENCY,
+      },
+      {
+        status: 201,
+      },
+    );
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error(
+      "SHOP PAYPAL CHECKOUT ERROR:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to create Shop PayPal order.",
+        shopOrderId:
+          createdShopOrderId,
+      },
+      {
+        status: 500,
+      },
+    );
   }
 }

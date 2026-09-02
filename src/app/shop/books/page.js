@@ -1,3 +1,5 @@
+// src/app/shop/books/page.js
+
 "use client";
 
 import { motion } from "framer-motion";
@@ -6,7 +8,9 @@ import FloatingCart from "@/app/components/FloatingCart";
 
 const books = [
   {
-    type:"book",
+    id: "book-i-do-i-dont",
+    type: "book",
+    category: "Books",
     title: "I DO, I DON’T",
     year: "2023",
     price: "$25",
@@ -16,17 +20,21 @@ const books = [
     link: "/shop/books/ido-idont",
   },
   {
-    type:"book",
+    id: "book-diary-special-mum",
+    type: "book",
+    category: "Books",
     title: "Diary of a Special Mum",
     year: "2024",
     price: "$25",
     image: "/book-diary.webp",
     description:
-    "Foreworded by Eric CHINJE, this inspiring book shares Delly Singah's real-life experiences as a special-needs parent, offering practical insights, hope, and autism awareness while challenging stereotypes and reducing stigma.",
+      "Foreworded by Eric CHINJE, this inspiring book shares Delly Singah's real-life experiences as a special-needs parent, offering practical insights, hope, and autism awareness while challenging stereotypes and reducing stigma.",
     link: "/shop/books/diary-of-a-special-mum",
   },
   {
-    type:"book",
+    id: "book-adventures-delphine",
+    type: "book",
+    category: "Books",
     title: "Adventures of Delphine",
     year: "2025",
     price: "$40",
@@ -36,31 +44,44 @@ const books = [
     link: "/shop/books/adventures-of-delphine",
   },
   {
-    type:"book",
+    id: "book-journal-maman-speciale",
+    type: "book",
+    category: "Books",
     title: "Journal d'une Maman Spéciale",
-    year:"2024",
-    price:"$25",
+    year: "2024",
+    price: "$25",
     image: "/journal-maman-speciale.webp",
     description:
-    "The French edition of Diary of a Special Mum, offering encouragement,resilience,autism awareness,and hope for mothers,families, and caregivers.",
+      "The French edition of Diary of a Special Mum, offering encouragement,resilience,autism awareness,and hope for mothers,families, and caregivers.",
     link: "/shop/books/journal-d'une-maman-spécial",
-
-  }
+  },
 ];
-   function addToCart(product){
-    const existingCart=JSON.parse(
-    localStorage.getItem("dm-cart")
-    || "[]"
-   );
-    existingCart.push(product);
 
-    localStorage.setItem(
-        "dm-cart",
-        JSON.stringify(existingCart)
-);
-window.dispatchEvent(new
-    Event("cartUpdated"));
+function addToCart(product) {
+  const existingCart = JSON.parse(
+    localStorage.getItem("dm-cart") || "[]",
+  );
+
+  existingCart.push({
+    id: product.id,
+    type: product.type,
+    category: product.category,
+    title: product.title,
+    price: product.price,
+    image: product.image,
+    quantity: 1,
+  });
+
+  localStorage.setItem(
+    "dm-cart",
+    JSON.stringify(existingCart),
+  );
+
+  window.dispatchEvent(
+    new Event("cartUpdated"),
+  );
 }
+
 export default function BooksPage() {
   return (
     <>
@@ -81,63 +102,65 @@ export default function BooksPage() {
       <SiteNav />
 
       <main className="overflow-hidden bg-[#080304] text-white">
-      <section className="relative min-h-screen overflow-hidden">
-  <div className="absolute inset-0">
-    <img
-      src="/ido-idont-book.webp"
-      alt="Delly Singah Books"
-      className=" absolute right-[-200px] top-2 h-full w-auto max-w-none object-cover"
-    />
+        <section className="relative min-h-screen overflow-hidden">
+          <div className="absolute inset-0">
+            <img
+              src="/ido-idont-book.webp"
+              alt="Delly Singah Books"
+              className="absolute right-[-200px] top-2 h-full w-auto max-w-none object-cover"
+            />
 
-    <div className="absolute inset-0 bg-black/5" />
-    <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/10" />
-  </div>
+            <div className="absolute inset-0 bg-black/5" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/10" />
+          </div>
 
-  <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl items-center px-6 pt-40">
-    <motion.div
-      initial={{ y: 70, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 1 }}
-      className="max-w-4xl rounded-[3rem] border border-white/15 bg-black/35 p-8 shadow-2xl backdrop-blur-sm lg:p-14"
-    >
-      <p className="text-sm font-black uppercase tracking-[0.45em] text-red-100">
-        Delly Singah Books
-      </p>
+          <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl items-center px-6 pt-40">
+            <motion.div
+              initial={{ y: 70, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 1 }}
+              className="max-w-4xl rounded-[3rem] border border-white/15 bg-black/35 p-8 shadow-2xl backdrop-blur-sm lg:p-14"
+            >
+              <p className="text-sm font-black uppercase tracking-[0.45em] text-red-100">
+                Delly Singah Books
+              </p>
 
-      <h1 className="font-display mt-8 text-6xl font-bold leading-[0.9] text-white drop-shadow-[0_8px_35px_rgba(0,0,0,0.75)] lg:text-8xl">
-        Wisdom for Love,
-        <span className="block text-[#ffccd5]">
-          Healing & Purpose
-        </span>
-      </h1>
+              <h1 className="font-display mt-8 text-6xl font-bold leading-[0.9] text-white drop-shadow-[0_8px_35px_rgba(0,0,0,0.75)] lg:text-8xl">
+                Wisdom for Love,
+                <span className="block text-[#ffccd5]">
+                  Healing & Purpose
+                </span>
+              </h1>
 
-      <p className="mt-10 max-w-3xl text-xl leading-10 text-white/95 drop-shadow-[0_4px_18px_rgba(0,0,0,0.7)]">
-        Explore transformational books by Delly Singah designed to inspire
-        healthy relationships, intentional marriage, emotional healing,
-        motherhood, purpose and godly living.
-      </p>
+              <p className="mt-10 max-w-3xl text-xl leading-10 text-white/95 drop-shadow-[0_4px_18px_rgba(0,0,0,0.7)]">
+                Explore transformational books by Delly Singah designed to
+                inspire healthy relationships, intentional marriage, emotional
+                healing, motherhood, purpose and godly living.
+              </p>
 
-      <div className="mt-12 flex flex-wrap gap-5">
-        <a
-          href="#books"
-          className="rounded-full bg-white px-10 py-5 text-lg font-black text-[#b30018] transition hover:scale-105"
+              <div className="mt-12 flex flex-wrap gap-5">
+                <a
+                  href="#books"
+                  className="rounded-full bg-white px-10 py-5 text-lg font-black text-[#b30018] transition hover:scale-105"
+                >
+                  Shop Books
+                </a>
+
+                <a
+                  href="/about/founder"
+                  className="rounded-full border border-white/20 bg-white/10 px-10 py-5 text-lg font-black text-white backdrop-blur-xl transition hover:bg-white/20"
+                >
+                  About The Author
+                </a>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        <section
+          id="books"
+          className="bg-[#fff8f5] px-6 py-32 text-black"
         >
-          Shop Books
-        </a>
-
-        <a
-          href="/about/founder"
-          className="rounded-full border border-white/20 bg-white/10 px-10 py-5 text-lg font-black text-white backdrop-blur-xl transition hover:bg-white/20"
-        >
-          About The Author
-        </a>
-      </div>
-    </motion.div>
-  </div>
-</section>
- 
-
-        <section id="books" className="bg-[#fff8f5] px-6 py-32 text-black">
           <div className="mx-auto max-w-7xl">
             <motion.div
               initial={{ y: 70, opacity: 0 }}
@@ -164,7 +187,7 @@ export default function BooksPage() {
             <div className="mt-20 grid gap-10 lg:grid-cols-3">
               {books.map((book, index) => (
                 <motion.div
-                  key={book.title}
+                  key={book.id}
                   initial={{ y: 70, opacity: 0 }}
                   whileInView={{ y: 0, opacity: 1 }}
                   viewport={{ once: true }}
@@ -175,7 +198,7 @@ export default function BooksPage() {
                     <img
                       src={book.image}
                       alt={book.title}
-                      className="h-[460px] w-full rounded-[2.3rem] object-contain bg-white p-4"
+                      className="h-[460px] w-full rounded-[2.3rem] bg-white object-contain p-4"
                     />
                   </div>
 
@@ -205,17 +228,13 @@ export default function BooksPage() {
                       </a>
 
                       <button
-                      type="button"
-                      onClick={()=>
-                        addToCart({
-                            title:book.title,
-                            price:book.price,
-                            image:book.image,
-                        })
-                      }
-                      className="rounded-full border border-[#b30018]/20 px-7 py-4 font-black text-[#b30018] transition hover:bg-red-50"
+                        type="button"
+                        onClick={() =>
+                          addToCart(book)
+                        }
+                        className="rounded-full border border-[#b30018]/20 px-7 py-4 font-black text-[#b30018] transition hover:bg-red-50"
                       >
-                        Add To Cart 
+                        Add To Cart
                       </button>
                     </div>
                   </div>
@@ -311,7 +330,8 @@ export default function BooksPage() {
             </div>
           </div>
         </section>
-        <FloatingCart/>
+
+        <FloatingCart />
       </main>
 
       <SiteFooter />
