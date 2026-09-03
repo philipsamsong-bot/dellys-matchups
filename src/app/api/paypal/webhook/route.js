@@ -1,68 +1,51 @@
 // src/app/api/paypal/webhook/route.js
 
-import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const PAYPAL_API_BASE =
   process.env.PAYPAL_API_BASE ||
   "https://api-m.paypal.com";
 
-const PAYPAL_CLIENT_ID =
-  process.env.PAYPAL_CLIENT_ID;
-
-const PAYPAL_CLIENT_SECRET =
-  process.env.PAYPAL_CLIENT_SECRET;
-
-const PAYPAL_WEBHOOK_ID =
-  process.env.PAYPAL_WEBHOOK_ID;
-
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const VALID_PLANS = new Set([
-  "premium",
-  "vip",
-]);
-
-const ACTIVE_SUBSCRIPTION_EVENTS = new Set([
+const ACTIVE_EVENTS = new Set([
   "BILLING.SUBSCRIPTION.ACTIVATED",
   "BILLING.SUBSCRIPTION.RE-ACTIVATED",
 ]);
 
-const INACTIVE_SUBSCRIPTION_EVENTS = {
-  "BILLING.SUBSCRIPTION.CANCELLED": "cancelled",
-  "BILLING.SUBSCRIPTION.SUSPENDED": "suspended",
-  "BILLING.SUBSCRIPTION.EXPIRED": "expired",
-};
+const INACTIVE_EVENTS = new Map([
+  [
+    "BILLING.SUBSCRIPTION.CANCELLED",
+    "cancelled",
+  ],
+  [
+    "BILLING.SUBSCRIPTION.SUSPENDED",
+    "suspended",
+  ],
+  [
+    "BILLING.SUBSCRIPTION.EXPIRED",
+    "expired",
+  ],
+]);
 
-function getRequiredEnvironmentVariable(
-  value,
-  name,
-) {
-  if (!value) {
+function getSupabaseAdmin() {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const serviceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
     throw new Error(
-      `Missing environment variable: ${name}`,
+      "Supabase server environment variables are missing.",
     );
   }
 
-  return value;
-}
-
-function createSupabaseAdmin() {
   return createClient(
-    getRequiredEnvironmentVariable(
-      SUPABASE_URL,
-      "NEXT_PUBLIC_SUPABASE_URL",
-    ),
-    getRequiredEnvironmentVariable(
-      SUPABASE_SERVICE_ROLE_KEY,
-      "SUPABASE_SERVICE_ROLE_KEY",
-    ),
+    supabaseUrl,
+    serviceRoleKey,
     {
       auth: {
         autoRefreshToken: false,
@@ -72,83 +55,40 @@ function createSupabaseAdmin() {
   );
 }
 
-function parseCustomId(customId) {
-  if (typeof customId !== "string") {
-    return {};
+function getPayPalCredentials() {
+  const clientId =
+    process.env.PAYPAL_CLIENT_ID;
+
+  const clientSecret =
+    process.env.PAYPAL_CLIENT_SECRET;
+
+  const webhookId =
+    process.env.PAYPAL_WEBHOOK_ID;
+
+  if (
+    !clientId ||
+    !clientSecret ||
+    !webhookId
+  ) {
+    throw new Error(
+      "PayPal webhook environment variables are missing.",
+    );
   }
 
-  try {
-    const parsed = JSON.parse(customId);
-
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      Array.isArray(parsed)
-    ) {
-      return {};
-    }
-
-    return parsed;
-  } catch {
-    return {};
-  }
-}
-
-function getString(value) {
-  return typeof value === "string"
-    ? value.trim()
-    : "";
-}
-
-function normalizePlan(value) {
-  return getString(value).toLowerCase();
-}
-
-function getWebhookHeaders(request) {
   return {
-    transmissionId: request.headers.get(
-      "paypal-transmission-id",
-    ),
-    transmissionTime: request.headers.get(
-      "paypal-transmission-time",
-    ),
-    transmissionSignature: request.headers.get(
-      "paypal-transmission-sig",
-    ),
-    certificateUrl: request.headers.get(
-      "paypal-cert-url",
-    ),
-    authenticationAlgorithm:
-      request.headers.get(
-        "paypal-auth-algo",
-      ),
+    clientId,
+    clientSecret,
+    webhookId,
   };
 }
 
-function hasRequiredWebhookHeaders(headers) {
-  return Boolean(
-    headers.transmissionId &&
-      headers.transmissionTime &&
-      headers.transmissionSignature &&
-      headers.certificateUrl &&
-      headers.authenticationAlgorithm,
-  );
-}
-
 async function getPayPalAccessToken() {
-  const clientId =
-    getRequiredEnvironmentVariable(
-      PAYPAL_CLIENT_ID,
-      "PAYPAL_CLIENT_ID",
-    );
+  const {
+    clientId,
+    clientSecret,
+  } = getPayPalCredentials();
 
-  const clientSecret =
-    getRequiredEnvironmentVariable(
-      PAYPAL_CLIENT_SECRET,
-      "PAYPAL_CLIENT_SECRET",
-    );
-
-  const authentication = Buffer.from(
+  const credentials = Buffer.from(
     `${clientId}:${clientSecret}`,
   ).toString("base64");
 
@@ -158,7 +98,7 @@ async function getPayPalAccessToken() {
       method: "POST",
       headers: {
         Authorization:
-          `Basic ${authentication}`,
+          `Basic ${credentials}`,
         "Content-Type":
           "application/x-www-form-urlencoded",
       },
@@ -169,17 +109,17 @@ async function getPayPalAccessToken() {
 
   const data = await response.json();
 
-  if (!response.ok) {
-    throw new Error(
-      data.error_description ||
-        data.message ||
-        "Unable to authenticate with PayPal.",
+  if (
+    !response.ok ||
+    !data?.access_token
+  ) {
+    console.error(
+      "PAYPAL WEBHOOK TOKEN ERROR:",
+      data,
     );
-  }
 
-  if (!data.access_token) {
     throw new Error(
-      "PayPal did not return an access token.",
+      "Unable to authenticate with PayPal.",
     );
   }
 
@@ -188,25 +128,50 @@ async function getPayPalAccessToken() {
 
 async function verifyPayPalWebhook(
   request,
-  event,
+  webhookEvent,
 ) {
-  const webhookId =
-    getRequiredEnvironmentVariable(
-      PAYPAL_WEBHOOK_ID,
-      "PAYPAL_WEBHOOK_ID",
-    );
-
-  const headers =
-    getWebhookHeaders(request);
-
-  if (
-    !hasRequiredWebhookHeaders(headers)
-  ) {
-    return false;
-  }
+  const { webhookId } =
+    getPayPalCredentials();
 
   const accessToken =
     await getPayPalAccessToken();
+
+  const transmissionId =
+    request.headers.get(
+      "paypal-transmission-id",
+    );
+
+  const transmissionTime =
+    request.headers.get(
+      "paypal-transmission-time",
+    );
+
+  const certUrl =
+    request.headers.get(
+      "paypal-cert-url",
+    );
+
+  const authAlgo =
+    request.headers.get(
+      "paypal-auth-algo",
+    );
+
+  const transmissionSig =
+    request.headers.get(
+      "paypal-transmission-sig",
+    );
+
+  if (
+    !transmissionId ||
+    !transmissionTime ||
+    !certUrl ||
+    !authAlgo ||
+    !transmissionSig
+  ) {
+    throw new Error(
+      "Required PayPal webhook headers are missing.",
+    );
+  }
 
   const response = await fetch(
     `${PAYPAL_API_BASE}/v1/notifications/verify-webhook-signature`,
@@ -219,20 +184,17 @@ async function verifyPayPalWebhook(
           "application/json",
       },
       body: JSON.stringify({
-        auth_algo:
-          headers.authenticationAlgorithm,
-        cert_url:
-          headers.certificateUrl,
         transmission_id:
-          headers.transmissionId,
-        transmission_sig:
-          headers.transmissionSignature,
+          transmissionId,
         transmission_time:
-          headers.transmissionTime,
-        webhook_id:
-          webhookId,
+          transmissionTime,
+        cert_url: certUrl,
+        auth_algo: authAlgo,
+        transmission_sig:
+          transmissionSig,
+        webhook_id: webhookId,
         webhook_event:
-          event,
+          webhookEvent,
       }),
       cache: "no-store",
     },
@@ -240,19 +202,63 @@ async function verifyPayPalWebhook(
 
   const data = await response.json();
 
-  if (!response.ok) {
+  if (
+    !response.ok ||
+    data?.verification_status !==
+      "SUCCESS"
+  ) {
     console.error(
-      "PAYPAL WEBHOOK VERIFICATION ERROR:",
+      "PAYPAL WEBHOOK VERIFY ERROR:",
       data,
     );
 
     return false;
   }
 
-  return (
-    data.verification_status ===
-    "SUCCESS"
-  );
+  return true;
+}
+
+function parseCustomId(resource) {
+  const rawCustomId =
+    resource?.custom_id;
+
+  if (!rawCustomId) {
+    return null;
+  }
+
+  try {
+    const parsed =
+      typeof rawCustomId ===
+      "string"
+        ? JSON.parse(rawCustomId)
+        : rawCustomId;
+
+    const userId = String(
+      parsed?.userId || "",
+    ).trim();
+
+    const plan = String(
+      parsed?.plan || "",
+    )
+      .trim()
+      .toLowerCase();
+
+    if (
+      !userId ||
+      !["premium", "vip"].includes(
+        plan,
+      )
+    ) {
+      return null;
+    }
+
+    return {
+      userId,
+      plan,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function updateProfileMembership(
@@ -260,24 +266,29 @@ async function updateProfileMembership(
   userId,
   updates,
 ) {
-  const { data, error } =
-    await supabaseAdmin
-      .from("profiles")
-      .update({
-        ...updates,
-        updated_at:
-          new Date().toISOString(),
-      })
-      .eq("id", userId)
-      .select("id");
+  const {
+    data,
+    error,
+  } = await supabaseAdmin
+    .from("profiles")
+    .update({
+      ...updates,
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .select("id");
 
   if (error) {
-    throw new Error(error.message);
+    throw error;
   }
 
-  if (!data || data.length === 0) {
+  if (
+    !Array.isArray(data) ||
+    data.length === 0
+  ) {
     throw new Error(
-      "The membership profile could not be updated.",
+      `No profile found for user ${userId}.`,
     );
   }
 }
@@ -292,8 +303,11 @@ async function activateMembership({
     supabaseAdmin,
     userId,
     {
+      plan,
       membership_plan: plan,
-      subscription_status: "active",
+      subscription: plan,
+      subscription_status:
+        "active",
       paypal_subscription_id:
         subscriptionId || null,
       vip_badge: plan === "vip",
@@ -304,53 +318,96 @@ async function activateMembership({
 async function deactivateMembership({
   supabaseAdmin,
   userId,
-  subscriptionStatus,
+  subscriptionId,
+  inactiveStatus,
 }) {
   await updateProfileMembership(
     supabaseAdmin,
     userId,
     {
+      plan: "free",
       membership_plan: "free",
+      subscription: "free",
       subscription_status:
-        subscriptionStatus,
+        inactiveStatus,
+      paypal_subscription_id:
+        subscriptionId || null,
       vip_badge: false,
+    },
+  );
+}
+
+async function handleSubscriptionUpdated({
+  supabaseAdmin,
+  userId,
+  plan,
+  subscriptionId,
+  resource,
+}) {
+  const status = String(
+    resource?.status || "",
+  )
+    .trim()
+    .toUpperCase();
+
+  if (status === "ACTIVE") {
+    await activateMembership({
+      supabaseAdmin,
+      userId,
+      plan,
+      subscriptionId,
+    });
+
+    return;
+  }
+
+  if (
+    [
+      "CANCELLED",
+      "SUSPENDED",
+      "EXPIRED",
+    ].includes(status)
+  ) {
+    await deactivateMembership({
+      supabaseAdmin,
+      userId,
+      subscriptionId,
+      inactiveStatus:
+        status.toLowerCase(),
+    });
+
+    return;
+  }
+
+  await updateProfileMembership(
+    supabaseAdmin,
+    userId,
+    {
+      subscription_status:
+        status
+          ? status.toLowerCase()
+          : "updated",
+      paypal_subscription_id:
+        subscriptionId || null,
     },
   );
 }
 
 export async function POST(request) {
   try {
-    const rawBody = await request.text();
-
-    let event;
-
-    try {
-      event = JSON.parse(rawBody);
-    } catch {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid PayPal webhook payload.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
+    const webhookEvent =
+      await request.json();
 
     const verified =
       await verifyPayPalWebhook(
         request,
-        event,
+        webhookEvent,
       );
 
     if (!verified) {
-      console.warn(
-        "PAYPAL WEBHOOK REJECTED: signature verification failed.",
-      );
-
       return NextResponse.json(
         {
+          ok: false,
           error:
             "Invalid PayPal webhook signature.",
         },
@@ -360,49 +417,45 @@ export async function POST(request) {
       );
     }
 
-    const eventType =
-      getString(event?.event_type);
+    const eventType = String(
+      webhookEvent?.event_type || "",
+    ).trim();
 
     const resource =
-      event?.resource &&
-      typeof event.resource === "object" &&
-      !Array.isArray(event.resource)
-        ? event.resource
-        : {};
+      webhookEvent?.resource || {};
 
-    const customData =
-      parseCustomId(
-        resource.custom_id,
+    const subscriptionId = String(
+      resource?.id || "",
+    ).trim();
+
+    const custom =
+      parseCustomId(resource);
+
+    if (!custom) {
+      console.info(
+        "PAYPAL WEBHOOK IGNORED: no valid Matchups custom_id",
+        {
+          eventType,
+          subscriptionId,
+        },
       );
 
-    const userId =
-      getString(customData.userId);
-
-    const plan =
-      normalizePlan(
-        customData.plan,
-      );
-
-    const subscriptionId =
-      getString(resource.id);
-
-    if (
-      !userId ||
-      !VALID_PLANS.has(plan)
-    ) {
       return NextResponse.json({
-        received: true,
-        processed: false,
-        reason:
-          "No valid Matchups membership metadata was found.",
+        ok: true,
+        ignored: true,
       });
     }
 
+    const {
+      userId,
+      plan,
+    } = custom;
+
     const supabaseAdmin =
-      createSupabaseAdmin();
+      getSupabaseAdmin();
 
     if (
-      ACTIVE_SUBSCRIPTION_EVENTS.has(
+      ACTIVE_EVENTS.has(
         eventType,
       )
     ) {
@@ -413,37 +466,49 @@ export async function POST(request) {
         subscriptionId,
       });
 
+      console.info(
+        "PAYPAL MEMBERSHIP ACTIVATED:",
+        {
+          userId,
+          plan,
+          subscriptionId,
+          eventType,
+        },
+      );
+
       return NextResponse.json({
-        received: true,
-        processed: true,
-        action:
-          "membership_activated",
-        plan,
-        subscriptionId:
-          subscriptionId || null,
+        ok: true,
+        action: "activated",
       });
     }
 
     const inactiveStatus =
-      INACTIVE_SUBSCRIPTION_EVENTS[
-        eventType
-      ];
+      INACTIVE_EVENTS.get(
+        eventType,
+      );
 
     if (inactiveStatus) {
       await deactivateMembership({
         supabaseAdmin,
         userId,
-        subscriptionStatus:
-          inactiveStatus,
+        subscriptionId,
+        inactiveStatus,
       });
 
+      console.info(
+        "PAYPAL MEMBERSHIP DEACTIVATED:",
+        {
+          userId,
+          subscriptionId,
+          status:
+            inactiveStatus,
+          eventType,
+        },
+      );
+
       return NextResponse.json({
-        received: true,
-        processed: true,
-        action:
-          "membership_deactivated",
-        subscriptionStatus:
-          inactiveStatus,
+        ok: true,
+        action: "deactivated",
       });
     }
 
@@ -451,22 +516,26 @@ export async function POST(request) {
       eventType ===
       "BILLING.SUBSCRIPTION.PAYMENT.FAILED"
     ) {
-      await updateProfileMembership(
+      await deactivateMembership({
         supabaseAdmin,
         userId,
+        subscriptionId,
+        inactiveStatus:
+          "payment_failed",
+      });
+
+      console.info(
+        "PAYPAL MEMBERSHIP PAYMENT FAILED:",
         {
-          subscription_status:
-            "payment_failed",
-          paypal_subscription_id:
-            subscriptionId || null,
+          userId,
+          subscriptionId,
         },
       );
 
       return NextResponse.json({
-        received: true,
-        processed: true,
+        ok: true,
         action:
-          "subscription_payment_failed",
+          "payment_failed",
       });
     }
 
@@ -474,27 +543,32 @@ export async function POST(request) {
       eventType ===
       "BILLING.SUBSCRIPTION.UPDATED"
     ) {
-      await updateProfileMembership(
+      await handleSubscriptionUpdated({
         supabaseAdmin,
         userId,
-        {
-          paypal_subscription_id:
-            subscriptionId || null,
-        },
-      );
+        plan,
+        subscriptionId,
+        resource,
+      });
 
       return NextResponse.json({
-        received: true,
-        processed: true,
-        action:
-          "subscription_updated",
+        ok: true,
+        action: "updated",
       });
     }
 
+    console.info(
+      "PAYPAL WEBHOOK IGNORED:",
+      {
+        eventType,
+        userId,
+        subscriptionId,
+      },
+    );
+
     return NextResponse.json({
-      received: true,
-      processed: false,
-      eventType,
+      ok: true,
+      ignored: true,
     });
   } catch (error) {
     console.error(
@@ -504,10 +578,11 @@ export async function POST(request) {
 
     return NextResponse.json(
       {
+        ok: false,
         error:
           error instanceof Error
             ? error.message
-            : "Unable to process PayPal webhook.",
+            : "Webhook processing failed.",
       },
       {
         status: 500,
