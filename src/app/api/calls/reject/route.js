@@ -1,68 +1,79 @@
 // src/app/api/calls/reject/route.js
 
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-function createSupabaseClients() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+export const runtime = "nodejs";
 
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    throw new Error("Supabase server environment variables are missing.");
+const TERMINAL_STATUSES = new Set([
+  "rejected",
+  "missed",
+  "ended",
+]);
+
+function getRequiredEnvironmentVariable(name) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing environment variable: ${name}`);
   }
 
-  return {
-    authClient: createClient(supabaseUrl, anonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    }),
-    adminClient: createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    }),
-  };
+  return value;
 }
 
-function isTerminalStatus(status) {
-  return ["rejected", "missed", "ended"].includes(status);
+function createSupabaseAdmin() {
+  return createClient(
+    getRequiredEnvironmentVariable("NEXT_PUBLIC_SUPABASE_URL"),
+    getRequiredEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY"),
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    },
+  );
+}
+
+function getBearerToken(request) {
+  const authorization = request.headers.get("authorization");
+
+  if (!authorization?.startsWith("Bearer ")) {
+    return "";
+  }
+
+  return authorization.slice(7).trim();
 }
 
 export async function POST(request) {
   try {
-    const authorization = request.headers.get("authorization");
-
-    if (!authorization?.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Missing authorization token." },
-        { status: 401 }
-      );
-    }
-
-    const token = authorization.slice("Bearer ".length).trim();
+    const token = getBearerToken(request);
 
     if (!token) {
       return NextResponse.json(
-        { error: "Missing authorization token." },
-        { status: 401 }
+        {
+          error: "Missing authorization token.",
+        },
+        {
+          status: 401,
+        },
       );
     }
 
-    const { authClient, adminClient } = createSupabaseClients();
+    const supabaseAdmin = createSupabaseAdmin();
 
     const {
       data: { user },
-      error: userError,
-    } = await authClient.auth.getUser(token);
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(token);
 
-    if (userError || !user) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: "Unauthorized user." },
-        { status: 401 }
+        {
+          error: "Unauthorized user.",
+        },
+        {
+          status: 401,
+        },
       );
     }
 
@@ -72,113 +83,171 @@ export async function POST(request) {
       body = await request.json();
     } catch {
       return NextResponse.json(
-        { error: "Invalid request body." },
-        { status: 400 }
+        {
+          error: "Invalid request body.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
     const callId =
-      typeof body?.callId === "string" ? body.callId.trim() : "";
+      typeof body?.callId === "string"
+        ? body.callId.trim()
+        : "";
 
     if (!callId) {
       return NextResponse.json(
-        { error: "callId is required." },
-        { status: 400 }
+        {
+          error: "callId is required.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
-    const { data: existingCall, error: existingCallError } =
-      await adminClient
-        .from("matchup_calls")
-        .select("*")
-        .eq("id", callId)
-        .maybeSingle();
+    const {
+      data: existingCall,
+      error: existingCallError,
+    } = await supabaseAdmin
+      .from("matchup_calls")
+      .select("*")
+      .eq("id", callId)
+      .maybeSingle();
 
     if (existingCallError) {
+      console.error(
+        "CALL REJECT LOOKUP ERROR:",
+        existingCallError,
+      );
+
       return NextResponse.json(
-        { error: existingCallError.message },
-        { status: 500 }
+        {
+          error: "Unable to load call.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
     if (!existingCall) {
       return NextResponse.json(
-        { error: "Call not found." },
-        { status: 404 }
+        {
+          error: "Call not found.",
+        },
+        {
+          status: 404,
+        },
       );
     }
 
     if (existingCall.receiver_id !== user.id) {
       return NextResponse.json(
         {
-          error: "Only the receiving participant can reject this call.",
+          error:
+            "Only the receiving participant can reject this call.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        },
       );
     }
 
     if (existingCall.status === "rejected") {
       return NextResponse.json({
         success: true,
+        alreadyRejected: true,
         call: existingCall,
       });
     }
 
-    if (isTerminalStatus(existingCall.status)) {
+    if (TERMINAL_STATUSES.has(existingCall.status)) {
       return NextResponse.json(
         {
           error: `This call has already been ${existingCall.status}.`,
         },
-        { status: 409 }
+        {
+          status: 409,
+        },
       );
     }
 
     if (existingCall.status !== "initiated") {
       return NextResponse.json(
-        { error: "This call can no longer be rejected." },
-        { status: 409 }
+        {
+          error: "This call can no longer be rejected.",
+        },
+        {
+          status: 409,
+        },
       );
     }
 
     const endedAt = new Date().toISOString();
 
-    const { data: updatedCall, error: updateError } =
-      await adminClient
-        .from("matchup_calls")
-        .update({
-          status: "rejected",
-          ended_at: endedAt,
-        })
-        .eq("id", callId)
-        .eq("status", "initiated")
-        .select("*")
-        .maybeSingle();
+    const {
+      data: updatedCall,
+      error: updateError,
+    } = await supabaseAdmin
+      .from("matchup_calls")
+      .update({
+        status: "rejected",
+        ended_at: endedAt,
+      })
+      .eq("id", callId)
+      .eq("status", "initiated")
+      .select("*")
+      .maybeSingle();
 
     if (updateError) {
+      console.error(
+        "CALL REJECT UPDATE ERROR:",
+        updateError,
+      );
+
       return NextResponse.json(
-        { error: updateError.message },
-        { status: 500 }
+        {
+          error: "Unable to reject call.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
     if (updatedCall) {
       return NextResponse.json({
         success: true,
+        alreadyRejected: false,
         call: updatedCall,
       });
     }
 
-    const { data: latestCall, error: latestCallError } =
-      await adminClient
-        .from("matchup_calls")
-        .select("*")
-        .eq("id", callId)
-        .maybeSingle();
+    const {
+      data: latestCall,
+      error: latestCallError,
+    } = await supabaseAdmin
+      .from("matchup_calls")
+      .select("*")
+      .eq("id", callId)
+      .maybeSingle();
 
     if (latestCallError) {
+      console.error(
+        "CALL REJECT RELOAD ERROR:",
+        latestCallError,
+      );
+
       return NextResponse.json(
-        { error: latestCallError.message },
-        { status: 500 }
+        {
+          error: "Unable to reload call status.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
@@ -189,25 +258,33 @@ export async function POST(request) {
     ) {
       return NextResponse.json({
         success: true,
+        alreadyRejected: true,
         call: latestCall,
       });
     }
 
     return NextResponse.json(
       {
-        error: "The call changed state before it could be rejected.",
+        error:
+          "The call changed state before it could be rejected.",
       },
-      { status: 409 }
+      {
+        status: 409,
+      },
     );
   } catch (error) {
+    console.error(
+      "CALL REJECT ROUTE ERROR:",
+      error,
+    );
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to reject call.",
+        error: "Unable to reject call.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      },
     );
   }
 }

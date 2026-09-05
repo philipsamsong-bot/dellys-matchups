@@ -1,64 +1,73 @@
 // src/app/api/calls/miss/route.js
 
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-function createSupabaseClients() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+export const runtime = "nodejs";
 
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    throw new Error("Supabase server environment variables are missing.");
+function getRequiredEnvironmentVariable(name) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing environment variable: ${name}`);
   }
 
-  return {
-    authClient: createClient(supabaseUrl, anonKey, {
+  return value;
+}
+
+function createSupabaseAdmin() {
+  return createClient(
+    getRequiredEnvironmentVariable("NEXT_PUBLIC_SUPABASE_URL"),
+    getRequiredEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY"),
+    {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
       },
-    }),
-    adminClient: createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    }),
-  };
+    },
+  );
+}
+
+function getBearerToken(request) {
+  const authorization = request.headers.get("authorization");
+
+  if (!authorization?.startsWith("Bearer ")) {
+    return "";
+  }
+
+  return authorization.slice(7).trim();
 }
 
 export async function POST(request) {
   try {
-    const authorization = request.headers.get("authorization");
-
-    if (!authorization?.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Missing authorization token." },
-        { status: 401 }
-      );
-    }
-
-    const token = authorization.slice("Bearer ".length).trim();
+    const token = getBearerToken(request);
 
     if (!token) {
       return NextResponse.json(
-        { error: "Missing authorization token." },
-        { status: 401 }
+        {
+          error: "Missing authorization token.",
+        },
+        {
+          status: 401,
+        },
       );
     }
 
-    const { authClient, adminClient } = createSupabaseClients();
+    const supabaseAdmin = createSupabaseAdmin();
 
     const {
       data: { user },
-      error: userError,
-    } = await authClient.auth.getUser(token);
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(token);
 
-    if (userError || !user) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: "Unauthorized user." },
-        { status: 401 }
+        {
+          error: "Unauthorized user.",
+        },
+        {
+          status: 401,
+        },
       );
     }
 
@@ -68,56 +77,83 @@ export async function POST(request) {
       body = await request.json();
     } catch {
       return NextResponse.json(
-        { error: "Invalid request body." },
-        { status: 400 }
+        {
+          error: "Invalid request body.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
     const callId =
-      typeof body?.callId === "string" ? body.callId.trim() : "";
+      typeof body?.callId === "string"
+        ? body.callId.trim()
+        : "";
 
     if (!callId) {
       return NextResponse.json(
-        { error: "callId is required." },
-        { status: 400 }
+        {
+          error: "callId is required.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
-    const { data: existingCall, error: existingCallError } =
-      await adminClient
-        .from("matchup_calls")
-        .select("*")
-        .eq("id", callId)
-        .maybeSingle();
+    const {
+      data: existingCall,
+      error: existingCallError,
+    } = await supabaseAdmin
+      .from("matchup_calls")
+      .select("*")
+      .eq("id", callId)
+      .maybeSingle();
 
     if (existingCallError) {
+      console.error(
+        "CALL MISS LOOKUP ERROR:",
+        existingCallError,
+      );
+
       return NextResponse.json(
-        { error: existingCallError.message },
-        { status: 500 }
+        {
+          error: "Unable to load call.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
     if (!existingCall) {
       return NextResponse.json(
-        { error: "Call not found." },
-        { status: 404 }
+        {
+          error: "Call not found.",
+        },
+        {
+          status: 404,
+        },
       );
     }
 
-    const isParticipant =
-      existingCall.caller_id === user.id ||
-      existingCall.receiver_id === user.id;
-
-    if (!isParticipant) {
+    if (existingCall.caller_id !== user.id) {
       return NextResponse.json(
-        { error: "You are not allowed to mark this call as missed." },
-        { status: 403 }
+        {
+          error:
+            "Only the caller can mark this call as missed.",
+        },
+        {
+          status: 403,
+        },
       );
     }
 
     if (existingCall.status === "missed") {
       return NextResponse.json({
         success: true,
+        alreadyMissed: true,
         call: existingCall,
       });
     }
@@ -125,83 +161,114 @@ export async function POST(request) {
     if (existingCall.status !== "initiated") {
       return NextResponse.json(
         {
-          error: `This call is already ${existingCall.status} and cannot be marked as missed.`,
+          error:
+            `This call is already ${existingCall.status} and cannot be marked as missed.`,
         },
-        { status: 409 }
+        {
+          status: 409,
+        },
       );
     }
 
     const endedAt = new Date().toISOString();
 
-    const { data: updatedCall, error: updateError } =
-      await adminClient
-        .from("matchup_calls")
-        .update({
-          status: "missed",
-          ended_at: endedAt,
-        })
-        .eq("id", callId)
-        .eq("status", "initiated")
-        .select("*")
-        .maybeSingle();
+    const {
+      data: updatedCall,
+      error: updateError,
+    } = await supabaseAdmin
+      .from("matchup_calls")
+      .update({
+        status: "missed",
+        ended_at: endedAt,
+      })
+      .eq("id", callId)
+      .eq("status", "initiated")
+      .select("*")
+      .maybeSingle();
 
     if (updateError) {
+      console.error(
+        "CALL MISS UPDATE ERROR:",
+        updateError,
+      );
+
       return NextResponse.json(
-        { error: updateError.message },
-        { status: 500 }
+        {
+          error: "Unable to mark call as missed.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
     if (updatedCall) {
       return NextResponse.json({
         success: true,
+        alreadyMissed: false,
         call: updatedCall,
       });
     }
 
-    const { data: latestCall, error: latestCallError } =
-      await adminClient
-        .from("matchup_calls")
-        .select("*")
-        .eq("id", callId)
-        .maybeSingle();
+    const {
+      data: latestCall,
+      error: latestCallError,
+    } = await supabaseAdmin
+      .from("matchup_calls")
+      .select("*")
+      .eq("id", callId)
+      .maybeSingle();
 
     if (latestCallError) {
+      console.error(
+        "CALL MISS RELOAD ERROR:",
+        latestCallError,
+      );
+
       return NextResponse.json(
-        { error: latestCallError.message },
-        { status: 500 }
+        {
+          error: "Unable to reload call status.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
     if (
       latestCall &&
-      latestCall.status === "missed" &&
-      (
-        latestCall.caller_id === user.id ||
-        latestCall.receiver_id === user.id
-      )
+      latestCall.caller_id === user.id &&
+      latestCall.status === "missed"
     ) {
       return NextResponse.json({
         success: true,
+        alreadyMissed: true,
         call: latestCall,
       });
     }
 
     return NextResponse.json(
       {
-        error: "The call changed state before it could be marked as missed.",
+        error:
+          "The call changed state before it could be marked as missed.",
       },
-      { status: 409 }
+      {
+        status: 409,
+      },
     );
   } catch (error) {
+    console.error(
+      "CALL MISS ROUTE ERROR:",
+      error,
+    );
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to mark call as missed.",
+        error: "Unable to mark call as missed.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      },
     );
   }
 }

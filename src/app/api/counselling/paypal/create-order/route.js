@@ -1,5 +1,4 @@
 // src/app/api/counselling/paypal/create-order/route.js
-// ============================================================
 
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -23,6 +22,12 @@ const SUPABASE_URL =
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const APP_PAYPAL_RETURN_URL =
+  "dellysmatchups://paypal/counselling-return";
+
+const APP_PAYPAL_CANCEL_URL =
+  "dellysmatchups://paypal/counselling-cancel";
+
 const COUNSELLING_SESSIONS = {
   individual: {
     title: "Individual Session",
@@ -33,11 +38,13 @@ const COUNSELLING_SESSIONS = {
     price: 250,
   },
   international_individual: {
-    title: "International Individual Session",
+    title:
+      "International Individual Session",
     price: 100,
   },
   international_couple: {
-    title: "International Couple Session",
+    title:
+      "International Couple Session",
     price: 250,
   },
 };
@@ -45,17 +52,14 @@ const COUNSELLING_SESSIONS = {
 const BOOKING_SERVICE_ALIASES = {
   individual: "individual",
   "individual session": "individual",
-
   couple: "couple",
   "couple session": "couple",
-
   international_individual:
     "international_individual",
   "international individual":
     "international_individual",
   "international individual session":
     "international_individual",
-
   international_couple:
     "international_couple",
   "international couple":
@@ -129,12 +133,23 @@ function resolveBookingSessionType(service) {
 
   return (
     BOOKING_SERVICE_ALIASES[
-      normalizeService(rawService)
+      normalizeService(
+        rawService,
+      )
     ] || null
   );
 }
 
-async function parseJsonResponse(response) {
+function isAppChannel(value) {
+  return (
+    getString(value).toLowerCase() ===
+    "app"
+  );
+}
+
+async function parseJsonResponse(
+  response,
+) {
   const text =
     await response.text();
 
@@ -150,6 +165,33 @@ async function parseJsonResponse(response) {
         "PayPal returned an invalid response.",
     };
   }
+}
+
+function getApprovalUrl(paypalData) {
+  if (
+    !Array.isArray(
+      paypalData?.links,
+    )
+  ) {
+    return "";
+  }
+
+  const approvalLink =
+    paypalData.links.find(
+      (link) =>
+        link &&
+        typeof link.href ===
+          "string" &&
+        (
+          link.rel === "approve" ||
+          link.rel === "payer-action"
+        ),
+    );
+
+  return (
+    approvalLink?.href?.trim() ||
+    ""
+  );
 }
 
 function createSupabaseAdmin() {
@@ -233,6 +275,60 @@ async function getPayPalAccessToken() {
   return data.access_token;
 }
 
+function buildPayPalOrderPayload({
+  checkoutReference,
+  bookingId,
+  sessionType,
+  session,
+  customerEmail,
+  appChannel,
+}) {
+  const payload = {
+    intent: "CAPTURE",
+    purchase_units: [
+      {
+        reference_id:
+          checkoutReference,
+        description:
+          `DMs Counselling - ${session.title}`,
+        custom_id:
+          JSON.stringify({
+            purpose:
+              "counselling",
+            bookingId,
+            sessionType,
+            checkoutReference,
+            customerEmail,
+            channel:
+              appChannel
+                ? "app"
+                : "web",
+          }),
+        amount: {
+          currency_code: "USD",
+          value:
+            session.price.toFixed(
+              2,
+            ),
+        },
+      },
+    ],
+  };
+
+  if (appChannel) {
+    payload.application_context = {
+      return_url:
+        APP_PAYPAL_RETURN_URL,
+      cancel_url:
+        APP_PAYPAL_CANCEL_URL,
+      user_action:
+        "PAY_NOW",
+    };
+  }
+
+  return payload;
+}
+
 export async function POST(request) {
   try {
     const body =
@@ -246,6 +342,11 @@ export async function POST(request) {
     const requestedSessionType =
       getString(
         body.sessionType,
+      );
+
+    const appChannel =
+      isAppChannel(
+        body.channel,
       );
 
     if (!bookingId) {
@@ -287,7 +388,14 @@ export async function POST(request) {
         "counselling_bookings",
       )
       .select(
-        "id,full_name,email,service,preferred_date,payment_status",
+        [
+          "id",
+          "full_name",
+          "email",
+          "service",
+          "preferred_date",
+          "payment_status",
+        ].join(","),
       )
       .eq(
         "id",
@@ -444,14 +552,14 @@ export async function POST(request) {
     const accessToken =
       await getPayPalAccessToken();
 
-    const customMetadata =
-      JSON.stringify({
-        purpose:
-          "counselling",
+    const paypalPayload =
+      buildPayPalOrderPayload({
+        checkoutReference,
         bookingId,
         sessionType,
-        checkoutReference,
+        session,
         customerEmail,
+        appChannel,
       });
 
     const paypalResponse =
@@ -469,28 +577,10 @@ export async function POST(request) {
             "PayPal-Request-Id":
               `counselling-${checkoutReference}`,
           },
-          body: JSON.stringify({
-            intent:
-              "CAPTURE",
-            purchase_units: [
-              {
-                reference_id:
-                  checkoutReference,
-                description:
-                  `DMs Counselling - ${session.title}`,
-                custom_id:
-                  customMetadata,
-                amount: {
-                  currency_code:
-                    "USD",
-                  value:
-                    session.price.toFixed(
-                      2,
-                    ),
-                },
-              },
-            ],
-          }),
+          body:
+            JSON.stringify(
+              paypalPayload,
+            ),
           cache: "no-store",
         },
       );
@@ -545,6 +635,31 @@ export async function POST(request) {
     const orderId =
       paypalData.id.trim();
 
+    const approvalUrl =
+      getApprovalUrl(
+        paypalData,
+      );
+
+    if (
+      appChannel &&
+      !approvalUrl
+    ) {
+      console.error(
+        "COUNSELLING PAYPAL ORDER MISSING APPROVAL URL:",
+        paypalData,
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "PayPal did not return an approval URL.",
+        },
+        {
+          status: 502,
+        },
+      );
+    }
+
     const {
       data: payment,
       error: paymentError,
@@ -575,6 +690,11 @@ export async function POST(request) {
           `Booking ID: ${bookingId}`,
           `Session Type: ${sessionType}`,
           `Checkout Reference: ${checkoutReference}`,
+          `Channel: ${
+            appChannel
+              ? "app"
+              : "web"
+          }`,
         ].join("\n"),
       })
       .select("id")
@@ -617,6 +737,12 @@ export async function POST(request) {
           payment.id,
         bookingId,
         sessionType,
+        approvalUrl:
+          approvalUrl || undefined,
+        channel:
+          appChannel
+            ? "app"
+            : "web",
       },
       {
         status: 201,

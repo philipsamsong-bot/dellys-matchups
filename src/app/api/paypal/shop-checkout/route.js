@@ -32,7 +32,21 @@ const APP_RETURN_URL =
 const APP_CANCEL_URL =
   "dellysmatchups://paypal/shop-cancel";
 
-function getRequiredEnvironmentVariable(value, name) {
+const FIELD_LIMITS = {
+  customerName: 200,
+  customerEmail: 320,
+  customerPhone: 100,
+  address: 500,
+  city: 150,
+  country: 150,
+  postalCode: 50,
+  note: 1000,
+};
+
+function getRequiredEnvironmentVariable(
+  value,
+  name,
+) {
   if (!value) {
     throw new Error(
       `Missing environment variable: ${name}`,
@@ -58,6 +72,13 @@ function isValidEmail(value) {
   );
 }
 
+function exceedsLimit(
+  value,
+  limit,
+) {
+  return value.length > limit;
+}
+
 function createSupabaseAdmin() {
   return createClient(
     getRequiredEnvironmentVariable(
@@ -77,8 +98,11 @@ function createSupabaseAdmin() {
   );
 }
 
-async function parsePayPalResponse(response) {
-  const text = await response.text();
+async function parsePayPalResponse(
+  response,
+) {
+  const text =
+    await response.text();
 
   if (!text) {
     return {};
@@ -107,27 +131,32 @@ async function getPayPalAccessToken() {
       "PAYPAL_CLIENT_SECRET",
     );
 
-  const authorization = Buffer.from(
-    `${clientId}:${clientSecret}`,
-  ).toString("base64");
+  const authorization =
+    Buffer.from(
+      `${clientId}:${clientSecret}`,
+    ).toString("base64");
 
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v1/oauth2/token`,
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          `Basic ${authorization}`,
-        "Content-Type":
-          "application/x-www-form-urlencoded",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v1/oauth2/token`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Basic ${authorization}`,
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+        body:
+          "grant_type=client_credentials",
+        cache: "no-store",
       },
-      body: "grant_type=client_credentials",
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parsePayPalResponse(response);
+    await parsePayPalResponse(
+      response,
+    );
 
   if (!response.ok) {
     console.error(
@@ -157,7 +186,9 @@ function createOrderNumber() {
     .toUpperCase()}`;
 }
 
-function buildOrderItems(calculatedCart) {
+function buildOrderItems(
+  calculatedCart,
+) {
   return calculatedCart.items.map(
     (item) => ({
       id: item.id,
@@ -173,19 +204,32 @@ function buildOrderItems(calculatedCart) {
   );
 }
 
-function findPayPalApprovalUrl(paypalData) {
+function findPayPalApprovalUrl(
+  paypalData,
+) {
   const links =
-    Array.isArray(paypalData?.links)
+    Array.isArray(
+      paypalData?.links,
+    )
       ? paypalData.links
       : [];
 
-  const approvalLink = links.find(
-    (link) =>
-      link?.rel === "approve" &&
-      typeof link?.href === "string",
-  );
+  const approvalLink =
+    links.find(
+      (link) =>
+        (
+          link?.rel === "approve" ||
+          link?.rel === "payer-action"
+        ) &&
+        typeof link?.href ===
+          "string" &&
+        link.href.trim(),
+    );
 
-  return approvalLink?.href?.trim() || "";
+  return (
+    approvalLink?.href?.trim() ||
+    ""
+  );
 }
 
 function createPayPalOrderPayload({
@@ -203,8 +247,10 @@ function createPayPalOrderPayload({
       {
         reference_id:
           checkoutReference,
+
         description:
           `Delly's Matchups Shop - ${orderNumber}`,
+
         custom_id:
           JSON.stringify({
             purpose: "shop",
@@ -213,25 +259,31 @@ function createPayPalOrderPayload({
             checkoutReference,
             customerEmail,
           }),
+
         amount: {
           currency_code:
             SHOP_CURRENCY,
+
           value:
             calculatedCart.total.toFixed(
               2,
             ),
+
           breakdown: {
             item_total: {
               currency_code:
                 SHOP_CURRENCY,
+
               value:
                 calculatedCart.subtotal.toFixed(
                   2,
                 ),
             },
+
             shipping: {
               currency_code:
                 SHOP_CURRENCY,
+
               value:
                 calculatedCart.shipping.toFixed(
                   2,
@@ -239,29 +291,37 @@ function createPayPalOrderPayload({
             },
           },
         },
-        items: trustedItems.map(
-          (item) => ({
-            name:
-              item.title.slice(
-                0,
-                127,
-              ),
-            quantity:
-              String(
-                item.quantity,
-              ),
-            unit_amount: {
-              currency_code:
-                SHOP_CURRENCY,
-              value:
-                Number(
-                  item.price,
-                ).toFixed(2),
-            },
-            category:
-              "PHYSICAL_GOODS",
-          }),
-        ),
+
+        items:
+          trustedItems.map(
+            (item) => ({
+              name:
+                item.title.slice(
+                  0,
+                  127,
+                ),
+
+              quantity:
+                String(
+                  item.quantity,
+                ),
+
+              unit_amount: {
+                currency_code:
+                  SHOP_CURRENCY,
+
+                value:
+                  Number(
+                    item.price,
+                  ).toFixed(
+                    2,
+                  ),
+              },
+
+              category:
+                "PHYSICAL_GOODS",
+            }),
+          ),
       },
     ],
   };
@@ -284,17 +344,169 @@ function createPayPalOrderPayload({
   return payload;
 }
 
-export async function POST(request) {
+async function deleteShopOrder(
+  supabaseAdmin,
+  shopOrderId,
+) {
+  if (
+    !supabaseAdmin ||
+    !shopOrderId
+  ) {
+    return;
+  }
+
+  const { error } =
+    await supabaseAdmin
+      .from("shop_orders")
+      .delete()
+      .eq(
+        "id",
+        shopOrderId,
+      );
+
+  if (error) {
+    console.error(
+      "SHOP ORDER CLEANUP ERROR:",
+      error,
+    );
+  }
+}
+
+function validateCustomerFields({
+  customerName,
+  customerEmail,
+  customerPhone,
+  address,
+  city,
+  country,
+  postalCode,
+  customerNote,
+}) {
+  if (!customerName) {
+    return "Customer name is required.";
+  }
+
+  if (
+    exceedsLimit(
+      customerName,
+      FIELD_LIMITS.customerName,
+    )
+  ) {
+    return "Customer name is too long.";
+  }
+
+  if (
+    !isValidEmail(
+      customerEmail,
+    )
+  ) {
+    return "A valid customer email is required.";
+  }
+
+  if (
+    exceedsLimit(
+      customerEmail,
+      FIELD_LIMITS.customerEmail,
+    )
+  ) {
+    return "Customer email is too long.";
+  }
+
+  if (!customerPhone) {
+    return "Customer phone number is required.";
+  }
+
+  if (
+    exceedsLimit(
+      customerPhone,
+      FIELD_LIMITS.customerPhone,
+    )
+  ) {
+    return "Customer phone number is too long.";
+  }
+
+  if (!country) {
+    return "Shipping country is required.";
+  }
+
+  if (
+    exceedsLimit(
+      country,
+      FIELD_LIMITS.country,
+    )
+  ) {
+    return "Shipping country is too long.";
+  }
+
+  if (!address) {
+    return "Shipping address is required.";
+  }
+
+  if (
+    exceedsLimit(
+      address,
+      FIELD_LIMITS.address,
+    )
+  ) {
+    return "Shipping address is too long.";
+  }
+
+  if (!city) {
+    return "Shipping city is required.";
+  }
+
+  if (
+    exceedsLimit(
+      city,
+      FIELD_LIMITS.city,
+    )
+  ) {
+    return "Shipping city is too long.";
+  }
+
+  if (!postalCode) {
+    return "Postal / ZIP code is required.";
+  }
+
+  if (
+    exceedsLimit(
+      postalCode,
+      FIELD_LIMITS.postalCode,
+    )
+  ) {
+    return "Postal / ZIP code is too long.";
+  }
+
+  if (
+    exceedsLimit(
+      customerNote,
+      FIELD_LIMITS.note,
+    )
+  ) {
+    return "Order note is too long.";
+  }
+
+  return null;
+}
+
+export async function POST(
+  request,
+) {
+  let supabaseAdmin = null;
   let createdShopOrderId = null;
+  let paypalOrderCreated = false;
 
   try {
     const body =
       await request.json();
 
-    const cart = body.cart;
+    const cart =
+      body.cart;
 
     const channel =
-      getString(body.channel);
+      getString(
+        body.channel,
+      );
 
     const isNativeApp =
       channel === "app";
@@ -315,13 +527,19 @@ export async function POST(request) {
       );
 
     const address =
-      getString(body.address);
+      getString(
+        body.address,
+      );
 
     const city =
-      getString(body.city);
+      getString(
+        body.city,
+      );
 
     const country =
-      getString(body.country);
+      getString(
+        body.country,
+      );
 
     const postalCode =
       getString(
@@ -329,104 +547,29 @@ export async function POST(request) {
       );
 
     const customerNote =
-      getString(body.note);
-
-    if (!customerName) {
-      return NextResponse.json(
-        {
-          error:
-            "Customer name is required.",
-        },
-        {
-          status: 400,
-        },
+      getString(
+        body.note,
       );
-    }
 
-    if (
-      !isValidEmail(
+    const customerValidationError =
+      validateCustomerFields({
+        customerName,
         customerEmail,
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "A valid customer email is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (!customerPhone) {
-      return NextResponse.json(
-        {
-          error:
-            "Customer phone number is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (!country) {
-      return NextResponse.json(
-        {
-          error:
-            "Shipping country is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (!address) {
-      return NextResponse.json(
-        {
-          error:
-            "Shipping address is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (!city) {
-      return NextResponse.json(
-        {
-          error:
-            "Shipping city is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (!postalCode) {
-      return NextResponse.json(
-        {
-          error:
-            "Postal / ZIP code is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
+        customerPhone,
+        address,
+        city,
+        country,
+        postalCode,
+        customerNote,
+      });
 
     if (
-      customerNote.length >
-      1000
+      customerValidationError
     ) {
       return NextResponse.json(
         {
           error:
-            "Order note is too long.",
+            customerValidationError,
         },
         {
           status: 400,
@@ -456,7 +599,8 @@ export async function POST(request) {
     }
 
     if (
-      calculatedCart.total <= 0 ||
+      calculatedCart.total <=
+        0 ||
       calculatedCart.currency !==
         SHOP_CURRENCY
     ) {
@@ -479,19 +623,19 @@ export async function POST(request) {
         calculatedCart,
       );
 
-    const supabaseAdmin =
+    supabaseAdmin =
       createSupabaseAdmin();
 
     const orderNote = [
-      postalCode
-        ? `Postal / ZIP Code: ${postalCode}`
-        : "",
+      `Postal / ZIP Code: ${postalCode}`,
+
       customerNote
         ? `Customer Note: ${customerNote}`
         : "",
+
       isNativeApp
         ? "Checkout Channel: Native App"
-        : "",
+        : "Checkout Channel: Website",
     ]
       .filter(Boolean)
       .join("\n");
@@ -499,43 +643,61 @@ export async function POST(request) {
     const {
       data: shopOrder,
       error: shopOrderError,
-    } = await supabaseAdmin
-      .from("shop_orders")
-      .insert({
-        order_number:
-          orderNumber,
-        shipping_amount:
-          calculatedCart.shipping,
-        status:
-          "pending",
-        customer_name:
-          customerName,
-        customer_email:
-          customerEmail,
-        customer_phone:
-          customerPhone,
-        address,
-        city,
-        country,
-        note:
-          orderNote || null,
-        items:
-          trustedItems,
-        total_amount:
-          calculatedCart.total,
-        payment_method:
-          "PayPal / Card",
-        payment_status:
-          "pending",
-        paypal_order_id:
-          null,
-      })
-      .select(
-        "id,order_number",
-      )
-      .single();
+    } =
+      await supabaseAdmin
+        .from("shop_orders")
+        .insert({
+          order_number:
+            orderNumber,
 
-    if (shopOrderError) {
+          shipping_amount:
+            calculatedCart.shipping,
+
+          status:
+            "pending",
+
+          customer_name:
+            customerName,
+
+          customer_email:
+            customerEmail,
+
+          customer_phone:
+            customerPhone,
+
+          address,
+
+          city,
+
+          country,
+
+          note:
+            orderNote ||
+            null,
+
+          items:
+            trustedItems,
+
+          total_amount:
+            calculatedCart.total,
+
+          payment_method:
+            "PayPal / Card",
+
+          payment_status:
+            "pending",
+
+          paypal_order_id:
+            null,
+        })
+        .select(
+          "id,order_number",
+        )
+        .single();
+
+    if (
+      shopOrderError
+    ) {
       console.error(
         "SHOP ORDER INSERT ERROR:",
         shopOrderError,
@@ -552,7 +714,9 @@ export async function POST(request) {
       );
     }
 
-    if (!shopOrder?.id) {
+    if (
+      !shopOrder?.id
+    ) {
       return NextResponse.json(
         {
           error:
@@ -590,20 +754,26 @@ export async function POST(request) {
         `${PAYPAL_API_BASE}/v2/checkout/orders`,
         {
           method: "POST",
+
           headers: {
             Authorization:
               `Bearer ${accessToken}`,
+
             "Content-Type":
               "application/json",
+
             Prefer:
               "return=representation",
+
             "PayPal-Request-Id":
               `shop-${checkoutReference}`,
           },
+
           body:
             JSON.stringify(
               paypalPayload,
             ),
+
           cache: "no-store",
         },
       );
@@ -613,19 +783,18 @@ export async function POST(request) {
         paypalResponse,
       );
 
-    if (!paypalResponse.ok) {
+    if (
+      !paypalResponse.ok
+    ) {
       console.error(
         "SHOP PAYPAL CREATE ERROR:",
         paypalData,
       );
 
-      await supabaseAdmin
-        .from("shop_orders")
-        .delete()
-        .eq(
-          "id",
-          shopOrder.id,
-        );
+      await deleteShopOrder(
+        supabaseAdmin,
+        shopOrder.id,
+      );
 
       createdShopOrderId =
         null;
@@ -653,13 +822,10 @@ export async function POST(request) {
         paypalData,
       );
 
-      await supabaseAdmin
-        .from("shop_orders")
-        .delete()
-        .eq(
-          "id",
-          shopOrder.id,
-        );
+      await deleteShopOrder(
+        supabaseAdmin,
+        shopOrder.id,
+      );
 
       createdShopOrderId =
         null;
@@ -678,6 +844,9 @@ export async function POST(request) {
     const paypalOrderId =
       paypalData.id.trim();
 
+    paypalOrderCreated =
+      true;
+
     const approvalUrl =
       findPayPalApprovalUrl(
         paypalData,
@@ -691,6 +860,14 @@ export async function POST(request) {
         "SHOP PAYPAL APPROVAL URL MISSING:",
         paypalData,
       );
+
+      await deleteShopOrder(
+        supabaseAdmin,
+        shopOrder.id,
+      );
+
+      createdShopOrderId =
+        null;
 
       return NextResponse.json(
         {
@@ -706,16 +883,17 @@ export async function POST(request) {
     const {
       error:
         shopOrderUpdateError,
-    } = await supabaseAdmin
-      .from("shop_orders")
-      .update({
-        paypal_order_id:
-          paypalOrderId,
-      })
-      .eq(
-        "id",
-        shopOrder.id,
-      );
+    } =
+      await supabaseAdmin
+        .from("shop_orders")
+        .update({
+          paypal_order_id:
+            paypalOrderId,
+        })
+        .eq(
+          "id",
+          shopOrder.id,
+        );
 
     if (
       shopOrderUpdateError
@@ -739,50 +917,64 @@ export async function POST(request) {
     const {
       data: payment,
       error: paymentError,
-    } = await supabaseAdmin
-      .from("payments")
-      .insert({
-        customer_name:
-          customerName,
-        customer_email:
-          customerEmail,
-        purpose:
-          "shop",
-        item_name:
-          `${calculatedCart.itemCount} Shop Item${
-            calculatedCart.itemCount ===
-            1
-              ? ""
-              : "s"
-          }`,
-        amount:
-          calculatedCart.total,
-        currency:
-          SHOP_CURRENCY,
-        payment_method:
-          "PayPal / Card",
-        status:
-          "pending",
-        provider_reference:
-          paypalOrderId,
-        proof_url:
-          null,
-        notes: [
-          `Shop Order ID: ${shopOrder.id}`,
-          `Order Number: ${orderNumber}`,
-          `Checkout Reference: ${checkoutReference}`,
-          `Item Count: ${calculatedCart.itemCount}`,
-          isNativeApp
-            ? "Checkout Channel: Native App"
-            : "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      })
-      .select("id")
-      .single();
+    } =
+      await supabaseAdmin
+        .from("payments")
+        .insert({
+          customer_name:
+            customerName,
 
-    if (paymentError) {
+          customer_email:
+            customerEmail,
+
+          purpose:
+            "shop",
+
+          item_name:
+            `${calculatedCart.itemCount} Shop Item${
+              calculatedCart.itemCount ===
+              1
+                ? ""
+                : "s"
+            }`,
+
+          amount:
+            calculatedCart.total,
+
+          currency:
+            SHOP_CURRENCY,
+
+          payment_method:
+            "PayPal / Card",
+
+          status:
+            "pending",
+
+          provider_reference:
+            paypalOrderId,
+
+          proof_url:
+            null,
+
+          notes: [
+            `Shop Order ID: ${shopOrder.id}`,
+            `Order Number: ${orderNumber}`,
+            `Checkout Reference: ${checkoutReference}`,
+            `Item Count: ${calculatedCart.itemCount}`,
+
+            isNativeApp
+              ? "Checkout Channel: Native App"
+              : "Checkout Channel: Website",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        })
+        .select("id")
+        .single();
+
+    if (
+      paymentError
+    ) {
       console.error(
         "SHOP PAYMENT INSERT ERROR:",
         paymentError,
@@ -799,7 +991,9 @@ export async function POST(request) {
       );
     }
 
-    if (!payment?.id) {
+    if (
+      !payment?.id
+    ) {
       return NextResponse.json(
         {
           error:
@@ -814,18 +1008,26 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: true,
+
         orderId:
           paypalOrderId,
+
         paypalOrderId,
+
         shopOrderId:
           shopOrder.id,
+
         orderNumber,
+
         paymentId:
           payment.id,
+
         amount:
           calculatedCart.total,
+
         currency:
           SHOP_CURRENCY,
+
         approvalUrl:
           approvalUrl || null,
       },
@@ -839,12 +1041,27 @@ export async function POST(request) {
       error,
     );
 
+    if (
+      supabaseAdmin &&
+      createdShopOrderId &&
+      !paypalOrderCreated
+    ) {
+      await deleteShopOrder(
+        supabaseAdmin,
+        createdShopOrderId,
+      );
+
+      createdShopOrderId =
+        null;
+    }
+
     return NextResponse.json(
       {
         error:
           error instanceof Error
             ? error.message
             : "Unable to create Shop PayPal order.",
+
         shopOrderId:
           createdShopOrderId,
       },

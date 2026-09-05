@@ -1,23 +1,41 @@
+// src/app/chat/[userId]/page.js
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import DashboardChrome from "@/app/components/DashboardChrome";
 
 const emojis = ["😊", "❤️", "😂", "🙏", "🔥", "😍"];
 
-function getPlan(profile) {
-  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
+function getMembership(profile) {
+  return (
+    profile?.membership_status ||
+    profile?.membership_plan ||
+    profile?.plan ||
+    profile?.subscription ||
+    "free"
+  );
 }
 
-function hasPremiumAccess(profile) {
-  const plan = getPlan(profile);
-  return plan === "premium" || plan === "vip";
+function canSendMessages(profile) {
+  const membership = getMembership(profile);
+  return membership === "premium" || membership === "vip";
+}
+
+function canStartAudioCall(profile) {
+  const membership = getMembership(profile);
+  return membership === "premium" || membership === "vip";
+}
+
+function canStartVideoCall(profile) {
+  const membership = getMembership(profile);
+  return membership === "vip";
 }
 
 export default function ChatPage() {
   const { userId } = useParams();
+  const router = useRouter();
 
   const [currentUser, setCurrentUser] = useState(null);
   const [currentProfile, setCurrentProfile] = useState(null);
@@ -27,11 +45,22 @@ export default function ChatPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [startingCallType, setStartingCallType] = useState(null);
 
   const bottomRef = useRef(null);
 
-  const hasAccess = useMemo(
-    () => hasPremiumAccess(currentProfile),
+  const hasMessagingAccess = useMemo(
+    () => canSendMessages(currentProfile),
+    [currentProfile]
+  );
+
+  const hasAudioAccess = useMemo(
+    () => canStartAudioCall(currentProfile),
+    [currentProfile]
+  );
+
+  const hasVideoAccess = useMemo(
+    () => canStartVideoCall(currentProfile),
     [currentProfile]
   );
 
@@ -54,7 +83,7 @@ export default function ChatPage() {
         .eq("id", user.id)
         .single();
 
-      if (!hasPremiumAccess(myProfile)) {
+      if (!canSendMessages(myProfile)) {
         window.location.href = "/matchups/checkout";
         return;
       }
@@ -189,6 +218,57 @@ export default function ChatPage() {
     });
   }
 
+  async function startCall(callType) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    if (callType === "audio" && !hasAudioAccess) {
+      window.location.href = "/matchups/checkout?plan=premium";
+      return;
+    }
+
+    if (callType === "video" && !hasVideoAccess) {
+      window.location.href = "/matchups/checkout?plan=vip";
+      return;
+    }
+
+    setStartingCallType(callType);
+
+    const response = await fetch("/api/calls/start", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        receiverId: userId,
+        callType,
+      }),
+    });
+
+    const payload = await response.json();
+    setStartingCallType(null);
+
+    if (!response.ok) {
+      const parts = [payload.error || `Unable to start ${callType} call.`];
+
+      if (payload.details) parts.push(payload.details);
+      if (payload.hint) parts.push(`Hint: ${payload.hint}`);
+      if (payload.code) parts.push(`Code: ${payload.code}`);
+
+      alert(parts.join("\n\n"));
+      return;
+    }
+
+    router.push(`/calls/${payload.call.id}`);
+  }
+
   function formatTime(date) {
     return new Date(date).toLocaleTimeString([], {
       hour: "2-digit",
@@ -210,7 +290,6 @@ export default function ChatPage() {
   return (
     <>
       <DashboardChrome />
-
       <main className="min-h-screen bg-[#b30018] pt-28 text-white">
         <div className="grid min-h-[calc(100vh-7rem)] grid-cols-1 lg:grid-cols-[300px_1fr] xl:grid-cols-[300px_1fr_320px]">
           <aside className="hidden border-r border-white/10 bg-[#7a0010]/60 lg:block">
@@ -245,7 +324,6 @@ export default function ChatPage() {
                         alt={profile.full_name || "Member"}
                         className="h-14 w-14 rounded-full object-cover object-top"
                       />
-
                       <div className="min-w-0 flex-1">
                         <h3 className="truncate font-bold">
                           {profile.full_name || "Member"}
@@ -266,7 +344,7 @@ export default function ChatPage() {
           </aside>
 
           <section className="flex min-h-[calc(100vh-7rem)] flex-col">
-            <div className="flex items-center justify-between border-b border-white/10 bg-[#7a0010]/50 px-5 py-4 backdrop-blur-xl">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-[#7a0010]/50 px-5 py-4 backdrop-blur-xl">
               <a
                 href={`/profile/${receiverProfile?.id}`}
                 className="flex items-center gap-4"
@@ -276,7 +354,6 @@ export default function ChatPage() {
                   alt={receiverProfile?.full_name || "Member"}
                   className="h-14 w-14 rounded-full object-cover object-top"
                 />
-
                 <div>
                   <h1 className="font-serif text-2xl font-black">
                     {receiverProfile?.full_name || "Member"}
@@ -287,12 +364,41 @@ export default function ChatPage() {
                 </div>
               </a>
 
-              <a
-                href="/browse"
-                className="rounded-full bg-white px-5 py-3 font-black text-[#b30018] transition hover:scale-105"
-              >
-                Browse
-              </a>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => startCall("audio")}
+                  disabled={startingCallType !== null}
+                  className="rounded-full border border-white/20 px-5 py-3 font-black text-white transition hover:bg-white hover:text-[#b30018] disabled:opacity-60"
+                >
+                  {startingCallType === "audio" ? "Starting Audio..." : "Audio Call"}
+                </button>
+
+                {hasVideoAccess ? (
+                  <button
+                    type="button"
+                    onClick={() => startCall("video")}
+                    disabled={startingCallType !== null}
+                    className="rounded-full bg-white px-5 py-3 font-black text-[#b30018] transition hover:scale-105 disabled:opacity-60"
+                  >
+                    {startingCallType === "video" ? "Starting Video..." : "Video Call"}
+                  </button>
+                ) : (
+                  <a
+                    href="/matchups/checkout?plan=vip"
+                    className="rounded-full bg-white/10 px-5 py-3 font-black text-white transition hover:bg-white hover:text-[#b30018]"
+                  >
+                    Unlock VIP Video
+                  </a>
+                )}
+
+                <a
+                  href="/browse"
+                  className="rounded-full bg-white px-5 py-3 font-black text-[#b30018] transition hover:scale-105"
+                >
+                  Browse
+                </a>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-6">
@@ -336,13 +442,12 @@ export default function ChatPage() {
                       </div>
                     );
                   })}
-
                   <div ref={bottomRef} />
                 </div>
               )}
             </div>
 
-            {hasAccess && (
+            {hasMessagingAccess && (
               <form
                 onSubmit={sendMessage}
                 className="border-t border-white/10 bg-[#7a0010]/50 p-4 backdrop-blur-xl"
@@ -367,7 +472,6 @@ export default function ChatPage() {
                     placeholder="Write a thoughtful message..."
                     className="flex-1 rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
                   />
-
                   <button
                     type="submit"
                     disabled={sending}
@@ -390,26 +494,49 @@ export default function ChatPage() {
                 alt={receiverProfile?.full_name || "Member"}
                 className="h-72 w-full rounded-[1.5rem] object-cover object-top"
               />
-
               <h2 className="mt-5 font-serif text-3xl font-black">
                 {receiverProfile?.full_name || "Member"}
               </h2>
-
               <p className="mt-1 text-white/70">
                 {receiverProfile?.age || "Age not added"} •{" "}
                 {receiverProfile?.city || "City not added"}
               </p>
-
               <p className="mt-4 text-sm leading-7 text-white/75">
                 {receiverProfile?.bio || "No bio added yet."}
               </p>
-
               <p className="mt-4 text-sm text-red-100">
                 {receiverProfile?.interests || "No interests added."}
               </p>
             </a>
 
             <div className="mt-6 grid gap-3">
+              <button
+                type="button"
+                onClick={() => startCall("audio")}
+                disabled={startingCallType !== null}
+                className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018] disabled:opacity-60"
+              >
+                {startingCallType === "audio" ? "Starting Audio..." : "Audio Call"}
+              </button>
+
+              {hasVideoAccess ? (
+                <button
+                  type="button"
+                  onClick={() => startCall("video")}
+                  disabled={startingCallType !== null}
+                  className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018] disabled:opacity-60"
+                >
+                  {startingCallType === "video" ? "Starting Video..." : "Video Call"}
+                </button>
+              ) : (
+                <a
+                  href="/matchups/checkout?plan=vip"
+                  className="rounded-2xl border border-white/15 py-3 text-center font-bold text-white/80 transition hover:bg-white hover:text-[#b30018]"
+                >
+                  Upgrade To VIP
+                </a>
+              )}
+
               <button
                 type="button"
                 onClick={() => alert("Report feature coming soon.")}

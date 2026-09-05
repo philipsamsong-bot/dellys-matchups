@@ -1,4 +1,4 @@
-// src/app/api/admin/exceptional-cases/route.js
+// src/app/api/admin/articles/route.js
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -13,20 +13,16 @@ const SUPABASE_SERVICE_ROLE_KEY =
 
 const FIELD_LIMITS = {
   title: 300,
-  anonymousName: 200,
-  imageUrl: 2000,
+  slug: 300,
+  author: 200,
+  featuredImage: 2000,
 };
 
 class AdminAuthError extends Error {
-  constructor(
-    message,
-    status,
-  ) {
+  constructor(message, status) {
     super(message);
-    this.name =
-      "AdminAuthError";
-    this.status =
-      status;
+    this.name = "AdminAuthError";
+    this.status = status;
   }
 }
 
@@ -55,46 +51,43 @@ function createSupabaseAdmin() {
     ),
     {
       auth: {
-        autoRefreshToken:
-          false,
-
-        persistSession:
-          false,
+        autoRefreshToken: false,
+        persistSession: false,
       },
     },
   );
 }
 
 function getString(value) {
-  return typeof value ===
-    "string"
+  return typeof value === "string"
     ? value.trim()
     : "";
 }
 
-function isValidImageUrl(
-  value,
-) {
+function makeSlug(value) {
+  return getString(value)
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function isValidImageUrl(value) {
   if (!value) {
     return true;
   }
 
   try {
-    const url =
-      new URL(value);
+    const url = new URL(value);
 
-    return (
-      url.protocol ===
-      "https:"
-    );
+    return url.protocol === "https:";
   } catch {
     return false;
   }
 }
 
-function getAuthorizationToken(
-  request,
-) {
+function getAuthorizationToken(request) {
   const authorization =
     request.headers.get(
       "authorization",
@@ -162,7 +155,7 @@ async function requireAdmin(
 
   if (profileError) {
     console.error(
-      "EXCEPTIONAL CASES ADMIN PROFILE ERROR:",
+      "ADMIN ARTICLES PROFILE ERROR:",
       profileError,
     );
 
@@ -184,55 +177,118 @@ async function requireAdmin(
   return user;
 }
 
-function validateCreateInput({
+function validateArticleInput({
   title,
-  anonymousName,
-  imageUrl,
+  slug,
+  author,
+  featuredImage,
   content,
 }) {
   if (!title) {
-    return "Title is required.";
+    return "Article title is required.";
   }
 
   if (
     title.length >
     FIELD_LIMITS.title
   ) {
-    return "Title is too long.";
+    return "Article title is too long.";
   }
 
-  if (!content) {
-    return "Content is required.";
-  }
-
-  if (
-    anonymousName.length >
-    FIELD_LIMITS.anonymousName
-  ) {
-    return "Anonymous name is too long.";
+  if (!slug) {
+    return "Article slug is required.";
   }
 
   if (
-    imageUrl.length >
-    FIELD_LIMITS.imageUrl
+    slug.length >
+    FIELD_LIMITS.slug
   ) {
-    return "Image URL is too long.";
+    return "Article slug is too long.";
+  }
+
+  if (
+    slug !==
+    makeSlug(slug)
+  ) {
+    return "Article slug contains invalid characters.";
+  }
+
+  if (!author) {
+    return "Article author is required.";
+  }
+
+  if (
+    author.length >
+    FIELD_LIMITS.author
+  ) {
+    return "Article author is too long.";
+  }
+
+  if (
+    featuredImage.length >
+    FIELD_LIMITS.featuredImage
+  ) {
+    return "Featured image URL is too long.";
   }
 
   if (
     !isValidImageUrl(
-      imageUrl,
+      featuredImage,
     )
   ) {
     return "Featured image must use a valid HTTPS URL.";
   }
 
+  if (!content) {
+    return "Article content is required.";
+  }
+
   return null;
+}
+
+async function findArticleBySlug(
+  supabaseAdmin,
+  slug,
+  excludeId = "",
+) {
+  let query =
+    supabaseAdmin
+      .from("articles")
+      .select("id,slug")
+      .eq(
+        "slug",
+        slug,
+      )
+      .limit(2);
+
+  if (excludeId) {
+    query =
+      query.neq(
+        "id",
+        excludeId,
+      );
+  }
+
+  const {
+    data,
+    error,
+  } =
+    await query;
+
+  if (error) {
+    throw new Error(
+      error.message,
+    );
+  }
+
+  return Array.isArray(data)
+    ? data
+    : [];
 }
 
 function handleRouteError(
   error,
-  fallbackMessage,
+  label,
 ) {
   if (
     error instanceof
@@ -251,7 +307,7 @@ function handleRouteError(
   }
 
   console.error(
-    fallbackMessage,
+    label,
     error,
   );
 
@@ -285,28 +341,25 @@ export async function GET(
       error,
     } =
       await supabaseAdmin
-        .from(
-          "exceptional_cases",
-        )
+        .from("articles")
         .select("*")
         .order(
           "created_at",
           {
-            ascending:
-              false,
+            ascending: false,
           },
         );
 
     if (error) {
       console.error(
-        "EXCEPTIONAL CASES GET ERROR:",
+        "ADMIN ARTICLES GET ERROR:",
         error,
       );
 
       return NextResponse.json(
         {
           error:
-            "Unable to load Exceptional Cases.",
+            "Unable to load articles.",
         },
         {
           status: 500,
@@ -315,13 +368,13 @@ export async function GET(
     }
 
     return NextResponse.json({
-      cases:
+      articles:
         data || [],
     });
   } catch (error) {
     return handleRouteError(
       error,
-      "EXCEPTIONAL CASES GET ERROR:",
+      "ADMIN ARTICLES GET ERROR:",
     );
   }
 }
@@ -346,14 +399,21 @@ export async function POST(
         body.title,
       );
 
-    const anonymousName =
-      getString(
-        body.anonymous_name,
-      ) || "Anonymous";
+    const slug =
+      makeSlug(
+        body.slug ||
+          title,
+      );
 
-    const imageUrl =
+    const author =
       getString(
-        body.image_url,
+        body.author,
+      ) ||
+      "Delly Singah";
+
+    const featuredImage =
+      getString(
+        body.featured_image,
       );
 
     const content =
@@ -361,11 +421,27 @@ export async function POST(
         body.content,
       );
 
+    if (
+      typeof body.published !==
+      "boolean"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Published must be true or false.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
     const validationError =
-      validateCreateInput({
+      validateArticleInput({
         title,
-        anonymousName,
-        imageUrl,
+        slug,
+        author,
+        featuredImage,
         content,
       });
 
@@ -383,56 +459,61 @@ export async function POST(
       );
     }
 
+    const duplicates =
+      await findArticleBySlug(
+        supabaseAdmin,
+        slug,
+      );
+
     if (
-      typeof body.published !==
-      "boolean"
+      duplicates.length >
+      0
     ) {
       return NextResponse.json(
         {
           error:
-            "Published must be true or false.",
+            "Another article already uses this slug.",
         },
         {
-          status: 400,
+          status: 409,
         },
       );
     }
 
+    const now =
+      new Date().toISOString();
+
     const {
-      data: createdCase,
+      data: article,
       error,
     } =
       await supabaseAdmin
-        .from(
-          "exceptional_cases",
-        )
+        .from("articles")
         .insert({
           title,
-
-          anonymous_name:
-            anonymousName,
-
-          image_url:
-            imageUrl,
-
+          slug,
+          author,
+          featured_image:
+            featuredImage,
           content,
-
           published:
             body.published,
+          updated_at:
+            now,
         })
         .select("*")
         .single();
 
     if (error) {
       console.error(
-        "EXCEPTIONAL CASE CREATE ERROR:",
+        "ADMIN ARTICLE CREATE ERROR:",
         error,
       );
 
       return NextResponse.json(
         {
           error:
-            "Unable to save Exceptional Case.",
+            "Unable to create article.",
         },
         {
           status: 500,
@@ -443,9 +524,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-
-        case:
-          createdCase,
+        article,
       },
       {
         status: 201,
@@ -454,7 +533,7 @@ export async function POST(
   } catch (error) {
     return handleRouteError(
       error,
-      "EXCEPTIONAL CASE CREATE ERROR:",
+      "ADMIN ARTICLE CREATE ERROR:",
     );
   }
 }
@@ -483,13 +562,168 @@ export async function PATCH(
       return NextResponse.json(
         {
           error:
-            "Exceptional Case ID is required.",
+            "Article ID is required.",
         },
         {
           status: 400,
         },
       );
     }
+
+    const {
+      data: existingArticle,
+      error:
+        articleLookupError,
+    } =
+      await supabaseAdmin
+        .from("articles")
+        .select("*")
+        .eq(
+          "id",
+          id,
+        )
+        .maybeSingle();
+
+    if (
+      articleLookupError
+    ) {
+      console.error(
+        "ADMIN ARTICLE LOOKUP ERROR:",
+        articleLookupError,
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Unable to load article.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    if (
+      !existingArticle
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Article was not found.",
+        },
+        {
+          status: 404,
+        },
+      );
+    }
+
+    const hasFullArticlePayload =
+      body.title !== undefined ||
+      body.slug !== undefined ||
+      body.author !== undefined ||
+      body.featured_image !==
+        undefined ||
+      body.content !== undefined;
+
+    if (
+      !hasFullArticlePayload
+    ) {
+      if (
+        typeof body.published !==
+        "boolean"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Published must be true or false.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      const {
+        data: article,
+        error,
+      } =
+        await supabaseAdmin
+          .from("articles")
+          .update({
+            published:
+              body.published,
+
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq(
+            "id",
+            id,
+          )
+          .select("*")
+          .maybeSingle();
+
+      if (error) {
+        console.error(
+          "ADMIN ARTICLE PUBLISH ERROR:",
+          error,
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Unable to update article publication status.",
+          },
+          {
+            status: 500,
+          },
+        );
+      }
+
+      if (!article) {
+        return NextResponse.json(
+          {
+            error:
+              "Article was not found.",
+          },
+          {
+            status: 404,
+          },
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        article,
+      });
+    }
+
+    const title =
+      getString(
+        body.title,
+      );
+
+    const slug =
+      makeSlug(
+        body.slug ||
+          title,
+      );
+
+    const author =
+      getString(
+        body.author,
+      ) ||
+      "Delly Singah";
+
+    const featuredImage =
+      getString(
+        body.featured_image,
+      );
+
+    const content =
+      getString(
+        body.content,
+      );
 
     if (
       typeof body.published !==
@@ -506,17 +740,68 @@ export async function PATCH(
       );
     }
 
+    const validationError =
+      validateArticleInput({
+        title,
+        slug,
+        author,
+        featuredImage,
+        content,
+      });
+
+    if (
+      validationError
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            validationError,
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const duplicates =
+      await findArticleBySlug(
+        supabaseAdmin,
+        slug,
+        id,
+      );
+
+    if (
+      duplicates.length >
+      0
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Another article already uses this slug.",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
     const {
-      data: updatedCase,
+      data: article,
       error,
     } =
       await supabaseAdmin
-        .from(
-          "exceptional_cases",
-        )
+        .from("articles")
         .update({
+          title,
+          slug,
+          author,
+          featured_image:
+            featuredImage,
+          content,
           published:
             body.published,
+          updated_at:
+            new Date().toISOString(),
         })
         .eq(
           "id",
@@ -527,14 +812,14 @@ export async function PATCH(
 
     if (error) {
       console.error(
-        "EXCEPTIONAL CASE UPDATE ERROR:",
+        "ADMIN ARTICLE UPDATE ERROR:",
         error,
       );
 
       return NextResponse.json(
         {
           error:
-            "Unable to update Exceptional Case.",
+            "Unable to update article.",
         },
         {
           status: 500,
@@ -542,11 +827,11 @@ export async function PATCH(
       );
     }
 
-    if (!updatedCase) {
+    if (!article) {
       return NextResponse.json(
         {
           error:
-            "Exceptional Case was not found.",
+            "Article was not found.",
         },
         {
           status: 404,
@@ -556,14 +841,12 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-
-      case:
-        updatedCase,
+      article,
     });
   } catch (error) {
     return handleRouteError(
       error,
-      "EXCEPTIONAL CASE UPDATE ERROR:",
+      "ADMIN ARTICLE UPDATE ERROR:",
     );
   }
 }
@@ -598,7 +881,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           error:
-            "Exceptional Case ID is required.",
+            "Article ID is required.",
         },
         {
           status: 400,
@@ -607,13 +890,11 @@ export async function DELETE(
     }
 
     const {
-      data: deletedCase,
+      data: article,
       error,
     } =
       await supabaseAdmin
-        .from(
-          "exceptional_cases",
-        )
+        .from("articles")
         .delete()
         .eq(
           "id",
@@ -624,14 +905,14 @@ export async function DELETE(
 
     if (error) {
       console.error(
-        "EXCEPTIONAL CASE DELETE ERROR:",
+        "ADMIN ARTICLE DELETE ERROR:",
         error,
       );
 
       return NextResponse.json(
         {
           error:
-            "Unable to delete Exceptional Case.",
+            "Unable to delete article.",
         },
         {
           status: 500,
@@ -639,11 +920,11 @@ export async function DELETE(
       );
     }
 
-    if (!deletedCase) {
+    if (!article) {
       return NextResponse.json(
         {
           error:
-            "Exceptional Case was not found.",
+            "Article was not found.",
         },
         {
           status: 404,
@@ -653,14 +934,13 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-
       id:
-        deletedCase.id,
+        article.id,
     });
   } catch (error) {
     return handleRouteError(
       error,
-      "EXCEPTIONAL CASE DELETE ERROR:",
+      "ADMIN ARTICLE DELETE ERROR:",
     );
   }
 }

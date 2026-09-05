@@ -4,44 +4,36 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { StreamClient } from "@stream-io/node-sdk";
 
+export const runtime = "nodejs";
+
 const TOKEN_VALIDITY_SECONDS = 60 * 60;
 
-function createSupabaseClients() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function getRequiredEnvironmentVariable(name) {
+  const value = process.env[name];
 
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    throw new Error("Supabase server environment variables are missing.");
+  if (!value) {
+    throw new Error(`Missing environment variable: ${name}`);
   }
 
-  const authClient = createClient(supabaseUrl, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
+  return value;
+}
 
-  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+function createSupabaseAdmin() {
+  return createClient(
+    getRequiredEnvironmentVariable("NEXT_PUBLIC_SUPABASE_URL"),
+    getRequiredEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY"),
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
     },
-  });
-
-  return {
-    authClient,
-    adminClient,
-  };
+  );
 }
 
 function createStreamClient() {
-  const apiKey = process.env.STREAM_API_KEY;
-  const apiSecret = process.env.STREAM_API_SECRET;
-
-  if (!apiKey || !apiSecret) {
-    throw new Error("Stream server environment variables are missing.");
-  }
+  const apiKey = getRequiredEnvironmentVariable("STREAM_API_KEY");
+  const apiSecret = getRequiredEnvironmentVariable("STREAM_API_SECRET");
 
   return {
     apiKey,
@@ -53,10 +45,10 @@ function getBearerToken(request) {
   const authorization = request.headers.get("authorization");
 
   if (!authorization?.startsWith("Bearer ")) {
-    return null;
+    return "";
   }
 
-  return authorization.slice("Bearer ".length).trim() || null;
+  return authorization.slice(7).trim();
 }
 
 export async function POST(request) {
@@ -65,51 +57,86 @@ export async function POST(request) {
 
     if (!accessToken) {
       return NextResponse.json(
-        { error: "Missing authorization token." },
-        { status: 401 }
+        {
+          error: "Missing authorization token.",
+        },
+        {
+          status: 401,
+        },
       );
     }
 
-    const { authClient, adminClient } = createSupabaseClients();
+    const supabaseAdmin = createSupabaseAdmin();
 
     const {
       data: { user },
       error: authError,
-    } = await authClient.auth.getUser(accessToken);
+    } = await supabaseAdmin.auth.getUser(accessToken);
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: "Unauthorized user." },
-        { status: 401 }
+        {
+          error: "Unauthorized user.",
+        },
+        {
+          status: 401,
+        },
       );
     }
 
-    const { data: profile, error: profileError } = await adminClient
+    const {
+      data: profile,
+      error: profileError,
+    } = await supabaseAdmin
       .from("profiles")
       .select("id, full_name, avatar_url")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (profileError || !profile) {
+    if (profileError) {
+      console.error("STREAM PROFILE LOOKUP ERROR:", profileError);
+
       return NextResponse.json(
         {
-          error: "Profile not found.",
-          details: profileError?.message || null,
+          error: "Unable to load user profile.",
         },
-        { status: 404 }
+        {
+          status: 500,
+        },
       );
     }
 
-    const { apiKey, client: streamClient } = createStreamClient();
+    if (!profile) {
+      return NextResponse.json(
+        {
+          error: "Profile not found.",
+        },
+        {
+          status: 404,
+        },
+      );
+    }
+
+    const {
+      apiKey,
+      client: streamClient,
+    } = createStreamClient();
+
+    const streamUser = {
+      id: user.id,
+      role: "user",
+      name:
+        profile.full_name ||
+        "Delly's Matchups Member",
+    };
+
+    if (profile.avatar_url) {
+      streamUser.image = profile.avatar_url;
+    }
 
     await streamClient.upsertUsers({
       users: {
-        [user.id]: {
-          id: user.id,
-          role: "user",
-          name: profile.full_name || "Delly's Matchups Member",
-          image: profile.avatar_url || undefined,
-        },
+        [user.id]: streamUser,
       },
     });
 
@@ -124,22 +151,21 @@ export async function POST(request) {
       token,
       user: {
         id: user.id,
-        name: profile.full_name || "Delly's Matchups Member",
+        name: streamUser.name,
         image: profile.avatar_url || null,
       },
+      expiresIn: TOKEN_VALIDITY_SECONDS,
     });
   } catch (error) {
-    console.error("STREAM TOKEN ROUTE ERROR", error);
+    console.error("STREAM TOKEN ROUTE ERROR:", error);
 
     return NextResponse.json(
       {
         error: "Unable to create Stream token.",
-        details:
-          error instanceof Error
-            ? error.message
-            : "Unknown server error.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      },
     );
   }
 }

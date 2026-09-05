@@ -1,76 +1,88 @@
 // src/app/api/calls/end/route.js
 
+import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { StreamClient } from "@stream-io/node-sdk";
-import { NextResponse } from "next/server";
 
-function createSupabaseClients() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+export const runtime = "nodejs";
 
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    throw new Error("Supabase server environment variables are missing.");
+function getRequiredEnvironmentVariable(name) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing environment variable: ${name}`);
   }
 
-  return {
-    authClient: createClient(supabaseUrl, anonKey, {
+  return value;
+}
+
+function createSupabaseAdmin() {
+  return createClient(
+    getRequiredEnvironmentVariable("NEXT_PUBLIC_SUPABASE_URL"),
+    getRequiredEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY"),
+    {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
       },
-    }),
-    adminClient: createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    }),
-  };
+    },
+  );
 }
 
 function createStreamClient() {
-  const apiKey = process.env.STREAM_API_KEY;
-  const apiSecret = process.env.STREAM_API_SECRET;
+  return new StreamClient(
+    getRequiredEnvironmentVariable("STREAM_API_KEY"),
+    getRequiredEnvironmentVariable("STREAM_API_SECRET"),
+  );
+}
 
-  if (!apiKey || !apiSecret) {
-    throw new Error("Stream server environment variables are missing.");
+function getBearerToken(request) {
+  const authorization = request.headers.get("authorization");
+
+  if (!authorization?.startsWith("Bearer ")) {
+    return "";
   }
 
-  return new StreamClient(apiKey, apiSecret);
+  return authorization.slice(7).trim();
+}
+
+function isParticipant(call, userId) {
+  return (
+    call.caller_id === userId ||
+    call.receiver_id === userId
+  );
 }
 
 export async function POST(request) {
   try {
-    const authorization = request.headers.get("authorization");
-
-    if (!authorization?.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Missing authorization token." },
-        { status: 401 }
-      );
-    }
-
-    const token = authorization.slice("Bearer ".length).trim();
+    const token = getBearerToken(request);
 
     if (!token) {
       return NextResponse.json(
-        { error: "Missing authorization token." },
-        { status: 401 }
+        {
+          error: "Missing authorization token.",
+        },
+        {
+          status: 401,
+        },
       );
     }
 
-    const { authClient, adminClient } = createSupabaseClients();
+    const supabaseAdmin = createSupabaseAdmin();
 
     const {
       data: { user },
-      error: userError,
-    } = await authClient.auth.getUser(token);
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(token);
 
-    if (userError || !user) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: "Unauthorized user." },
-        { status: 401 }
+        {
+          error: "Unauthorized user.",
+        },
+        {
+          status: 401,
+        },
       );
     }
 
@@ -80,56 +92,82 @@ export async function POST(request) {
       body = await request.json();
     } catch {
       return NextResponse.json(
-        { error: "Invalid request body." },
-        { status: 400 }
+        {
+          error: "Invalid request body.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
     const callId =
-      typeof body?.callId === "string" ? body.callId.trim() : "";
+      typeof body?.callId === "string"
+        ? body.callId.trim()
+        : "";
 
     if (!callId) {
       return NextResponse.json(
-        { error: "callId is required." },
-        { status: 400 }
+        {
+          error: "callId is required.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
-    const { data: existingCall, error: existingCallError } =
-      await adminClient
-        .from("matchup_calls")
-        .select("*")
-        .eq("id", callId)
-        .maybeSingle();
+    const {
+      data: existingCall,
+      error: existingCallError,
+    } = await supabaseAdmin
+      .from("matchup_calls")
+      .select("*")
+      .eq("id", callId)
+      .maybeSingle();
 
     if (existingCallError) {
+      console.error(
+        "CALL END LOOKUP ERROR:",
+        existingCallError,
+      );
+
       return NextResponse.json(
-        { error: existingCallError.message },
-        { status: 500 }
+        {
+          error: "Unable to load call.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
     if (!existingCall) {
       return NextResponse.json(
-        { error: "Call not found." },
-        { status: 404 }
+        {
+          error: "Call not found.",
+        },
+        {
+          status: 404,
+        },
       );
     }
 
-    const isParticipant =
-      existingCall.caller_id === user.id ||
-      existingCall.receiver_id === user.id;
-
-    if (!isParticipant) {
+    if (!isParticipant(existingCall, user.id)) {
       return NextResponse.json(
-        { error: "You are not allowed to end this call." },
-        { status: 403 }
+        {
+          error: "You are not allowed to end this call.",
+        },
+        {
+          status: 403,
+        },
       );
     }
 
     if (existingCall.status === "ended") {
       return NextResponse.json({
         success: true,
+        alreadyEnded: true,
         call: existingCall,
       });
     }
@@ -142,7 +180,9 @@ export async function POST(request) {
         {
           error: `This call has already been ${existingCall.status}.`,
         },
-        { status: 409 }
+        {
+          status: 409,
+        },
       );
     }
 
@@ -151,106 +191,144 @@ export async function POST(request) {
       existingCall.status !== "accepted"
     ) {
       return NextResponse.json(
-        { error: "This call cannot be ended." },
-        { status: 409 }
+        {
+          error: "This call cannot be ended.",
+        },
+        {
+          status: 409,
+        },
       );
     }
 
     if (existingCall.stream_call_id) {
-      const streamClient = createStreamClient();
-
-      const streamCall = streamClient.video.call(
-        "default",
-        existingCall.stream_call_id
-      );
-
       try {
+        const streamClient = createStreamClient();
+
+        const streamCall = streamClient.video.call(
+          "default",
+          existingCall.stream_call_id,
+        );
+
         await streamCall.end();
-      } catch (error) {
-        console.error("STREAM END CALL ERROR:", error);
+      } catch (streamError) {
+        console.error(
+          "STREAM END CALL ERROR:",
+          streamError,
+        );
 
         return NextResponse.json(
           {
-            error: "Unable to end the live Stream call.",
-            details:
-              error instanceof Error ? error.message : "Unknown Stream error.",
+            error: "Unable to end the live call.",
           },
-          { status: 502 }
+          {
+            status: 502,
+          },
         );
       }
     }
 
     const endedAt = new Date().toISOString();
 
-    const { data: updatedCall, error: updateError } =
-      await adminClient
-        .from("matchup_calls")
-        .update({
-          status: "ended",
-          ended_at: endedAt,
-        })
-        .eq("id", callId)
-        .in("status", ["initiated", "accepted"])
-        .select("*")
-        .maybeSingle();
+    const {
+      data: updatedCall,
+      error: updateError,
+    } = await supabaseAdmin
+      .from("matchup_calls")
+      .update({
+        status: "ended",
+        ended_at: endedAt,
+      })
+      .eq("id", callId)
+      .in("status", [
+        "initiated",
+        "accepted",
+      ])
+      .select("*")
+      .maybeSingle();
 
     if (updateError) {
+      console.error(
+        "CALL END UPDATE ERROR:",
+        updateError,
+      );
+
       return NextResponse.json(
-        { error: updateError.message },
-        { status: 500 }
+        {
+          error: "Unable to update call status.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
     if (updatedCall) {
       return NextResponse.json({
         success: true,
+        alreadyEnded: false,
         call: updatedCall,
       });
     }
 
-    const { data: latestCall, error: latestCallError } =
-      await adminClient
-        .from("matchup_calls")
-        .select("*")
-        .eq("id", callId)
-        .maybeSingle();
+    const {
+      data: latestCall,
+      error: latestCallError,
+    } = await supabaseAdmin
+      .from("matchup_calls")
+      .select("*")
+      .eq("id", callId)
+      .maybeSingle();
 
     if (latestCallError) {
+      console.error(
+        "CALL END RELOAD ERROR:",
+        latestCallError,
+      );
+
       return NextResponse.json(
-        { error: latestCallError.message },
-        { status: 500 }
+        {
+          error: "Unable to reload call status.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
     if (
       latestCall &&
       latestCall.status === "ended" &&
-      (
-        latestCall.caller_id === user.id ||
-        latestCall.receiver_id === user.id
-      )
+      isParticipant(latestCall, user.id)
     ) {
       return NextResponse.json({
         success: true,
+        alreadyEnded: true,
         call: latestCall,
       });
     }
 
     return NextResponse.json(
       {
-        error: "The call changed state before it could be ended.",
+        error:
+          "The call changed state before it could be ended.",
       },
-      { status: 409 }
+      {
+        status: 409,
+      },
     );
   } catch (error) {
+    console.error(
+      "CALL END ROUTE ERROR:",
+      error,
+    );
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to end call.",
+        error: "Unable to end call.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      },
     );
   }
 }

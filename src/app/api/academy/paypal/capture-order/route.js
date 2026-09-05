@@ -6,12 +6,18 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 
 const PAYPAL_API_BASE =
-  process.env.PAYPAL_API_BASE || "https://api-m.paypal.com";
+  process.env.PAYPAL_API_BASE ||
+  "https://api-m.paypal.com";
 
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
+const PAYPAL_CLIENT_ID =
+  process.env.PAYPAL_CLIENT_ID;
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const PAYPAL_CLIENT_SECRET =
+  process.env.PAYPAL_CLIENT_SECRET;
+
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -33,26 +39,35 @@ const ACADEMY_COURSES = {
     price: 100,
   },
   "module-4": {
-    title: "Module 4: Leadership & Influence",
+    title:
+      "Module 4: Leadership & Influence",
     price: 100,
   },
   "module-5": {
-    title: "Module 5: Healing & Restoration",
+    title:
+      "Module 5: Healing & Restoration",
     price: 100,
   },
   "module-6": {
-    title: "Module 6: Master Classes",
+    title:
+      "Module 6: Master Classes",
     price: 100,
   },
   "module-7": {
-    title: "Module 7: Virginity 101",
+    title:
+      "Module 7: Virginity 101",
     price: 100,
   },
 };
 
-function getRequiredEnvironmentVariable(value, name) {
+function getRequiredEnvironmentVariable(
+  value,
+  name,
+) {
   if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
+    throw new Error(
+      `Missing environment variable: ${name}`,
+    );
   }
 
   return value;
@@ -88,12 +103,15 @@ function isAcademyCourseKey(value) {
 }
 
 function parseCustomId(customId) {
-  if (typeof customId !== "string") {
+  if (
+    typeof customId !== "string"
+  ) {
     return {};
   }
 
   try {
-    const parsed = JSON.parse(customId);
+    const parsed =
+      JSON.parse(customId);
 
     if (
       !parsed ||
@@ -109,17 +127,26 @@ function parseCustomId(customId) {
   }
 }
 
-function extractNoteValue(notes, label) {
-  if (typeof notes !== "string") {
+function extractNoteValue(
+  notes,
+  label,
+) {
+  if (
+    typeof notes !== "string"
+  ) {
     return null;
   }
 
-  const lines = notes.split(/\r?\n/);
-  const prefix = `${label}:`;
+  const lines =
+    notes.split(/\r?\n/);
 
-  const line = lines.find((value) =>
-    value.startsWith(prefix),
-  );
+  const prefix =
+    `${label}:`;
+
+  const line =
+    lines.find((value) =>
+      value.startsWith(prefix),
+    );
 
   if (!line) {
     return null;
@@ -132,65 +159,112 @@ function extractNoteValue(notes, label) {
   return result || null;
 }
 
-function extractCourseKeyFromNotes(notes) {
-  const courseKey = extractNoteValue(
-    notes,
-    "Course Key",
-  );
+function extractCourseKeyFromNotes(
+  notes,
+) {
+  const courseKey =
+    extractNoteValue(
+      notes,
+      "Course Key",
+    );
 
-  return isAcademyCourseKey(courseKey)
+  return isAcademyCourseKey(
+    courseKey,
+  )
     ? courseKey
     : null;
 }
 
-function extractCheckoutReferenceFromNotes(notes) {
+function extractCheckoutReferenceFromNotes(
+  notes,
+) {
   return extractNoteValue(
     notes,
     "Checkout Reference",
   );
 }
 
-function moneyMatches(actual, expected) {
-  const amount = Number(actual);
+function moneyMatches(
+  actual,
+  expected,
+) {
+  const amount =
+    Number(actual);
 
   return (
     Number.isFinite(amount) &&
-    Math.abs(amount - expected) < 0.001
+    Math.abs(
+      amount - expected,
+    ) < 0.001
   );
 }
 
+async function parsePayPalResponse(
+  response,
+) {
+  const text =
+    await response.text();
+
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      message:
+        "PayPal returned an invalid response.",
+    };
+  }
+}
+
 async function getPayPalAccessToken() {
-  const clientId = getRequiredEnvironmentVariable(
-    PAYPAL_CLIENT_ID,
-    "PAYPAL_CLIENT_ID",
-  );
+  const clientId =
+    getRequiredEnvironmentVariable(
+      PAYPAL_CLIENT_ID,
+      "PAYPAL_CLIENT_ID",
+    );
 
-  const clientSecret = getRequiredEnvironmentVariable(
-    PAYPAL_CLIENT_SECRET,
-    "PAYPAL_CLIENT_SECRET",
-  );
+  const clientSecret =
+    getRequiredEnvironmentVariable(
+      PAYPAL_CLIENT_SECRET,
+      "PAYPAL_CLIENT_SECRET",
+    );
 
-  const auth = Buffer.from(
-    `${clientId}:${clientSecret}`,
-  ).toString("base64");
+  const auth =
+    Buffer.from(
+      `${clientId}:${clientSecret}`,
+    ).toString("base64");
 
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v1/oauth2/token`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type":
-          "application/x-www-form-urlencoded",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v1/oauth2/token`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Basic ${auth}`,
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+        body:
+          "grant_type=client_credentials",
+        cache: "no-store",
       },
-      body: "grant_type=client_credentials",
-      cache: "no-store",
-    },
-  );
+    );
 
-  const data = await response.json();
+  const data =
+    await parsePayPalResponse(
+      response,
+    );
 
   if (!response.ok) {
+    console.error(
+      "ACADEMY PAYPAL AUTH ERROR:",
+      data,
+    );
+
     throw new Error(
       data.error_description ||
         data.message ||
@@ -207,24 +281,38 @@ async function getPayPalAccessToken() {
   return data.access_token;
 }
 
-async function getPayPalOrder(orderId, accessToken) {
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
-      orderId,
-    )}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
+async function getPayPalOrder(
+  orderId,
+  accessToken,
+) {
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
+        orderId,
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+          "Content-Type":
+            "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    },
-  );
+    );
 
-  const data = await response.json();
+  const data =
+    await parsePayPalResponse(
+      response,
+    );
 
   if (!response.ok) {
+    console.error(
+      "ACADEMY PAYPAL GET ORDER ERROR:",
+      data,
+    );
+
     throw new Error(
       data.message ||
         data.error_description ||
@@ -235,24 +323,37 @@ async function getPayPalOrder(orderId, accessToken) {
   return data;
 }
 
-function getCompletedCapture(order) {
-  const purchaseUnits = Array.isArray(
-    order?.purchase_units,
-  )
-    ? order.purchase_units
-    : [];
-
-  for (const purchaseUnit of purchaseUnits) {
-    const captures = Array.isArray(
-      purchaseUnit?.payments?.captures,
+function getCompletedCapture(
+  order,
+) {
+  const purchaseUnits =
+    Array.isArray(
+      order?.purchase_units,
     )
-      ? purchaseUnit.payments.captures
+      ? order.purchase_units
       : [];
 
-    const completedCapture = captures.find(
-      (capture) =>
-        capture?.status === "COMPLETED",
-    );
+  for (
+    const purchaseUnit
+    of purchaseUnits
+  ) {
+    const captures =
+      Array.isArray(
+        purchaseUnit
+          ?.payments
+          ?.captures,
+      )
+        ? purchaseUnit
+            .payments
+            .captures
+        : [];
+
+    const completedCapture =
+      captures.find(
+        (capture) =>
+          capture?.status ===
+          "COMPLETED",
+      );
 
     if (completedCapture) {
       return completedCapture;
@@ -269,45 +370,63 @@ async function activateAcademyEnrollment(
   course,
 ) {
   const customerEmail =
-    typeof payment.customer_email === "string"
+    typeof payment.customer_email ===
+    "string"
       ? payment.customer_email
           .trim()
           .toLowerCase()
       : "";
 
   const customerName =
-    typeof payment.customer_name === "string"
+    typeof payment.customer_name ===
+    "string"
       ? payment.customer_name.trim()
       : "";
 
-  if (!customerEmail || !customerName) {
+  if (
+    !customerEmail ||
+    !customerName
+  ) {
     throw new Error(
       "Academy payment is missing customer information.",
     );
   }
 
-  const { error } = await supabaseAdmin
-    .from("academy_enrollments")
-    .upsert(
-      {
-        user_email: customerEmail,
-        customer_name: customerName,
-        course_key: courseKey,
-        course_title: course.title,
-        access_type:
-          courseKey === "full-academy"
-            ? "full"
-            : "single",
-        payment_id: payment.id,
-        status: "active",
-      },
-      {
-        onConflict: "user_email,course_key",
-      },
-    );
+  const { error } =
+    await supabaseAdmin
+      .from(
+        "academy_enrollments",
+      )
+      .upsert(
+        {
+          user_email:
+            customerEmail,
+          customer_name:
+            customerName,
+          course_key:
+            courseKey,
+          course_title:
+            course.title,
+          access_type:
+            courseKey ===
+            "full-academy"
+              ? "full"
+              : "single",
+          payment_id:
+            payment.id,
+          status:
+            "active",
+        },
+        {
+          onConflict:
+            "user_email,course_key",
+        },
+      );
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(
+      error.message,
+    );
   }
 }
 
@@ -319,31 +438,50 @@ function verifyCompletedPayPalOrder(
   course,
   checkoutReference,
 ) {
-  if (order?.id !== orderId) {
+  if (
+    order?.id !== orderId
+  ) {
     throw new Error(
       "PayPal order ID does not match the requested Academy payment.",
     );
   }
 
-  if (order?.status !== "COMPLETED") {
+  if (
+    order?.status !==
+    "COMPLETED"
+  ) {
     throw new Error(
-      `PayPal order is ${order?.status || "not completed"}.`,
+      `PayPal order is ${
+        order?.status ||
+        "not completed"
+      }.`,
+    );
+  }
+
+  const purchaseUnits =
+    Array.isArray(
+      order?.purchase_units,
+    )
+      ? order.purchase_units
+      : [];
+
+  if (
+    purchaseUnits.length !== 1
+  ) {
+    throw new Error(
+      "PayPal order contains unexpected purchase information.",
     );
   }
 
   const purchaseUnit =
-    order?.purchase_units?.[0];
-
-  if (!purchaseUnit) {
-    throw new Error(
-      "PayPal order is missing purchase information.",
-    );
-  }
+    purchaseUnits[0];
 
   if (
-    purchaseUnit.amount?.currency_code !== "USD" ||
+    purchaseUnit.amount
+      ?.currency_code !== "USD" ||
     !moneyMatches(
-      purchaseUnit.amount?.value,
+      purchaseUnit.amount
+        ?.value,
       course.price,
     )
   ) {
@@ -353,7 +491,8 @@ function verifyCompletedPayPalOrder(
   }
 
   if (
-    payment.currency !== "USD" ||
+    payment.currency !==
+      "USD" ||
     !moneyMatches(
       payment.amount,
       course.price,
@@ -373,13 +512,16 @@ function verifyCompletedPayPalOrder(
     );
   }
 
-  const customData = parseCustomId(
-    purchaseUnit.custom_id,
-  );
+  const customData =
+    parseCustomId(
+      purchaseUnit.custom_id,
+    );
 
   if (
-    customData.purpose !== "academy" ||
-    customData.courseKey !== courseKey
+    customData.purpose !==
+      "academy" ||
+    customData.courseKey !==
+      courseKey
   ) {
     throw new Error(
       "PayPal Academy payment metadata is invalid.",
@@ -396,14 +538,16 @@ function verifyCompletedPayPalOrder(
   }
 
   const storedEmail =
-    typeof payment.customer_email === "string"
+    typeof payment.customer_email ===
+    "string"
       ? payment.customer_email
           .trim()
           .toLowerCase()
       : "";
 
   const paypalMetadataEmail =
-    typeof customData.customerEmail === "string"
+    typeof customData.customerEmail ===
+    "string"
       ? customData.customerEmail
           .trim()
           .toLowerCase()
@@ -412,7 +556,8 @@ function verifyCompletedPayPalOrder(
   if (
     !storedEmail ||
     !paypalMetadataEmail ||
-    storedEmail !== paypalMetadataEmail
+    storedEmail !==
+      paypalMetadataEmail
   ) {
     throw new Error(
       "PayPal customer metadata does not match the Academy payment.",
@@ -420,19 +565,25 @@ function verifyCompletedPayPalOrder(
   }
 
   const completedCapture =
-    getCompletedCapture(order);
+    getCompletedCapture(
+      order,
+    );
 
-  if (!completedCapture?.id) {
+  if (
+    !completedCapture?.id
+  ) {
     throw new Error(
       "Completed PayPal capture was not found.",
     );
   }
 
   if (
-    completedCapture.amount?.currency_code !==
+    completedCapture.amount
+      ?.currency_code !==
       "USD" ||
     !moneyMatches(
-      completedCapture.amount?.value,
+      completedCapture.amount
+        ?.value,
       course.price,
     )
   ) {
@@ -442,23 +593,29 @@ function verifyCompletedPayPalOrder(
   }
 
   return {
-    captureId: completedCapture.id,
+    captureId:
+      completedCapture.id,
   };
 }
 
-export async function POST(request) {
+export async function POST(
+  request,
+) {
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const orderId =
-      typeof body.orderId === "string"
+      typeof body.orderId ===
+      "string"
         ? body.orderId.trim()
         : "";
 
     if (!orderId) {
       return NextResponse.json(
         {
-          error: "Missing PayPal order ID.",
+          error:
+            "Missing PayPal order ID.",
         },
         {
           status: 400,
@@ -489,7 +646,10 @@ export async function POST(request) {
           "notes",
         ].join(","),
       )
-      .eq("purpose", "academy")
+      .eq(
+        "purpose",
+        "academy",
+      )
       .eq(
         "payment_method",
         "PayPal / Card",
@@ -520,8 +680,10 @@ export async function POST(request) {
     }
 
     if (
-      payment.status !== "pending" &&
-      payment.status !== "paid"
+      payment.status !==
+        "pending" &&
+      payment.status !==
+        "paid"
     ) {
       return NextResponse.json(
         {
@@ -552,7 +714,9 @@ export async function POST(request) {
     }
 
     const course =
-      ACADEMY_COURSES[courseKey];
+      ACADEMY_COURSES[
+        courseKey
+      ];
 
     const checkoutReference =
       extractCheckoutReferenceFromNotes(
@@ -572,8 +736,10 @@ export async function POST(request) {
     }
 
     if (
-      payment.item_name !== course.title ||
-      payment.currency !== "USD" ||
+      payment.item_name !==
+        course.title ||
+      payment.currency !==
+        "USD" ||
       !moneyMatches(
         payment.amount,
         course.price,
@@ -590,7 +756,10 @@ export async function POST(request) {
       );
     }
 
-    if (payment.status === "paid") {
+    if (
+      payment.status ===
+      "paid"
+    ) {
       await activateAcademyEnrollment(
         supabaseAdmin,
         payment,
@@ -601,7 +770,8 @@ export async function POST(request) {
       return NextResponse.json({
         success: true,
         alreadyProcessed: true,
-        paymentId: payment.id,
+        paymentId:
+          payment.id,
         orderId,
         courseKey,
         status: "paid",
@@ -611,33 +781,41 @@ export async function POST(request) {
     const accessToken =
       await getPayPalAccessToken();
 
-    const captureResponse = await fetch(
-      `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
-        orderId,
-      )}/capture`,
-      {
-        method: "POST",
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-          "Content-Type":
-            "application/json",
-          Prefer:
-            "return=representation",
-          "PayPal-Request-Id":
-            `academy-capture-${orderId}`,
+    const captureResponse =
+      await fetch(
+        `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
+          orderId,
+        )}/capture`,
+        {
+          method: "POST",
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+            "Content-Type":
+              "application/json",
+            Prefer:
+              "return=representation",
+            "PayPal-Request-Id":
+              `academy-capture-${orderId}`,
+          },
+          body:
+            JSON.stringify({}),
+          cache:
+            "no-store",
         },
-        body: JSON.stringify({}),
-        cache: "no-store",
-      },
-    );
+      );
 
     const captureData =
-      await captureResponse.json();
+      await parsePayPalResponse(
+        captureResponse,
+      );
 
-    let paypalOrder = captureData;
+    let paypalOrder =
+      captureData;
 
-    if (!captureResponse.ok) {
+    if (
+      !captureResponse.ok
+    ) {
       paypalOrder =
         await getPayPalOrder(
           orderId,
@@ -645,15 +823,20 @@ export async function POST(request) {
         );
 
       if (
-        paypalOrder?.status !== "COMPLETED"
+        paypalOrder?.status !==
+        "COMPLETED"
       ) {
+        console.error(
+          "ACADEMY PAYPAL CAPTURE ERROR:",
+          captureData,
+        );
+
         return NextResponse.json(
           {
             error:
               captureData.message ||
               captureData.error_description ||
               "Unable to capture PayPal Academy order.",
-            details: captureData,
           },
           {
             status: 502,
@@ -680,15 +863,21 @@ export async function POST(request) {
       .filter(Boolean)
       .join("\n");
 
-    const { error: updateError } =
-      await supabaseAdmin
-        .from("payments")
-        .update({
-          status: "paid",
-          provider_reference: orderId,
-          notes: updatedNotes,
-        })
-        .eq("id", payment.id);
+    const {
+      error: updateError,
+    } = await supabaseAdmin
+      .from("payments")
+      .update({
+        status: "paid",
+        provider_reference:
+          orderId,
+        notes:
+          updatedNotes,
+      })
+      .eq(
+        "id",
+        payment.id,
+      );
 
     if (updateError) {
       throw new Error(
@@ -701,7 +890,8 @@ export async function POST(request) {
       {
         ...payment,
         status: "paid",
-        notes: updatedNotes,
+        notes:
+          updatedNotes,
       },
       courseKey,
       course,
@@ -710,7 +900,8 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       alreadyProcessed: false,
-      paymentId: payment.id,
+      paymentId:
+        payment.id,
       orderId,
       captureId,
       courseKey,

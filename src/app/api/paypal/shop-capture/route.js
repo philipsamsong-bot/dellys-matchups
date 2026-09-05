@@ -32,76 +32,143 @@ const RESEND_FROM_EMAIL =
 const ADMIN_EMAIL =
   process.env.ADMIN_EMAIL;
 
-function getRequiredEnvironmentVariable(value, name) {
+function getRequiredEnvironmentVariable(
+  value,
+  name,
+) {
   if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
+    throw new Error(
+      `Missing environment variable: ${name}`,
+    );
   }
 
   return value;
 }
 
 function getString(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string"
+    ? value.trim()
+    : "";
 }
 
 function normalizeEmail(value) {
   return getString(value).toLowerCase();
 }
 
-function amountsMatch(left, right) {
-  const leftNumber = Number(left);
-  const rightNumber = Number(right);
+function amountsMatch(
+  left,
+  right,
+) {
+  const leftNumber =
+    Number(left);
+
+  const rightNumber =
+    Number(right);
 
   if (
-    !Number.isFinite(leftNumber) ||
-    !Number.isFinite(rightNumber)
+    !Number.isFinite(
+      leftNumber,
+    ) ||
+    !Number.isFinite(
+      rightNumber,
+    )
   ) {
     return false;
   }
 
-  return Math.abs(leftNumber - rightNumber) < 0.001;
+  return (
+    Math.abs(
+      leftNumber -
+        rightNumber,
+    ) < 0.001
+  );
 }
 
-function getNoteValue(notes, label) {
-  if (!notes || typeof notes !== "string") {
+function getNoteValue(
+  notes,
+  label,
+) {
+  if (
+    !notes ||
+    typeof notes !== "string"
+  ) {
     return "";
   }
 
-  const prefix = `${label}:`;
+  const prefix =
+    `${label}:`;
 
-  const line = notes
-    .split("\n")
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(prefix));
+  const line =
+    notes
+      .split("\n")
+      .map((item) =>
+        item.trim(),
+      )
+      .find((item) =>
+        item.startsWith(
+          prefix,
+        ),
+      );
 
   return line
-    ? line.slice(prefix.length).trim()
+    ? line
+        .slice(
+          prefix.length,
+        )
+        .trim()
     : "";
 }
 
-function parseCustomMetadata(value) {
-  if (!value || typeof value !== "string") {
+function parseCustomMetadata(
+  value,
+) {
+  if (
+    !value ||
+    typeof value !== "string"
+  ) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(value);
+    const parsed =
+      JSON.parse(value);
 
-    return parsed && typeof parsed === "object"
-      ? parsed
-      : null;
+    return (
+      parsed &&
+      typeof parsed ===
+        "object"
+        ? parsed
+        : null
+    );
   } catch {
     return null;
   }
 }
 
 function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  return String(
+    value ?? "",
+  )
+    .replaceAll(
+      "&",
+      "&amp;",
+    )
+    .replaceAll(
+      "<",
+      "&lt;",
+    )
+    .replaceAll(
+      ">",
+      "&gt;",
+    )
+    .replaceAll(
+      '"',
+      "&quot;",
+    )
+    .replaceAll(
+      "'",
+      "&#039;",
+    );
 }
 
 function createSupabaseAdmin() {
@@ -116,15 +183,20 @@ function createSupabaseAdmin() {
     ),
     {
       auth: {
-        autoRefreshToken: false,
-        persistSession: false,
+        autoRefreshToken:
+          false,
+        persistSession:
+          false,
       },
     },
   );
 }
 
-async function parsePayPalResponse(response) {
-  const text = await response.text();
+async function parsePayPalResponse(
+  response,
+) {
+  const text =
+    await response.text();
 
   if (!text) {
     return {};
@@ -134,7 +206,8 @@ async function parsePayPalResponse(response) {
     return JSON.parse(text);
   } catch {
     return {
-      message: "PayPal returned an invalid response.",
+      message:
+        "PayPal returned an invalid response.",
     };
   }
 }
@@ -152,26 +225,34 @@ async function getPayPalAccessToken() {
       "PAYPAL_CLIENT_SECRET",
     );
 
-  const authorization = Buffer.from(
-    `${clientId}:${clientSecret}`,
-  ).toString("base64");
+  const authorization =
+    Buffer.from(
+      `${clientId}:${clientSecret}`,
+    ).toString(
+      "base64",
+    );
 
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v1/oauth2/token`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${authorization}`,
-        "Content-Type":
-          "application/x-www-form-urlencoded",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v1/oauth2/token`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Basic ${authorization}`,
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+        body:
+          "grant_type=client_credentials",
+        cache: "no-store",
       },
-      body: "grant_type=client_credentials",
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parsePayPalResponse(response);
+    await parsePayPalResponse(
+      response,
+    );
 
   if (!response.ok) {
     console.error(
@@ -186,7 +267,9 @@ async function getPayPalAccessToken() {
     );
   }
 
-  if (!data.access_token) {
+  if (
+    !data.access_token
+  ) {
     throw new Error(
       "PayPal did not return an access token.",
     );
@@ -199,22 +282,27 @@ async function getPayPalOrder(
   accessToken,
   orderId,
 ) {
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
-      orderId,
-    )}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
+        orderId,
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+          "Content-Type":
+            "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parsePayPalResponse(response);
+    await parsePayPalResponse(
+      response,
+    );
 
   if (!response.ok) {
     console.error(
@@ -235,24 +323,32 @@ async function capturePayPalOrder(
   accessToken,
   orderId,
 ) {
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
-      orderId,
-    )}/capture`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
+        orderId,
+      )}/capture`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+          "Content-Type":
+            "application/json",
+          Prefer:
+            "return=representation",
+          "PayPal-Request-Id":
+            `shop-capture-${orderId}`,
+        },
+        body: "{}",
+        cache: "no-store",
       },
-      body: "{}",
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parsePayPalResponse(response);
+    await parsePayPalResponse(
+      response,
+    );
 
   if (response.ok) {
     return data;
@@ -282,31 +378,223 @@ async function capturePayPalOrder(
   );
 }
 
-function findCompletedCapture(order) {
-  const purchaseUnits =
-    Array.isArray(order?.purchase_units)
-      ? order.purchase_units
+function findCompletedCapture(
+  purchaseUnit,
+) {
+  const captures =
+    Array.isArray(
+      purchaseUnit?.payments
+        ?.captures,
+    )
+      ? purchaseUnit.payments
+          .captures
       : [];
 
-  for (const purchaseUnit of purchaseUnits) {
-    const captures =
-      Array.isArray(
-        purchaseUnit?.payments?.captures,
-      )
-        ? purchaseUnit.payments.captures
-        : [];
-
-    const capture = captures.find(
-      (item) =>
-        item?.status === "COMPLETED",
+  const completedCaptures =
+    captures.filter(
+      (capture) =>
+        capture?.status ===
+        "COMPLETED",
     );
 
-    if (capture) {
-      return capture;
-    }
+  if (
+    completedCaptures.length ===
+    0
+  ) {
+    return null;
   }
 
-  return null;
+  if (
+    completedCaptures.length >
+    1
+  ) {
+    throw new Error(
+      "Unexpected multiple completed PayPal captures were found.",
+    );
+  }
+
+  return completedCaptures[0];
+}
+
+function getShopItemCount(
+  items,
+) {
+  if (
+    !Array.isArray(items)
+  ) {
+    return 0;
+  }
+
+  return items.reduce(
+    (total, item) => {
+      const quantity =
+        Number(
+          item?.quantity,
+        );
+
+      if (
+        !Number.isInteger(
+          quantity,
+        ) ||
+        quantity <= 0
+      ) {
+        return total;
+      }
+
+      return (
+        total +
+        quantity
+      );
+    },
+    0,
+  );
+}
+
+function expectedPaymentItemName(
+  shopOrder,
+) {
+  const itemCount =
+    getShopItemCount(
+      shopOrder.items,
+    );
+
+  if (
+    itemCount <= 0
+  ) {
+    throw new Error(
+      "Stored Shop order contains no valid items.",
+    );
+  }
+
+  return `${itemCount} Shop Item${
+    itemCount === 1
+      ? ""
+      : "s"
+  }`;
+}
+
+function verifyStoredRecords({
+  payment,
+  shopOrder,
+  orderId,
+  orderNumber,
+}) {
+  if (
+    payment.purpose !==
+    "shop"
+  ) {
+    throw new Error(
+      "Stored payment purpose is invalid.",
+    );
+  }
+
+  if (
+    payment.payment_method !==
+    "PayPal / Card"
+  ) {
+    throw new Error(
+      "Stored payment method is not PayPal / Card.",
+    );
+  }
+
+  if (
+    shopOrder.payment_method !==
+    "PayPal / Card"
+  ) {
+    throw new Error(
+      "Stored Shop order payment method is not PayPal / Card.",
+    );
+  }
+
+  if (
+    shopOrder.order_number !==
+    orderNumber
+  ) {
+    throw new Error(
+      "Stored Shop order number does not match the payment.",
+    );
+  }
+
+  if (
+    shopOrder.paypal_order_id !==
+    orderId
+  ) {
+    throw new Error(
+      "Stored PayPal order ID does not match the Shop order.",
+    );
+  }
+
+  if (
+    payment.provider_reference !==
+    orderId
+  ) {
+    throw new Error(
+      "Stored payment reference does not match the PayPal order.",
+    );
+  }
+
+  if (
+    normalizeEmail(
+      shopOrder.customer_email,
+    ) !==
+    normalizeEmail(
+      payment.customer_email,
+    )
+  ) {
+    throw new Error(
+      "Shop customer does not match the payment.",
+    );
+  }
+
+  if (
+    payment.currency !==
+    SHOP_CURRENCY
+  ) {
+    throw new Error(
+      "Stored Shop payment currency is invalid.",
+    );
+  }
+
+  if (
+    !amountsMatch(
+      payment.amount,
+      shopOrder.total_amount,
+    )
+  ) {
+    throw new Error(
+      "Stored Shop payment amount does not match the order.",
+    );
+  }
+
+  const expectedItemName =
+    expectedPaymentItemName(
+      shopOrder,
+    );
+
+  if (
+    payment.item_name !==
+    expectedItemName
+  ) {
+    throw new Error(
+      "Stored Shop payment item information does not match the order.",
+    );
+  }
+
+  const totalAmount =
+    Number(
+      shopOrder.total_amount,
+    );
+
+  if (
+    !Number.isFinite(
+      totalAmount,
+    ) ||
+    totalAmount <= 0
+  ) {
+    throw new Error(
+      "Stored Shop order total is invalid.",
+    );
+  }
 }
 
 function verifyPayPalOrder({
@@ -315,24 +603,35 @@ function verifyPayPalOrder({
   shopOrder,
   checkoutReference,
 }) {
-  if (!order || order.id !== orderId) {
+  if (
+    !order ||
+    order.id !== orderId
+  ) {
     throw new Error(
       "PayPal Shop order ID verification failed.",
     );
   }
 
-  if (order.status !== "COMPLETED") {
+  if (
+    order.status !==
+    "COMPLETED"
+  ) {
     throw new Error(
       "PayPal Shop payment is not completed.",
     );
   }
 
   const purchaseUnits =
-    Array.isArray(order.purchase_units)
+    Array.isArray(
+      order.purchase_units,
+    )
       ? order.purchase_units
       : [];
 
-  if (purchaseUnits.length !== 1) {
+  if (
+    purchaseUnits.length !==
+    1
+  ) {
     throw new Error(
       "Unexpected PayPal purchase unit count.",
     );
@@ -351,7 +650,8 @@ function verifyPayPalOrder({
   }
 
   if (
-    purchaseUnit.amount?.currency_code !==
+    purchaseUnit.amount
+      ?.currency_code !==
     SHOP_CURRENCY
   ) {
     throw new Error(
@@ -361,7 +661,8 @@ function verifyPayPalOrder({
 
   if (
     !amountsMatch(
-      purchaseUnit.amount?.value,
+      purchaseUnit.amount
+        ?.value,
       shopOrder.total_amount,
     )
   ) {
@@ -381,15 +682,22 @@ function verifyPayPalOrder({
     );
   }
 
-  if (metadata.purpose !== "shop") {
+  if (
+    metadata.purpose !==
+    "shop"
+  ) {
     throw new Error(
       "PayPal Shop purpose verification failed.",
     );
   }
 
   if (
-    String(metadata.shopOrderId) !==
-    String(shopOrder.id)
+    String(
+      metadata.shopOrderId,
+    ) !==
+    String(
+      shopOrder.id,
+    )
   ) {
     throw new Error(
       "PayPal Shop order reference verification failed.",
@@ -428,16 +736,31 @@ function verifyPayPalOrder({
   }
 
   const completedCapture =
-    findCompletedCapture(order);
+    findCompletedCapture(
+      purchaseUnit,
+    );
 
-  if (!completedCapture) {
+  if (
+    !completedCapture
+  ) {
     throw new Error(
       "Completed PayPal Shop capture was not found.",
     );
   }
 
   if (
-    completedCapture.amount?.currency_code !==
+    !getString(
+      completedCapture.id,
+    )
+  ) {
+    throw new Error(
+      "PayPal Shop capture ID is missing.",
+    );
+  }
+
+  if (
+    completedCapture.amount
+      ?.currency_code !==
     SHOP_CURRENCY
   ) {
     throw new Error(
@@ -447,7 +770,8 @@ function verifyPayPalOrder({
 
   if (
     !amountsMatch(
-      completedCapture.amount?.value,
+      completedCapture.amount
+        ?.value,
       shopOrder.total_amount,
     )
   ) {
@@ -458,12 +782,44 @@ function verifyPayPalOrder({
 
   return {
     captureId:
-      completedCapture.id || "",
+      completedCapture.id,
   };
 }
 
+function appendPaymentNote(
+  notes,
+  line,
+) {
+  const existing =
+    getString(notes);
+
+  if (!line) {
+    return existing;
+  }
+
+  if (
+    existing
+      .split("\n")
+      .map((item) =>
+        item.trim(),
+      )
+      .includes(line)
+  ) {
+    return existing;
+  }
+
+  return [
+    existing,
+    line,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function createItemList(items) {
-  if (!Array.isArray(items)) {
+  if (
+    !Array.isArray(items)
+  ) {
     return "";
   }
 
@@ -476,7 +832,9 @@ function createItemList(items) {
         );
 
       const quantity =
-        Number(item?.quantity) || 1;
+        Number(
+          item?.quantity,
+        ) || 1;
 
       const unitPrice =
         Number(
@@ -496,7 +854,9 @@ function createItemList(items) {
     .join("");
 }
 
-async function sendOrderEmails(order) {
+async function sendOrderEmails(
+  order,
+) {
   if (
     !RESEND_API_KEY ||
     !RESEND_FROM_EMAIL ||
@@ -555,13 +915,17 @@ async function sendOrderEmails(order) {
       await resend.emails.send({
         from:
           `DMs Orders <${RESEND_FROM_EMAIL}>`,
+
         to:
           customerEmail,
+
         subject:
           "Your Delly's Matchups Order Confirmation",
+
         html: `
           <div style="font-family: Arial, sans-serif; padding: 40px;">
             <h2>Thank you for your order, ${customerName}.</h2>
+
             <p>Your payment has been received successfully.</p>
 
             <p>
@@ -590,7 +954,9 @@ async function sendOrderEmails(order) {
         `,
       });
 
-    if (customerResult.error) {
+    if (
+      customerResult.error
+    ) {
       console.error(
         "SHOP CUSTOMER EMAIL ERROR:",
         customerResult.error,
@@ -603,10 +969,13 @@ async function sendOrderEmails(order) {
       await resend.emails.send({
         from:
           `DMs Orders <${RESEND_FROM_EMAIL}>`,
+
         to:
           ADMIN_EMAIL,
+
         subject:
           "New Paid Shop Order",
+
         html: `
           <div style="font-family: Arial, sans-serif; padding: 40px;">
             <h2>New Paid Shop Order</h2>
@@ -628,7 +997,10 @@ async function sendOrderEmails(order) {
 
             <p>
               <strong>Phone:</strong>
-              ${escapeHtml(order.customer_phone || "")}
+              ${escapeHtml(
+                order.customer_phone ||
+                  "",
+              )}
             </p>
 
             <p>
@@ -653,7 +1025,9 @@ async function sendOrderEmails(order) {
         `,
       });
 
-    if (adminResult.error) {
+    if (
+      adminResult.error
+    ) {
       console.error(
         "SHOP ADMIN EMAIL ERROR:",
         adminResult.error,
@@ -673,13 +1047,17 @@ async function sendOrderEmails(order) {
   }
 }
 
-export async function POST(request) {
+export async function POST(
+  request,
+) {
   try {
     const body =
       await request.json();
 
     const orderId =
-      getString(body.orderId);
+      getString(
+        body.orderId,
+      );
 
     if (!orderId) {
       return NextResponse.json(
@@ -693,28 +1071,51 @@ export async function POST(request) {
       );
     }
 
+    if (
+      orderId.length > 200
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid PayPal order ID.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
     const supabaseAdmin =
       createSupabaseAdmin();
 
     const {
       data: payment,
-      error: paymentLookupError,
-    } = await supabaseAdmin
-      .from("payments")
-      .select(
-        "id,customer_name,customer_email,purpose,item_name,amount,currency,payment_method,status,provider_reference,notes",
-      )
-      .eq(
-        "purpose",
-        "shop",
-      )
-      .eq(
-        "provider_reference",
-        orderId,
-      )
-      .maybeSingle();
+      error:
+        paymentLookupError,
+    } =
+      await supabaseAdmin
+        .from("payments")
+        .select(
+          "id,customer_name,customer_email,purpose,item_name,amount,currency,payment_method,status,provider_reference,notes",
+        )
+        .eq(
+          "purpose",
+          "shop",
+        )
+        .eq(
+          "payment_method",
+          "PayPal / Card",
+        )
+        .eq(
+          "provider_reference",
+          orderId,
+        )
+        .limit(1)
+        .maybeSingle();
 
-    if (paymentLookupError) {
+    if (
+      paymentLookupError
+    ) {
       console.error(
         "SHOP PAYMENT LOOKUP ERROR:",
         paymentLookupError,
@@ -735,7 +1136,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           error:
-            "Shop payment record was not found.",
+            "Shop PayPal payment record was not found.",
         },
         {
           status: 404,
@@ -744,8 +1145,10 @@ export async function POST(request) {
     }
 
     if (
-      payment.status !== "pending" &&
-      payment.status !== "paid"
+      payment.status !==
+        "pending" &&
+      payment.status !==
+        "paid"
     ) {
       return NextResponse.json(
         {
@@ -794,19 +1197,23 @@ export async function POST(request) {
 
     const {
       data: shopOrder,
-      error: shopOrderError,
-    } = await supabaseAdmin
-      .from("shop_orders")
-      .select(
-        "id,order_number,shipping_amount,status,customer_name,customer_email,customer_phone,address,city,country,note,items,total_amount,payment_method,payment_status,paypal_order_id",
-      )
-      .eq(
-        "id",
-        shopOrderId,
-      )
-      .maybeSingle();
+      error:
+        shopOrderError,
+    } =
+      await supabaseAdmin
+        .from("shop_orders")
+        .select(
+          "id,order_number,shipping_amount,status,customer_name,customer_email,customer_phone,address,city,country,note,items,total_amount,payment_method,payment_status,paypal_order_id",
+        )
+        .eq(
+          "id",
+          shopOrderId,
+        )
+        .maybeSingle();
 
-    if (shopOrderError) {
+    if (
+      shopOrderError
+    ) {
       console.error(
         "SHOP ORDER LOOKUP ERROR:",
         shopOrderError,
@@ -835,14 +1242,20 @@ export async function POST(request) {
       );
     }
 
-    if (
-      shopOrder.order_number !==
-      orderNumber
-    ) {
+    try {
+      verifyStoredRecords({
+        payment,
+        shopOrder,
+        orderId,
+        orderNumber,
+      });
+    } catch (error) {
       return NextResponse.json(
         {
           error:
-            "Stored Shop order number does not match the payment.",
+            error instanceof Error
+              ? error.message
+              : "Stored Shop payment verification failed.",
         },
         {
           status: 409,
@@ -850,75 +1263,17 @@ export async function POST(request) {
       );
     }
 
-    if (
-      shopOrder.paypal_order_id !==
-      orderId
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Stored PayPal order ID does not match the Shop order.",
-        },
-        {
-          status: 409,
-        },
-      );
-    }
+    const paymentAlreadyPaid =
+      payment.status ===
+      "paid";
 
-    if (
-      normalizeEmail(
-        shopOrder.customer_email,
-      ) !==
-      normalizeEmail(
-        payment.customer_email,
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Shop customer does not match the payment.",
-        },
-        {
-          status: 409,
-        },
-      );
-    }
-
-    if (
-      payment.currency !==
-      SHOP_CURRENCY
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Stored Shop payment currency is invalid.",
-        },
-        {
-          status: 409,
-        },
-      );
-    }
-
-    if (
-      !amountsMatch(
-        payment.amount,
-        shopOrder.total_amount,
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Stored Shop payment amount does not match the order.",
-        },
-        {
-          status: 409,
-        },
-      );
-    }
+    const orderAlreadyPaid =
+      shopOrder.payment_status ===
+      "paid";
 
     const wasAlreadyPaid =
-      payment.status === "paid" &&
-      shopOrder.payment_status === "paid";
+      paymentAlreadyPaid &&
+      orderAlreadyPaid;
 
     const accessToken =
       await getPayPalAccessToken();
@@ -936,32 +1291,47 @@ export async function POST(request) {
 
     const {
       captureId,
-    } = verifyPayPalOrder({
-      order: paypalOrder,
-      orderId,
-      shopOrder,
-      checkoutReference,
-    });
+    } =
+      verifyPayPalOrder({
+        order:
+          paypalOrder,
+        orderId,
+        shopOrder,
+        checkoutReference,
+      });
 
-    if (!wasAlreadyPaid) {
+    if (
+      !orderAlreadyPaid
+    ) {
       const {
-        error: orderUpdateError,
-      } = await supabaseAdmin
-        .from("shop_orders")
-        .update({
-          status: "paid",
-          payment_status: "paid",
-          payment_method:
-            "PayPal / Card",
-          paypal_order_id:
-            orderId,
-        })
-        .eq(
-          "id",
-          shopOrder.id,
-        );
+        error:
+          orderUpdateError,
+      } =
+        await supabaseAdmin
+          .from(
+            "shop_orders",
+          )
+          .update({
+            status:
+              "paid",
 
-      if (orderUpdateError) {
+            payment_status:
+              "paid",
+
+            payment_method:
+              "PayPal / Card",
+
+            paypal_order_id:
+              orderId,
+          })
+          .eq(
+            "id",
+            shopOrder.id,
+          );
+
+      if (
+        orderUpdateError
+      ) {
         console.error(
           "SHOP ORDER PAID UPDATE ERROR:",
           orderUpdateError,
@@ -977,32 +1347,44 @@ export async function POST(request) {
           },
         );
       }
+    }
 
-      const updatedNotes = [
-        `Shop Order ID: ${shopOrder.id}`,
-        `Order Number: ${shopOrder.order_number}`,
-        `Checkout Reference: ${checkoutReference}`,
+    if (
+      !paymentAlreadyPaid
+    ) {
+      const captureNote =
         captureId
           ? `PayPal Capture ID: ${captureId}`
-          : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+          : "";
 
-      const {
-        error: paymentUpdateError,
-      } = await supabaseAdmin
-        .from("payments")
-        .update({
-          status: "paid",
-          notes: updatedNotes,
-        })
-        .eq(
-          "id",
-          payment.id,
+      const updatedNotes =
+        appendPaymentNote(
+          payment.notes,
+          captureNote,
         );
 
-      if (paymentUpdateError) {
+      const {
+        error:
+          paymentUpdateError,
+      } =
+        await supabaseAdmin
+          .from("payments")
+          .update({
+            status:
+              "paid",
+
+            notes:
+              updatedNotes ||
+              null,
+          })
+          .eq(
+            "id",
+            payment.id,
+          );
+
+      if (
+        paymentUpdateError
+      ) {
         console.error(
           "SHOP PAYMENT PAID UPDATE ERROR:",
           paymentUpdateError,
@@ -1020,34 +1402,50 @@ export async function POST(request) {
       }
     }
 
+    const newlyPaid =
+      !wasAlreadyPaid;
+
     const emailSent =
-      wasAlreadyPaid
-        ? true
-        : await sendOrderEmails(
+      newlyPaid
+        ? await sendOrderEmails(
             shopOrder,
-          );
+          )
+        : true;
 
     return NextResponse.json({
       success: true,
-      status: "paid",
+
+      status:
+        "paid",
+
       alreadyPaid:
         wasAlreadyPaid,
+
       shopOrderId:
         shopOrder.id,
+
       orderNumber:
         shopOrder.order_number,
+
       orderId,
+
       paypalOrderId:
         orderId,
+
       captureId:
-        captureId || null,
+        captureId ||
+        null,
+
       amount:
         Number(
           shopOrder.total_amount,
         ),
+
       currency:
         SHOP_CURRENCY,
+
       emailSent,
+
       customerName:
         shopOrder.customer_name,
     });

@@ -27,13 +27,32 @@ const PARTNER_CURRENCY = "USD";
 const MIN_SUPPORT_AMOUNT = 1;
 const MAX_SUPPORT_AMOUNT = 100000;
 
+const APP_RETURN_URL =
+  "dellysmatchups://paypal/partner-return";
+
+const APP_CANCEL_URL =
+  "dellysmatchups://paypal/partner-cancel";
+
 const PARTNERSHIP_TYPES = new Set([
   "Monthly Support",
   "Project Partnership",
   "Corporate Partnership",
 ]);
 
-function getRequiredEnvironmentVariable(value, name) {
+const FIELD_LIMITS = {
+  customerName: 200,
+  customerEmail: 320,
+  country: 150,
+  postalCode: 50,
+  customerPhone: 100,
+  organization: 200,
+  notes: 1000,
+};
+
+function getRequiredEnvironmentVariable(
+  value,
+  name,
+) {
   if (!value) {
     throw new Error(
       `Missing environment variable: ${name}`,
@@ -89,11 +108,123 @@ function normalizeSupportAmount(value) {
     return null;
   }
 
-  return Number(amount.toFixed(2));
+  const cents = Math.round(
+    amount * 100,
+  );
+
+  const normalized =
+    cents / 100;
+
+  if (
+    Math.abs(
+      amount - normalized,
+    ) > 0.0000001
+  ) {
+    return null;
+  }
+
+  return normalized;
 }
 
-async function parsePayPalResponse(response) {
-  const text = await response.text();
+function validatePartnerFields({
+  customerName,
+  customerEmail,
+  country,
+  postalCode,
+  customerPhone,
+  organization,
+  partnershipType,
+  notes,
+}) {
+  if (!customerName) {
+    return "Partner name is required.";
+  }
+
+  if (
+    customerName.length >
+    FIELD_LIMITS.customerName
+  ) {
+    return "Partner name is too long.";
+  }
+
+  if (
+    !isValidEmail(
+      customerEmail,
+    )
+  ) {
+    return "A valid partner email is required.";
+  }
+
+  if (
+    customerEmail.length >
+    FIELD_LIMITS.customerEmail
+  ) {
+    return "Partner email is too long.";
+  }
+
+  if (!country) {
+    return "Country is required.";
+  }
+
+  if (
+    country.length >
+    FIELD_LIMITS.country
+  ) {
+    return "Country is too long.";
+  }
+
+  if (!postalCode) {
+    return "Postal / ZIP code is required.";
+  }
+
+  if (
+    postalCode.length >
+    FIELD_LIMITS.postalCode
+  ) {
+    return "Postal / ZIP code is too long.";
+  }
+
+  if (!customerPhone) {
+    return "Phone number is required.";
+  }
+
+  if (
+    customerPhone.length >
+    FIELD_LIMITS.customerPhone
+  ) {
+    return "Phone number is too long.";
+  }
+
+  if (
+    !PARTNERSHIP_TYPES.has(
+      partnershipType,
+    )
+  ) {
+    return "Invalid partnership type.";
+  }
+
+  if (
+    organization.length >
+    FIELD_LIMITS.organization
+  ) {
+    return "Organization name is too long.";
+  }
+
+  if (
+    notes.length >
+    FIELD_LIMITS.notes
+  ) {
+    return "Partnership note is too long.";
+  }
+
+  return null;
+}
+
+async function parsePayPalResponse(
+  response,
+) {
+  const text =
+    await response.text();
 
   if (!text) {
     return {};
@@ -122,27 +253,36 @@ async function getPayPalAccessToken() {
       "PAYPAL_CLIENT_SECRET",
     );
 
-  const authorization = Buffer.from(
-    `${clientId}:${clientSecret}`,
-  ).toString("base64");
+  const authorization =
+    Buffer.from(
+      `${clientId}:${clientSecret}`,
+    ).toString("base64");
 
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v1/oauth2/token`,
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          `Basic ${authorization}`,
-        "Content-Type":
-          "application/x-www-form-urlencoded",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v1/oauth2/token`,
+      {
+        method: "POST",
+
+        headers: {
+          Authorization:
+            `Basic ${authorization}`,
+
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+
+        body:
+          "grant_type=client_credentials",
+
+        cache: "no-store",
       },
-      body: "grant_type=client_credentials",
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parsePayPalResponse(response);
+    await parsePayPalResponse(
+      response,
+    );
 
   if (!response.ok) {
     console.error(
@@ -157,22 +297,157 @@ async function getPayPalAccessToken() {
     );
   }
 
-  if (!data.access_token) {
+  const accessToken =
+    getString(
+      data.access_token,
+    );
+
+  if (!accessToken) {
     throw new Error(
       "PayPal did not return an access token.",
     );
   }
 
-  return data.access_token;
+  return accessToken;
 }
 
-export async function POST(request) {
+function findApprovalUrl(
+  paypalData,
+) {
+  const links =
+    Array.isArray(
+      paypalData?.links,
+    )
+      ? paypalData.links
+      : [];
+
+  const approvalLink =
+    links.find(
+      (link) =>
+        (
+          link?.rel === "approve" ||
+          link?.rel === "payer-action"
+        ) &&
+        typeof link?.href === "string" &&
+        link.href.trim(),
+    );
+
+  return (
+    approvalLink?.href?.trim() ||
+    ""
+  );
+}
+
+function createPayPalPayload({
+  checkoutReference,
+  partnershipType,
+  supportAmount,
+  isNativeApp,
+}) {
+  const payload = {
+    intent: "CAPTURE",
+
+    purchase_units: [
+      {
+        reference_id:
+          checkoutReference,
+
+        description:
+          `Delly's Matchups - ${partnershipType}`.slice(
+            0,
+            127,
+          ),
+
+        custom_id:
+          checkoutReference,
+
+        amount: {
+          currency_code:
+            PARTNER_CURRENCY,
+
+          value:
+            supportAmount.toFixed(
+              2,
+            ),
+        },
+      },
+    ],
+  };
+
+  if (isNativeApp) {
+    payload.payment_source = {
+      paypal: {
+        experience_context: {
+          user_action:
+            "PAY_NOW",
+
+          return_url:
+            APP_RETURN_URL,
+
+          cancel_url:
+            APP_CANCEL_URL,
+        },
+      },
+    };
+  }
+
+  return payload;
+}
+
+function buildPaymentNotes({
+  organization,
+  country,
+  postalCode,
+  customerPhone,
+  partnershipType,
+  checkoutReference,
+  notes,
+  isNativeApp,
+}) {
+  return [
+    `Organization: ${organization || "N/A"}`,
+    `Country: ${country}`,
+    `Postal / ZIP Code: ${postalCode}`,
+    `Phone: ${customerPhone}`,
+    `Partnership Type: ${partnershipType}`,
+    `Checkout Reference: ${checkoutReference}`,
+
+    isNativeApp
+      ? "Checkout Channel: Native App"
+      : "Checkout Channel: Website",
+
+    partnershipType ===
+      "Monthly Support"
+      ? "Payment Frequency: One-time"
+      : "",
+
+    notes
+      ? `Partner Note: ${notes}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export async function POST(
+  request,
+) {
   try {
     const body =
       await request.json();
 
+    const channel =
+      getString(
+        body.channel,
+      );
+
+    const isNativeApp =
+      channel === "app";
+
     const customerName =
-      getString(body.customerName);
+      getString(
+        body.customerName,
+      );
 
     const customerEmail =
       normalizeEmail(
@@ -180,113 +455,57 @@ export async function POST(request) {
       );
 
     const country =
-      getString(body.country);
+      getString(
+        body.country,
+      );
 
     const postalCode =
-      getString(body.postalCode);
+      getString(
+        body.postalCode,
+      );
 
     const customerPhone =
-      getString(body.customerPhone);
+      getString(
+        body.customerPhone,
+      );
 
     const organization =
-      getString(body.organization);
+      getString(
+        body.organization,
+      );
 
     const partnershipType =
-      getString(body.partnershipType);
+      getString(
+        body.partnershipType,
+      );
 
     const notes =
-      getString(body.notes);
+      getString(
+        body.notes,
+      );
 
     const supportAmount =
       normalizeSupportAmount(
         body.amount,
       );
 
-    if (!customerName) {
-      return NextResponse.json(
-        {
-          error:
-            "Partner name is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (
-      !isValidEmail(
+    const validationError =
+      validatePartnerFields({
+        customerName,
         customerEmail,
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "A valid partner email is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (!country) {
-      return NextResponse.json(
-        {
-          error:
-            "Country is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (!postalCode) {
-      return NextResponse.json(
-        {
-          error:
-            "Postal / ZIP code is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (!customerPhone) {
-      return NextResponse.json(
-        {
-          error:
-            "Phone number is required.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (
-      !PARTNERSHIP_TYPES.has(
+        country,
+        postalCode,
+        customerPhone,
+        organization,
         partnershipType,
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid partnership type.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
+        notes,
+      });
 
-    if (supportAmount === null) {
+    if (validationError) {
       return NextResponse.json(
         {
           error:
-            `Support amount must be between $${MIN_SUPPORT_AMOUNT} and $${MAX_SUPPORT_AMOUNT}.`,
+            validationError,
         },
         {
           status: 400,
@@ -295,24 +514,12 @@ export async function POST(request) {
     }
 
     if (
-      organization.length > 200
+      supportAmount === null
     ) {
       return NextResponse.json(
         {
           error:
-            "Organization name is too long.",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (notes.length > 1000) {
-      return NextResponse.json(
-        {
-          error:
-            "Partnership note is too long.",
+            `Support amount must be between $${MIN_SUPPORT_AMOUNT} and $${MAX_SUPPORT_AMOUNT} and contain no more than two decimal places.`,
         },
         {
           status: 400,
@@ -326,48 +533,39 @@ export async function POST(request) {
     const accessToken =
       await getPayPalAccessToken();
 
+    const paypalPayload =
+      createPayPalPayload({
+        checkoutReference,
+        partnershipType,
+        supportAmount,
+        isNativeApp,
+      });
+
     const paypalResponse =
       await fetch(
         `${PAYPAL_API_BASE}/v2/checkout/orders`,
         {
           method: "POST",
+
           headers: {
             Authorization:
               `Bearer ${accessToken}`,
+
             "Content-Type":
               "application/json",
+
             Prefer:
               "return=representation",
+
             "PayPal-Request-Id":
               `partner-${checkoutReference}`,
           },
-          body: JSON.stringify({
-            intent: "CAPTURE",
-            purchase_units: [
-              {
-                reference_id:
-                  checkoutReference,
-                description:
-                  `Delly's Matchups - ${partnershipType}`,
-                custom_id:
-                  JSON.stringify({
-                    purpose:
-                      "partner",
-                    partnershipType,
-                    checkoutReference,
-                    customerEmail,
-                  }),
-                amount: {
-                  currency_code:
-                    PARTNER_CURRENCY,
-                  value:
-                    supportAmount.toFixed(
-                      2,
-                    ),
-                },
-              },
-            ],
-          }),
+
+          body:
+            JSON.stringify(
+              paypalPayload,
+            ),
+
           cache: "no-store",
         },
       );
@@ -377,7 +575,9 @@ export async function POST(request) {
         paypalResponse,
       );
 
-    if (!paypalResponse.ok) {
+    if (
+      !paypalResponse.ok
+    ) {
       console.error(
         "PARTNER PAYPAL CREATE ERROR:",
         paypalData,
@@ -413,54 +613,88 @@ export async function POST(request) {
       );
     }
 
+    const approvalUrl =
+      findApprovalUrl(
+        paypalData,
+      );
+
+    if (
+      isNativeApp &&
+      !approvalUrl
+    ) {
+      console.error(
+        "PARTNER PAYPAL APPROVAL URL MISSING:",
+        paypalData,
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "PayPal did not return an approval URL for the app.",
+        },
+        {
+          status: 502,
+        },
+      );
+    }
+
     const supabaseAdmin =
       createSupabaseAdmin();
 
-    const paymentNotes = [
-      `Organization: ${organization || "N/A"}`,
-      `Country: ${country}`,
-      `Postal / ZIP Code: ${postalCode}`,
-      `Phone: ${customerPhone}`,
-      `Partnership Type: ${partnershipType}`,
-      `Checkout Reference: ${checkoutReference}`,
-      notes
-        ? `Partner Note: ${notes}`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const paymentNotes =
+      buildPaymentNotes({
+        organization,
+        country,
+        postalCode,
+        customerPhone,
+        partnershipType,
+        checkoutReference,
+        notes,
+        isNativeApp,
+      });
 
     const {
       data: payment,
       error: paymentError,
-    } = await supabaseAdmin
-      .from("payments")
-      .insert({
-        customer_name:
-          customerName,
-        customer_email:
-          customerEmail,
-        purpose:
-          "partner",
-        item_name:
-          partnershipType,
-        amount:
-          supportAmount,
-        currency:
-          PARTNER_CURRENCY,
-        payment_method:
-          "PayPal / Card",
-        status:
-          "pending",
-        provider_reference:
-          paypalOrderId,
-        proof_url:
-          null,
-        notes:
-          paymentNotes,
-      })
-      .select("id")
-      .single();
+    } =
+      await supabaseAdmin
+        .from("payments")
+        .insert({
+          customer_name:
+            customerName,
+
+          customer_email:
+            customerEmail,
+
+          purpose:
+            "partner",
+
+          item_name:
+            partnershipType,
+
+          amount:
+            supportAmount,
+
+          currency:
+            PARTNER_CURRENCY,
+
+          payment_method:
+            "PayPal / Card",
+
+          status:
+            "pending",
+
+          provider_reference:
+            paypalOrderId,
+
+          proof_url:
+            null,
+
+          notes:
+            paymentNotes,
+        })
+        .select("id")
+        .single();
 
     if (paymentError) {
       console.error(
@@ -494,16 +728,34 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: true,
+
         orderId:
           paypalOrderId,
+
         paypalOrderId,
+
         paymentId:
           payment.id,
+
         partnershipType,
+
         amount:
           supportAmount,
+
         currency:
           PARTNER_CURRENCY,
+
+        channel:
+          isNativeApp
+            ? "app"
+            : "web",
+
+        approvalUrl:
+          approvalUrl ||
+          null,
+
+        recurring:
+          false,
       },
       {
         status: 201,

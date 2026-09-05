@@ -29,7 +29,10 @@ const PARTNERSHIP_TYPES = new Set([
   "Corporate Partnership",
 ]);
 
-function getRequiredEnvironmentVariable(value, name) {
+function getRequiredEnvironmentVariable(
+  value,
+  name,
+) {
   if (!value) {
     throw new Error(
       `Missing environment variable: ${name}`,
@@ -45,13 +48,15 @@ function getString(value) {
     : "";
 }
 
-function normalizeEmail(value) {
-  return getString(value).toLowerCase();
-}
+function amountsMatch(
+  left,
+  right,
+) {
+  const leftNumber =
+    Number(left);
 
-function amountsMatch(left, right) {
-  const leftNumber = Number(left);
-  const rightNumber = Number(right);
+  const rightNumber =
+    Number(right);
 
   if (
     !Number.isFinite(leftNumber) ||
@@ -60,40 +65,80 @@ function amountsMatch(left, right) {
     return false;
   }
 
-  return Math.abs(leftNumber - rightNumber) < 0.001;
+  return (
+    Math.abs(
+      leftNumber -
+        rightNumber,
+    ) < 0.001
+  );
 }
 
-function getNoteValue(notes, label) {
-  if (!notes || typeof notes !== "string") {
+function getNoteValue(
+  notes,
+  label,
+) {
+  if (
+    !notes ||
+    typeof notes !== "string"
+  ) {
     return "";
   }
 
-  const prefix = `${label}:`;
+  const prefix =
+    `${label}:`;
 
-  const line = notes
-    .split("\n")
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(prefix));
+  const line =
+    notes
+      .split("\n")
+      .map((item) =>
+        item.trim(),
+      )
+      .find((item) =>
+        item.startsWith(
+          prefix,
+        ),
+      );
 
   return line
-    ? line.slice(prefix.length).trim()
+    ? line
+        .slice(
+          prefix.length,
+        )
+        .trim()
     : "";
 }
 
-function parseCustomMetadata(value) {
-  if (!value || typeof value !== "string") {
-    return null;
+function appendPaymentNote(
+  notes,
+  line,
+) {
+  const existing =
+    getString(notes);
+
+  if (!line) {
+    return existing;
   }
 
-  try {
-    const parsed = JSON.parse(value);
+  const lines =
+    existing
+      .split("\n")
+      .map((item) =>
+        item.trim(),
+      )
+      .filter(Boolean);
 
-    return parsed && typeof parsed === "object"
-      ? parsed
-      : null;
-  } catch {
-    return null;
+  if (
+    lines.includes(line)
+  ) {
+    return existing;
   }
+
+  return [
+    existing,
+    line,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function createSupabaseAdmin() {
@@ -115,8 +160,11 @@ function createSupabaseAdmin() {
   );
 }
 
-async function parsePayPalResponse(response) {
-  const text = await response.text();
+async function parsePayPalResponse(
+  response,
+) {
+  const text =
+    await response.text();
 
   if (!text) {
     return {};
@@ -145,27 +193,36 @@ async function getPayPalAccessToken() {
       "PAYPAL_CLIENT_SECRET",
     );
 
-  const authorization = Buffer.from(
-    `${clientId}:${clientSecret}`,
-  ).toString("base64");
+  const authorization =
+    Buffer.from(
+      `${clientId}:${clientSecret}`,
+    ).toString("base64");
 
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v1/oauth2/token`,
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          `Basic ${authorization}`,
-        "Content-Type":
-          "application/x-www-form-urlencoded",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v1/oauth2/token`,
+      {
+        method: "POST",
+
+        headers: {
+          Authorization:
+            `Basic ${authorization}`,
+
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+
+        body:
+          "grant_type=client_credentials",
+
+        cache: "no-store",
       },
-      body: "grant_type=client_credentials",
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parsePayPalResponse(response);
+    await parsePayPalResponse(
+      response,
+    );
 
   if (!response.ok) {
     console.error(
@@ -180,37 +237,48 @@ async function getPayPalAccessToken() {
     );
   }
 
-  if (!data.access_token) {
+  const accessToken =
+    getString(
+      data.access_token,
+    );
+
+  if (!accessToken) {
     throw new Error(
       "PayPal did not return an access token.",
     );
   }
 
-  return data.access_token;
+  return accessToken;
 }
 
 async function getPayPalOrder(
   accessToken,
   orderId,
 ) {
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
-      orderId,
-    )}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-        "Content-Type":
-          "application/json",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
+        orderId,
+      )}`,
+      {
+        method: "GET",
+
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+
+          "Content-Type":
+            "application/json",
+        },
+
+        cache: "no-store",
       },
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parsePayPalResponse(response);
+    await parsePayPalResponse(
+      response,
+    );
 
   if (!response.ok) {
     console.error(
@@ -231,27 +299,38 @@ async function capturePayPalOrder(
   accessToken,
   orderId,
 ) {
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
-      orderId,
-    )}/capture`,
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-        "Content-Type":
-          "application/json",
-        Prefer:
-          "return=representation",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
+        orderId,
+      )}/capture`,
+      {
+        method: "POST",
+
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+
+          "Content-Type":
+            "application/json",
+
+          Prefer:
+            "return=representation",
+
+          "PayPal-Request-Id":
+            `partner-capture-${orderId}`,
+        },
+
+        body: "{}",
+
+        cache: "no-store",
       },
-      body: "{}",
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parsePayPalResponse(response);
+    await parsePayPalResponse(
+      response,
+    );
 
   if (response.ok) {
     return data;
@@ -281,41 +360,157 @@ async function capturePayPalOrder(
   );
 }
 
-function findCompletedCapture(order) {
-  const purchaseUnits =
-    Array.isArray(order?.purchase_units)
-      ? order.purchase_units
+function findCompletedCapture(
+  purchaseUnit,
+) {
+  const captures =
+    Array.isArray(
+      purchaseUnit?.payments
+        ?.captures,
+    )
+      ? purchaseUnit.payments
+          .captures
       : [];
 
-  for (const purchaseUnit of purchaseUnits) {
-    const captures =
-      Array.isArray(
-        purchaseUnit?.payments?.captures,
-      )
-        ? purchaseUnit.payments.captures
-        : [];
+  const completedCaptures =
+    captures.filter(
+      (capture) =>
+        capture?.status ===
+        "COMPLETED",
+    );
 
-    const capture =
-      captures.find(
-        (item) =>
-          item?.status ===
-          "COMPLETED",
+  if (
+    completedCaptures.length === 0
+  ) {
+    return null;
+  }
+
+  if (
+    completedCaptures.length > 1
+  ) {
+    throw new Error(
+      "Unexpected multiple completed PayPal partnership captures were found.",
+    );
+  }
+
+  return completedCaptures[0];
+}
+
+function verifyStoredPartnerPayment(
+  payment,
+) {
+  if (
+    payment.purpose !==
+    "partner"
+  ) {
+    throw new Error(
+      "Stored payment purpose is invalid.",
+    );
+  }
+
+  if (
+    payment.payment_method !==
+    "PayPal / Card"
+  ) {
+    throw new Error(
+      "Stored partnership payment method is invalid.",
+    );
+  }
+
+  if (
+    payment.currency !==
+    PARTNER_CURRENCY
+  ) {
+    throw new Error(
+      "Stored partnership currency is invalid.",
+    );
+  }
+
+  const amount =
+    Number(
+      payment.amount,
+    );
+
+  if (
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
+    throw new Error(
+      "Stored partnership amount is invalid.",
+    );
+  }
+
+  const partnershipType =
+    getNoteValue(
+      payment.notes,
+      "Partnership Type",
+    );
+
+  const checkoutReference =
+    getNoteValue(
+      payment.notes,
+      "Checkout Reference",
+    );
+
+  if (
+    !PARTNERSHIP_TYPES.has(
+      partnershipType,
+    )
+  ) {
+    throw new Error(
+      "Stored partnership type is invalid.",
+    );
+  }
+
+  if (
+    payment.item_name !==
+    partnershipType
+  ) {
+    throw new Error(
+      "Stored partnership type does not match the payment item.",
+    );
+  }
+
+  if (
+    !checkoutReference
+  ) {
+    throw new Error(
+      "Stored partnership checkout reference is missing.",
+    );
+  }
+
+  if (
+    partnershipType ===
+    "Monthly Support"
+  ) {
+    const frequency =
+      getNoteValue(
+        payment.notes,
+        "Payment Frequency",
       );
 
-    if (capture) {
-      return capture;
+    if (
+      frequency &&
+      frequency !==
+        "One-time"
+    ) {
+      throw new Error(
+        "Stored Monthly Support payment frequency is invalid.",
+      );
     }
   }
 
-  return null;
+  return {
+    partnershipType,
+    checkoutReference,
+  };
 }
 
-function verifyPartnerPayment({
+function verifyPayPalPartnerPayment({
   order,
   orderId,
   payment,
   checkoutReference,
-  partnershipType,
 }) {
   if (
     !order ||
@@ -343,7 +538,8 @@ function verifyPartnerPayment({
       : [];
 
   if (
-    purchaseUnits.length !== 1
+    purchaseUnits.length !==
+    1
   ) {
     throw new Error(
       "Unexpected PayPal purchase unit count.",
@@ -363,7 +559,19 @@ function verifyPartnerPayment({
   }
 
   if (
-    purchaseUnit.amount?.currency_code !==
+    getString(
+      purchaseUnit.custom_id,
+    ) !==
+    checkoutReference
+  ) {
+    throw new Error(
+      "Partner PayPal metadata verification failed.",
+    );
+  }
+
+  if (
+    purchaseUnit.amount
+      ?.currency_code !==
     PARTNER_CURRENCY
   ) {
     throw new Error(
@@ -373,7 +581,8 @@ function verifyPartnerPayment({
 
   if (
     !amountsMatch(
-      purchaseUnit.amount?.value,
+      purchaseUnit.amount
+        ?.value,
       payment.amount,
     )
   ) {
@@ -382,63 +591,27 @@ function verifyPartnerPayment({
     );
   }
 
-  const metadata =
-    parseCustomMetadata(
-      purchaseUnit.custom_id,
-    );
-
-  if (!metadata) {
-    throw new Error(
-      "Partner payment metadata is missing or invalid.",
-    );
-  }
-
-  if (
-    metadata.purpose !==
-    "partner"
-  ) {
-    throw new Error(
-      "Partner payment purpose verification failed.",
-    );
-  }
-
-  if (
-    metadata.checkoutReference !==
-    checkoutReference
-  ) {
-    throw new Error(
-      "Partner metadata checkout reference verification failed.",
-    );
-  }
-
-  if (
-    metadata.partnershipType !==
-    partnershipType
-  ) {
-    throw new Error(
-      "Partner type verification failed.",
-    );
-  }
-
-  if (
-    normalizeEmail(
-      metadata.customerEmail,
-    ) !==
-    normalizeEmail(
-      payment.customer_email,
-    )
-  ) {
-    throw new Error(
-      "Partner email verification failed.",
-    );
-  }
-
   const completedCapture =
-    findCompletedCapture(order);
+    findCompletedCapture(
+      purchaseUnit,
+    );
 
-  if (!completedCapture) {
+  if (
+    !completedCapture
+  ) {
     throw new Error(
       "Completed PayPal partnership capture was not found.",
+    );
+  }
+
+  const captureId =
+    getString(
+      completedCapture.id,
+    );
+
+  if (!captureId) {
+    throw new Error(
+      "Completed PayPal partnership capture ID is missing.",
     );
   }
 
@@ -454,7 +627,8 @@ function verifyPartnerPayment({
 
   if (
     !amountsMatch(
-      completedCapture.amount?.value,
+      completedCapture.amount
+        ?.value,
       payment.amount,
     )
   ) {
@@ -464,18 +638,21 @@ function verifyPartnerPayment({
   }
 
   return {
-    captureId:
-      completedCapture.id || "",
+    captureId,
   };
 }
 
-export async function POST(request) {
+export async function POST(
+  request,
+) {
   try {
     const body =
       await request.json();
 
     const orderId =
-      getString(body.orderId);
+      getString(
+        body.orderId,
+      );
 
     if (!orderId) {
       return NextResponse.json(
@@ -489,28 +666,50 @@ export async function POST(request) {
       );
     }
 
+    if (
+      orderId.length > 200
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid PayPal order ID.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
     const supabaseAdmin =
       createSupabaseAdmin();
 
     const {
-      data: payment,
-      error: paymentLookupError,
-    } = await supabaseAdmin
-      .from("payments")
-      .select(
-        "id,customer_name,customer_email,purpose,item_name,amount,currency,payment_method,status,provider_reference,notes",
-      )
-      .eq(
-        "purpose",
-        "partner",
-      )
-      .eq(
-        "provider_reference",
-        orderId,
-      )
-      .maybeSingle();
+      data: payments,
+      error:
+        paymentLookupError,
+    } =
+      await supabaseAdmin
+        .from("payments")
+        .select(
+          "id,customer_name,customer_email,purpose,item_name,amount,currency,payment_method,status,provider_reference,notes",
+        )
+        .eq(
+          "purpose",
+          "partner",
+        )
+        .eq(
+          "payment_method",
+          "PayPal / Card",
+        )
+        .eq(
+          "provider_reference",
+          orderId,
+        )
+        .limit(2);
 
-    if (paymentLookupError) {
+    if (
+      paymentLookupError
+    ) {
       console.error(
         "PARTNER PAYMENT LOOKUP ERROR:",
         paymentLookupError,
@@ -527,17 +726,52 @@ export async function POST(request) {
       );
     }
 
-    if (!payment) {
+    if (
+      !Array.isArray(
+        payments,
+      ) ||
+      payments.length === 0
+    ) {
       return NextResponse.json(
         {
           error:
-            "Partnership payment record was not found.",
+            "Partnership PayPal payment record was not found.",
         },
         {
           status: 404,
         },
       );
     }
+
+    if (
+      payments.length > 1
+    ) {
+      console.error(
+        "DUPLICATE PARTNER PAYPAL ORDER:",
+        {
+          orderId,
+
+          paymentIds:
+            payments.map(
+              (payment) =>
+                payment.id,
+            ),
+        },
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Multiple partnership payment records were found for this PayPal order. Please contact support.",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
+    const payment =
+      payments[0];
 
     if (
       payment.status !==
@@ -556,88 +790,23 @@ export async function POST(request) {
       );
     }
 
-    if (
-      payment.currency !==
-      PARTNER_CURRENCY
-    ) {
+    let storedPartner;
+
+    try {
+      storedPartner =
+        verifyStoredPartnerPayment(
+          payment,
+        );
+    } catch (error) {
       return NextResponse.json(
         {
           error:
-            "Stored partnership currency is invalid.",
+            error instanceof Error
+              ? error.message
+              : "Stored partnership payment verification failed.",
         },
         {
           status: 409,
-        },
-      );
-    }
-
-    if (
-      payment.payment_method !==
-      "PayPal / Card"
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Stored partnership payment method is invalid.",
-        },
-        {
-          status: 409,
-        },
-      );
-    }
-
-    const partnershipType =
-      getNoteValue(
-        payment.notes,
-        "Partnership Type",
-      );
-
-    const checkoutReference =
-      getNoteValue(
-        payment.notes,
-        "Checkout Reference",
-      );
-
-    if (
-      !partnershipType ||
-      !PARTNERSHIP_TYPES.has(
-        partnershipType,
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Stored partnership type is invalid.",
-        },
-        {
-          status: 500,
-        },
-      );
-    }
-
-    if (
-      payment.item_name !==
-      partnershipType
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Stored partnership payment type does not match its item.",
-        },
-        {
-          status: 409,
-        },
-      );
-    }
-
-    if (!checkoutReference) {
-      return NextResponse.json(
-        {
-          error:
-            "Stored partnership checkout reference is missing.",
-        },
-        {
-          status: 500,
         },
       );
     }
@@ -662,41 +831,55 @@ export async function POST(request) {
 
     const {
       captureId,
-    } = verifyPartnerPayment({
-      order: paypalOrder,
-      orderId,
-      payment,
-      checkoutReference,
-      partnershipType,
-    });
+    } =
+      verifyPayPalPartnerPayment({
+        order:
+          paypalOrder,
 
-    if (!wasAlreadyPaid) {
-      const updatedNotes = [
-        payment.notes,
-        captureId
-          ? `PayPal Capture ID: ${captureId}`
-          : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+        orderId,
+
+        payment,
+
+        checkoutReference:
+          storedPartner.checkoutReference,
+      });
+
+    if (
+      !wasAlreadyPaid
+    ) {
+      const updatedNotes =
+        appendPaymentNote(
+          payment.notes,
+          `PayPal Capture ID: ${captureId}`,
+        );
 
       const {
+        data:
+          updatedPayment,
         error:
           paymentUpdateError,
-      } = await supabaseAdmin
-        .from("payments")
-        .update({
-          status: "paid",
-          notes: updatedNotes,
-        })
-        .eq(
-          "id",
-          payment.id,
-        )
-        .eq(
-          "status",
-          "pending",
-        );
+      } =
+        await supabaseAdmin
+          .from("payments")
+          .update({
+            status:
+              "paid",
+
+            notes:
+              updatedNotes,
+          })
+          .eq(
+            "id",
+            payment.id,
+          )
+          .eq(
+            "status",
+            "pending",
+          )
+          .select(
+            "id,status",
+          )
+          .maybeSingle();
 
       if (
         paymentUpdateError
@@ -716,27 +899,99 @@ export async function POST(request) {
           },
         );
       }
+
+      if (
+        !updatedPayment ||
+        updatedPayment.status !==
+          "paid"
+      ) {
+        const {
+          data:
+            currentPayment,
+          error:
+            currentPaymentError,
+        } =
+          await supabaseAdmin
+            .from("payments")
+            .select(
+              "id,status",
+            )
+            .eq(
+              "id",
+              payment.id,
+            )
+            .maybeSingle();
+
+        if (
+          currentPaymentError
+        ) {
+          console.error(
+            "PARTNER FINAL STATUS LOOKUP ERROR:",
+            currentPaymentError,
+          );
+
+          return NextResponse.json(
+            {
+              error:
+                "Partnership payment was captured but its final status could not be verified. Please contact support and do not pay again.",
+            },
+            {
+              status: 500,
+            },
+          );
+        }
+
+        if (
+          currentPayment?.status !==
+          "paid"
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Partnership payment was captured but could not be finalized. Please contact support and do not pay again.",
+            },
+            {
+              status: 409,
+            },
+          );
+        }
+      }
     }
 
     return NextResponse.json({
       success: true,
+
       status: "paid",
+
       alreadyPaid:
         wasAlreadyPaid,
+
       orderId,
+
       paypalOrderId:
         orderId,
-      captureId:
-        captureId || null,
+
+      captureId,
+
       paymentId:
         payment.id,
-      partnershipType,
+
+      partnershipType:
+        storedPartner.partnershipType,
+
       amount:
-        Number(payment.amount),
+        Number(
+          payment.amount,
+        ),
+
       currency:
         PARTNER_CURRENCY,
+
       customerName:
         payment.customer_name,
+
+      recurring:
+        false,
     });
   } catch (error) {
     console.error(

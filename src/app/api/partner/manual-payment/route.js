@@ -1,4 +1,4 @@
-// src/app/api/donations/manual-payment/route.js
+// src/app/api/partner/manual-payment/route.js
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -11,22 +11,21 @@ const SUPABASE_URL =
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const DONATION_CURRENCY = "USD";
+const PARTNER_CURRENCY = "USD";
 
-const MIN_DONATION_AMOUNT = 1;
+const MIN_SUPPORT_AMOUNT = 1;
+const MAX_SUPPORT_AMOUNT = 100000;
 
-const MAX_DONATION_AMOUNT = 100000;
+const PARTNERSHIP_TYPES = new Set([
+  "Monthly Support",
+  "Project Partnership",
+  "Corporate Partnership",
+]);
 
 const ALLOWED_PAYMENT_METHODS = [
   "Mobile Money",
   "Bank Transfer",
 ];
-
-const DONATION_PURPOSES = new Set([
-  "Delly Singah Foundation",
-  "Delly's Matchups",
-  "Other Purpose",
-]);
 
 const FIELD_LIMITS = {
   customerName: 200,
@@ -34,9 +33,9 @@ const FIELD_LIMITS = {
   country: 150,
   postalCode: 50,
   customerPhone: 100,
+  organization: 200,
   transactionReference: 200,
   proofUrl: 2000,
-  otherPurpose: 200,
   notes: 1000,
 };
 
@@ -88,22 +87,24 @@ function isValidEmail(value) {
   );
 }
 
-function normalizeDonationAmount(
+function normalizeSupportAmount(
   value,
 ) {
-  const amount = Number(value);
+  const amount =
+    Number(value);
 
   if (
     !Number.isFinite(amount) ||
-    amount < MIN_DONATION_AMOUNT ||
-    amount > MAX_DONATION_AMOUNT
+    amount < MIN_SUPPORT_AMOUNT ||
+    amount > MAX_SUPPORT_AMOUNT
   ) {
     return null;
   }
 
-  const cents = Math.round(
-    amount * 100,
-  );
+  const cents =
+    Math.round(
+      amount * 100,
+    );
 
   const normalized =
     cents / 100;
@@ -119,15 +120,21 @@ function normalizeDonationAmount(
   return normalized;
 }
 
-function isValidProofUrl(value) {
+function isValidProofUrl(
+  value,
+) {
   if (!value) {
     return true;
   }
 
   try {
-    const url = new URL(value);
+    const url =
+      new URL(value);
 
-    return url.protocol === "https:";
+    return (
+      url.protocol ===
+      "https:"
+    );
   } catch {
     return false;
   }
@@ -152,7 +159,8 @@ function amountsMatch(
 
   return (
     Math.abs(
-      leftNumber - rightNumber,
+      leftNumber -
+        rightNumber,
     ) < 0.001
   );
 }
@@ -171,14 +179,17 @@ function getNoteValue(
   const prefix =
     `${label}:`;
 
-  const line = notes
-    .split("\n")
-    .map((item) =>
-      item.trim(),
-    )
-    .find((item) =>
-      item.startsWith(prefix),
-    );
+  const line =
+    notes
+      .split("\n")
+      .map((item) =>
+        item.trim(),
+      )
+      .find((item) =>
+        item.startsWith(
+          prefix,
+        ),
+      );
 
   return line
     ? line
@@ -189,76 +200,28 @@ function getNoteValue(
     : "";
 }
 
-function resolveDonationPurpose({
-  donationPurpose,
-  otherPurpose,
-}) {
-  if (
-    !DONATION_PURPOSES.has(
-      donationPurpose,
-    )
-  ) {
-    return {
-      error:
-        "Please select a valid donation purpose.",
-    };
-  }
-
-  if (
-    donationPurpose ===
-    "Other Purpose"
-  ) {
-    if (!otherPurpose) {
-      return {
-        error:
-          "Please enter the purpose of your donation.",
-      };
-    }
-
-    if (
-      otherPurpose.length >
-      FIELD_LIMITS.otherPurpose
-    ) {
-      return {
-        error:
-          "Donation purpose is too long.",
-      };
-    }
-
-    return {
-      donationPurpose,
-      purposeLabel:
-        otherPurpose,
-    };
-  }
-
-  return {
-    donationPurpose,
-    purposeLabel:
-      donationPurpose,
-  };
-}
-
-function validateInput({
+function validatePartnerInput({
   customerName,
   customerEmail,
   country,
   postalCode,
   customerPhone,
+  organization,
+  partnershipType,
   paymentMethod,
   transactionReference,
   proofUrl,
   notes,
 }) {
   if (!customerName) {
-    return "Donor name is required.";
+    return "Partner name is required.";
   }
 
   if (
     customerName.length >
     FIELD_LIMITS.customerName
   ) {
-    return "Donor name is too long.";
+    return "Partner name is too long.";
   }
 
   if (
@@ -266,14 +229,14 @@ function validateInput({
       customerEmail,
     )
   ) {
-    return "A valid donor email is required.";
+    return "A valid partner email is required.";
   }
 
   if (
     customerEmail.length >
     FIELD_LIMITS.customerEmail
   ) {
-    return "Donor email is too long.";
+    return "Partner email is too long.";
   }
 
   if (!country) {
@@ -310,11 +273,26 @@ function validateInput({
   }
 
   if (
+    !PARTNERSHIP_TYPES.has(
+      partnershipType,
+    )
+  ) {
+    return "Invalid partnership type.";
+  }
+
+  if (
     !ALLOWED_PAYMENT_METHODS.includes(
       paymentMethod,
     )
   ) {
     return "Payment method must be Mobile Money or Bank Transfer.";
+  }
+
+  if (
+    organization.length >
+    FIELD_LIMITS.organization
+  ) {
+    return "Organization name is too long.";
   }
 
   if (!transactionReference) {
@@ -347,56 +325,56 @@ function validateInput({
     notes.length >
     FIELD_LIMITS.notes
   ) {
-    return "Donation note is too long.";
+    return "Partnership note is too long.";
   }
 
   return null;
 }
 
 function buildPaymentNotes({
+  organization,
   country,
   postalCode,
   customerPhone,
+  partnershipType,
   transactionReference,
-  donationPurpose,
-  otherPurpose,
-  purposeLabel,
   notes,
   isNativeApp,
 }) {
   return [
+    `Organization: ${organization || "N/A"}`,
     `Country: ${country}`,
     `Postal / ZIP Code: ${postalCode}`,
     `Phone: ${customerPhone}`,
+    `Partnership Type: ${partnershipType}`,
     `Transaction Reference: ${transactionReference}`,
-    `Donation Purpose: ${donationPurpose}`,
-    `Purpose Label: ${purposeLabel}`,
-
-    otherPurpose
-      ? `Other Purpose: ${otherPurpose}`
-      : "",
 
     isNativeApp
       ? "Checkout Channel: Native App"
       : "Checkout Channel: Website",
 
+    partnershipType ===
+      "Monthly Support"
+      ? "Payment Frequency: One-time"
+      : "",
+
     notes
-      ? `Donor Note: ${notes}`
+      ? `Partner Note: ${notes}`
       : "",
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-async function handleExistingPayment({
+function handleExistingPayment({
   existingPayments,
   customerName,
   customerEmail,
-  donationAmount,
+  organization,
+  partnershipType,
   paymentMethod,
   transactionReference,
-  donationPurpose,
-  purposeLabel,
+  supportAmount,
 }) {
   if (
     !Array.isArray(
@@ -411,7 +389,7 @@ async function handleExistingPayment({
     existingPayments.length > 1
   ) {
     console.error(
-      "DONATION DUPLICATE TRANSACTION REFERENCES:",
+      "PARTNER DUPLICATE TRANSACTION REFERENCES:",
       {
         transactionReference,
         paymentIds:
@@ -425,7 +403,7 @@ async function handleExistingPayment({
     return NextResponse.json(
       {
         error:
-          "This transaction reference is associated with multiple donation records. Please contact support.",
+          "This transaction reference is associated with multiple partnership payment records. Please contact support.",
       },
       {
         status: 409,
@@ -437,7 +415,8 @@ async function handleExistingPayment({
     existingPayments[0];
 
   if (
-    existing.status === "paid"
+    existing.status ===
+    "paid"
   ) {
     return NextResponse.json(
       {
@@ -450,17 +429,20 @@ async function handleExistingPayment({
     );
   }
 
-  const storedDonationPurpose =
+  const storedPartnershipType =
     getNoteValue(
       existing.notes,
-      "Donation Purpose",
+      "Partnership Type",
     );
 
-  const storedPurposeLabel =
+  const storedOrganization =
     getNoteValue(
       existing.notes,
-      "Purpose Label",
+      "Organization",
     );
+
+  const expectedOrganization =
+    organization || "N/A";
 
   const sameSubmission =
     getString(
@@ -471,30 +453,32 @@ async function handleExistingPayment({
       existing.customer_email,
     ) ===
       customerEmail &&
+    existing.item_name ===
+      partnershipType &&
+    storedPartnershipType ===
+      partnershipType &&
+    storedOrganization ===
+      expectedOrganization &&
     existing.payment_method ===
       paymentMethod &&
     existing.provider_reference ===
       transactionReference &&
     existing.currency ===
-      DONATION_CURRENCY &&
+      PARTNER_CURRENCY &&
     amountsMatch(
       existing.amount,
-      donationAmount,
+      supportAmount,
     ) &&
     existing.status ===
-      "pending_confirmation" &&
-    existing.item_name ===
-      purposeLabel &&
-    storedDonationPurpose ===
-      donationPurpose &&
-    storedPurposeLabel ===
-      purposeLabel;
+      "pending_confirmation";
 
-  if (!sameSubmission) {
+  if (
+    !sameSubmission
+  ) {
     return NextResponse.json(
       {
         error:
-          "That transaction reference has already been used for another donation.",
+          "That transaction reference has already been used for another partnership payment.",
       },
       {
         status: 409,
@@ -505,7 +489,8 @@ async function handleExistingPayment({
   return NextResponse.json({
     success: true,
 
-    alreadySubmitted: true,
+    alreadySubmitted:
+      true,
 
     status:
       "pending_confirmation",
@@ -513,22 +498,22 @@ async function handleExistingPayment({
     paymentId:
       existing.id,
 
+    partnershipType:
+      existing.item_name,
+
     amount:
       Number(
         existing.amount,
       ),
 
     currency:
-      DONATION_CURRENCY,
+      PARTNER_CURRENCY,
 
     paymentMethod:
       existing.payment_method,
 
-    donationPurpose:
-      storedDonationPurpose,
-
-    purposeLabel:
-      storedPurposeLabel,
+    recurring:
+      false,
   });
 }
 
@@ -572,6 +557,16 @@ export async function POST(
         body.customerPhone,
       );
 
+    const organization =
+      getString(
+        body.organization,
+      );
+
+    const partnershipType =
+      getString(
+        body.partnershipType,
+      );
+
     const paymentMethod =
       getString(
         body.paymentMethod,
@@ -592,28 +587,20 @@ export async function POST(
         body.notes,
       );
 
-    const donationPurpose =
-      getString(
-        body.donationPurpose,
-      );
-
-    const otherPurpose =
-      getString(
-        body.otherPurpose,
-      );
-
-    const donationAmount =
-      normalizeDonationAmount(
+    const supportAmount =
+      normalizeSupportAmount(
         body.amount,
       );
 
     const validationError =
-      validateInput({
+      validatePartnerInput({
         customerName,
         customerEmail,
         country,
         postalCode,
         customerPhone,
+        organization,
+        partnershipType,
         paymentMethod,
         transactionReference,
         proofUrl,
@@ -635,48 +622,25 @@ export async function POST(
     }
 
     if (
-      donationAmount ===
-      null
+      supportAmount === null
     ) {
       return NextResponse.json(
         {
           error:
-            `Donation amount must be between $${MIN_DONATION_AMOUNT} and $${MAX_DONATION_AMOUNT} and contain no more than two decimal places.`,
+            `Support amount must be between $${MIN_SUPPORT_AMOUNT} and $${MAX_SUPPORT_AMOUNT} and contain no more than two decimal places.`,
         },
         {
           status: 400,
         },
       );
     }
-
-    const purposeResult =
-      resolveDonationPurpose({
-        donationPurpose,
-        otherPurpose,
-      });
-
-    if (
-      purposeResult.error
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            purposeResult.error,
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    const purposeLabel =
-      purposeResult.purposeLabel;
 
     const supabaseAdmin =
       createSupabaseAdmin();
 
     const {
-      data: existingPayments,
+      data:
+        existingPayments,
       error:
         duplicateLookupError,
     } =
@@ -687,7 +651,7 @@ export async function POST(
         )
         .eq(
           "purpose",
-          "donation",
+          "partner",
         )
         .eq(
           "provider_reference",
@@ -703,7 +667,7 @@ export async function POST(
       duplicateLookupError
     ) {
       console.error(
-        "DONATION MANUAL DUPLICATE LOOKUP ERROR:",
+        "PARTNER MANUAL DUPLICATE LOOKUP ERROR:",
         duplicateLookupError,
       );
 
@@ -719,15 +683,15 @@ export async function POST(
     }
 
     const existingResponse =
-      await handleExistingPayment({
+      handleExistingPayment({
         existingPayments,
         customerName,
         customerEmail,
-        donationAmount,
+        organization,
+        partnershipType,
         paymentMethod,
         transactionReference,
-        donationPurpose,
-        purposeLabel,
+        supportAmount,
       });
 
     if (
@@ -738,20 +702,20 @@ export async function POST(
 
     const paymentNotes =
       buildPaymentNotes({
+        organization,
         country,
         postalCode,
         customerPhone,
+        partnershipType,
         transactionReference,
-        donationPurpose,
-        otherPurpose,
-        purposeLabel,
         notes,
         isNativeApp,
       });
 
     const {
       data: payment,
-      error: paymentError,
+      error:
+        paymentError,
     } =
       await supabaseAdmin
         .from("payments")
@@ -763,16 +727,16 @@ export async function POST(
             customerEmail,
 
           purpose:
-            "donation",
+            "partner",
 
           item_name:
-            purposeLabel,
+            partnershipType,
 
           amount:
-            donationAmount,
+            supportAmount,
 
           currency:
-            DONATION_CURRENCY,
+            PARTNER_CURRENCY,
 
           payment_method:
             paymentMethod,
@@ -784,14 +748,13 @@ export async function POST(
             transactionReference,
 
           proof_url:
-            proofUrl ||
-            null,
+            proofUrl || null,
 
           notes:
             paymentNotes,
         })
         .select(
-          "id,status,amount,currency,payment_method,item_name",
+          "id,status,item_name,amount,currency,payment_method",
         )
         .single();
 
@@ -799,14 +762,14 @@ export async function POST(
       paymentError
     ) {
       console.error(
-        "DONATION MANUAL PAYMENT INSERT ERROR:",
+        "PARTNER MANUAL PAYMENT INSERT ERROR:",
         paymentError,
       );
 
       return NextResponse.json(
         {
           error:
-            "Unable to save the donation payment submission.",
+            "Unable to save the partnership payment submission.",
         },
         {
           status: 500,
@@ -820,7 +783,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Donation payment record was not returned.",
+            "Partnership payment record was not returned.",
         },
         {
           status: 500,
@@ -835,7 +798,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Donation payment was saved with an unexpected status.",
+            "Partnership payment was saved with an unexpected status.",
         },
         {
           status: 500,
@@ -856,6 +819,9 @@ export async function POST(
         paymentId:
           payment.id,
 
+        partnershipType:
+          payment.item_name,
+
         amount:
           Number(
             payment.amount,
@@ -867,15 +833,13 @@ export async function POST(
         paymentMethod:
           payment.payment_method,
 
-        donationPurpose,
-
-        purposeLabel:
-          payment.item_name,
-
         channel:
           isNativeApp
             ? "app"
             : "web",
+
+        recurring:
+          false,
       },
       {
         status: 201,
@@ -883,7 +847,7 @@ export async function POST(
     );
   } catch (error) {
     console.error(
-      "DONATION MANUAL PAYMENT ERROR:",
+      "PARTNER MANUAL PAYMENT ERROR:",
       error,
     );
 
@@ -892,7 +856,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : "Unable to submit the donation.",
+            : "Unable to submit the partnership payment.",
       },
       {
         status: 500,

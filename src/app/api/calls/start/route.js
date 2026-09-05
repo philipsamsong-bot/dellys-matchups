@@ -1,141 +1,160 @@
-// app/api/calls/start/route.js
+// src/app/api/calls/start/route.js
 
-import { StreamClient } from "@stream-io/node-sdk";
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { StreamClient } from "@stream-io/node-sdk";
 
-function getMembership(profile) {
-  return (
-    profile?.membership_status ||
-    profile?.membership_plan ||
-    profile?.plan ||
-    profile?.subscription ||
-    "free"
-  )
-    .trim()
-    .toLowerCase();
+export const runtime = "nodejs";
+
+function getRequiredEnvironmentVariable(name) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing environment variable: ${name}`);
+  }
+
+  return value;
 }
 
-function canSendMessages(profile) {
-  const membership = getMembership(profile);
+function createSupabaseAdmin() {
+  return createClient(
+    getRequiredEnvironmentVariable("NEXT_PUBLIC_SUPABASE_URL"),
+    getRequiredEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY"),
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    },
+  );
+}
 
-  return membership === "premium" || membership === "vip";
+function createStreamClient() {
+  return new StreamClient(
+    getRequiredEnvironmentVariable("STREAM_API_KEY"),
+    getRequiredEnvironmentVariable("STREAM_API_SECRET"),
+  );
+}
+
+function getBearerToken(request) {
+  const authorization = request.headers.get("authorization");
+
+  if (!authorization?.startsWith("Bearer ")) {
+    return "";
+  }
+
+  return authorization.slice(7).trim();
+}
+
+function isPaidMembership(value) {
+  return value === "premium" || value === "vip";
+}
+
+function getEffectiveMembership(profile) {
+  const membershipValues = [
+    profile?.membership_status,
+    profile?.membership_plan,
+    profile?.plan,
+    profile?.subscription,
+  ]
+    .filter((value) => typeof value === "string")
+    .map((value) => value.trim().toLowerCase());
+
+  if (membershipValues.includes("vip")) {
+    return "vip";
+  }
+
+  if (membershipValues.includes("premium")) {
+    return "premium";
+  }
+
+  return "free";
 }
 
 function canStartAudioCall(profile) {
-  const membership = getMembership(profile);
-
-  return membership === "premium" || membership === "vip";
-}
-
-function canStartVideoCall(profile) {
-  const membership = getMembership(profile);
-
-  return membership === "premium" || membership === "vip";
-}
-
-function getErrorMessage(error) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
-  ) {
-    return error.message;
-  }
-
-  return "Unknown error.";
+  return isPaidMembership(
+    getEffectiveMembership(profile),
+  );
 }
 
 export async function POST(request) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const streamApiKey = process.env.STREAM_API_KEY;
-    const streamApiSecret = process.env.STREAM_API_SECRET;
+    const token = getBearerToken(request);
 
-    if (
-      !supabaseUrl ||
-      !anonKey ||
-      !serviceRoleKey ||
-      !streamApiKey ||
-      !streamApiSecret
-    ) {
-      return NextResponse.json(
-        {
-          error: "Server environment variables are missing.",
-          details: {
-            hasSupabaseUrl: Boolean(supabaseUrl),
-            hasSupabaseAnonKey: Boolean(anonKey),
-            hasSupabaseServiceRoleKey: Boolean(serviceRoleKey),
-            hasStreamApiKey: Boolean(streamApiKey),
-            hasStreamApiSecret: Boolean(streamApiSecret),
-          },
-        },
-        { status: 500 }
-      );
-    }
-
-    const authorization = request.headers.get("authorization");
-
-    if (!authorization?.startsWith("Bearer ")) {
+    if (!token) {
       return NextResponse.json(
         {
           error: "Missing authorization token.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        },
       );
     }
 
-    const token = authorization.replace("Bearer ", "").trim();
-
-    const authClient = createClient(supabaseUrl, anonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+    const supabaseAdmin = createSupabaseAdmin();
 
     const {
       data: { user },
-      error: userError,
-    } = await authClient.auth.getUser(token);
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(token);
 
-    if (userError || !user) {
+    if (authError || !user) {
       return NextResponse.json(
         {
           error: "Unauthorized user.",
-          details: userError?.message || null,
         },
-        { status: 401 }
+        {
+          status: 401,
+        },
       );
     }
 
-    const body = await request.json();
+    let body;
 
-    const receiverId =
-      typeof body?.receiverId === "string" ? body.receiverId.trim() : "";
-
-    const callType = body?.callType;
-
-    if (!receiverId || !["audio", "video"].includes(callType)) {
+    try {
+      body = await request.json();
+    } catch {
       return NextResponse.json(
         {
-          error: "Invalid receiverId or callType.",
+          error: "Invalid request body.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const receiverId =
+      typeof body?.receiverId === "string"
+        ? body.receiverId.trim()
+        : "";
+
+    const callType =
+      typeof body?.callType === "string"
+        ? body.callType.trim().toLowerCase()
+        : "";
+
+    if (!receiverId) {
+      return NextResponse.json(
+        {
+          error: "Receiver ID is required.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (callType !== "audio") {
+      return NextResponse.json(
+        {
+          error:
+            "Only audio calls are currently available.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
@@ -144,87 +163,117 @@ export async function POST(request) {
         {
           error: "You cannot call yourself.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        },
       );
     }
 
     const {
       data: callerProfile,
       error: callerProfileError,
-    } = await adminClient
+    } = await supabaseAdmin
       .from("profiles")
-      .select("*")
+      .select(
+        [
+          "id",
+          "full_name",
+          "membership_status",
+          "membership_plan",
+          "plan",
+          "subscription",
+        ].join(","),
+      )
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (callerProfileError || !callerProfile) {
+    if (callerProfileError) {
+      console.error(
+        "CALL START CALLER PROFILE ERROR:",
+        callerProfileError,
+      );
+
       return NextResponse.json(
         {
-          error: "Caller profile not found.",
-          details: callerProfileError?.message || null,
+          error: "Unable to load caller profile.",
         },
-        { status: 404 }
+        {
+          status: 500,
+        },
       );
     }
 
-    if (!canSendMessages(callerProfile)) {
+    if (!callerProfile) {
+      return NextResponse.json(
+        {
+          error: "Caller profile not found.",
+        },
+        {
+          status: 404,
+        },
+      );
+    }
+
+    if (!canStartAudioCall(callerProfile)) {
       return NextResponse.json(
         {
           error:
-            "Premium or VIP membership is required for Matchups messaging and calls.",
+            "Premium or VIP membership is required for audio calls.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        },
       );
     }
 
     const {
       data: receiverProfile,
       error: receiverProfileError,
-    } = await adminClient
+    } = await supabaseAdmin
       .from("profiles")
       .select("id, full_name, avatar_url")
       .eq("id", receiverId)
-      .single();
+      .maybeSingle();
 
-    if (receiverProfileError || !receiverProfile) {
+    if (receiverProfileError) {
+      console.error(
+        "CALL START RECEIVER PROFILE ERROR:",
+        receiverProfileError,
+      );
+
+      return NextResponse.json(
+        {
+          error: "Unable to load receiver profile.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    if (!receiverProfile) {
       return NextResponse.json(
         {
           error: "Receiver profile not found.",
-          details: receiverProfileError?.message || null,
         },
-        { status: 404 }
-      );
-    }
-
-    if (callType === "audio" && !canStartAudioCall(callerProfile)) {
-      return NextResponse.json(
         {
-          error: "Premium or VIP membership is required for audio calls.",
+          status: 404,
         },
-        { status: 403 }
       );
     }
 
-    if (callType === "video" && !canStartVideoCall(callerProfile)) {
-      return NextResponse.json(
-        {
-          error: "Premium or VIP membership is required for video calls.",
-        },
-        { status: 403 }
-      );
-    }
-
-    const streamCallId = `matchup-${callType}-${crypto.randomUUID()}`;
+    const streamCallId =
+      `matchup-audio-${crypto.randomUUID()}`;
 
     const {
       data: callRow,
       error: callInsertError,
-    } = await adminClient
+    } = await supabaseAdmin
       .from("matchup_calls")
       .insert({
         caller_id: user.id,
         receiver_id: receiverId,
-        call_type: callType,
+        call_type: "audio",
         stream_call_id: streamCallId,
         status: "initiated",
       })
@@ -232,38 +281,33 @@ export async function POST(request) {
       .single();
 
     if (callInsertError || !callRow) {
-      console.error("CALL INSERT ERROR", {
-        message: callInsertError?.message,
-        details: callInsertError?.details,
-        hint: callInsertError?.hint,
-        code: callInsertError?.code,
-      });
+      console.error(
+        "CALL START INSERT ERROR:",
+        callInsertError,
+      );
 
       return NextResponse.json(
         {
-          error: "Unable to create call row.",
-          details: callInsertError?.message || null,
-          hint: callInsertError?.hint || null,
-          code: callInsertError?.code || null,
+          error: "Unable to create call.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        },
       );
     }
 
     try {
-      const streamClient = new StreamClient(
-        streamApiKey,
-        streamApiSecret
-      );
+      const streamClient = createStreamClient();
 
-      const streamCall = streamClient.video.call(
-        "default",
-        streamCallId
-      );
+      const streamCall =
+        streamClient.video.call(
+          "default",
+          streamCallId,
+        );
 
       await streamCall.getOrCreate({
         ring: true,
-        video: callType === "video",
+        video: false,
         data: {
           created_by_id: user.id,
           members: [
@@ -275,33 +319,46 @@ export async function POST(request) {
             },
           ],
           custom: {
-            matchup_call_id: callRow.id,
-            call_type: callType,
+            matchup_call_id:
+              callRow.id,
+            call_type: "audio",
             caller_name:
-              callerProfile.full_name || "Delly's Matchups Member",
+              callerProfile.full_name ||
+              "Delly's Matchups Member",
             receiver_name:
-              receiverProfile.full_name || "Delly's Matchups Member",
+              receiverProfile.full_name ||
+              "Delly's Matchups Member",
           },
         },
       });
     } catch (streamError) {
-      console.error("STREAM CALL CREATE ERROR", streamError);
+      console.error(
+        "STREAM AUDIO CALL CREATE ERROR:",
+        streamError,
+      );
 
-      const { error: rollbackError } = await adminClient
+      const {
+        error: rollbackError,
+      } = await supabaseAdmin
         .from("matchup_calls")
         .delete()
         .eq("id", callRow.id);
 
       if (rollbackError) {
-        console.error("CALL ROLLBACK ERROR", rollbackError);
+        console.error(
+          "CALL START ROLLBACK ERROR:",
+          rollbackError,
+        );
       }
 
       return NextResponse.json(
         {
-          error: "Unable to ring the member.",
-          details: getErrorMessage(streamError),
+          error:
+            "Unable to start the audio call.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        },
       );
     }
 
@@ -310,14 +367,18 @@ export async function POST(request) {
       call: callRow,
     });
   } catch (error) {
-    console.error("CALL START ROUTE ERROR", error);
+    console.error(
+      "CALL START ROUTE ERROR:",
+      error,
+    );
 
     return NextResponse.json(
       {
         error: "Unable to start call.",
-        details: getErrorMessage(error),
       },
-      { status: 500 }
+      {
+        status: 500,
+      },
     );
   }
 }

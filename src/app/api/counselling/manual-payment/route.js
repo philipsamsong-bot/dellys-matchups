@@ -22,35 +22,26 @@ const COUNSELLING_SESSIONS = {
     price: 250,
   },
   international_individual: {
-    title:
-      "International Individual Session",
+    title: "International Individual Session",
     price: 100,
   },
   international_couple: {
-    title:
-      "International Couple Session",
+    title: "International Couple Session",
     price: 250,
   },
 };
 
 const BOOKING_SERVICE_ALIASES = {
-  individual:
-    "individual",
-  "individual session":
-    "individual",
-
-  couple:
-    "couple",
-  "couple session":
-    "couple",
-
+  individual: "individual",
+  "individual session": "individual",
+  couple: "couple",
+  "couple session": "couple",
   international_individual:
     "international_individual",
   "international individual":
     "international_individual",
   "international individual session":
     "international_individual",
-
   international_couple:
     "international_couple",
   "international couple":
@@ -59,11 +50,10 @@ const BOOKING_SERVICE_ALIASES = {
     "international_couple",
 };
 
-const MANUAL_PAYMENT_METHODS =
-  new Set([
-    "Mobile Money",
-    "Bank Transfer",
-  ]);
+const MANUAL_PAYMENT_METHODS = [
+  "Mobile Money",
+  "Bank Transfer",
+];
 
 function getRequiredEnvironmentVariable(
   value,
@@ -85,9 +75,7 @@ function getString(value) {
 }
 
 function normalizeEmail(value) {
-  return getString(
-    value,
-  ).toLowerCase();
+  return getString(value).toLowerCase();
 }
 
 function normalizeService(value) {
@@ -134,9 +122,7 @@ function resolveBookingSessionType(
 
   return (
     BOOKING_SERVICE_ALIASES[
-      normalizeService(
-        rawService,
-      )
+      normalizeService(rawService)
     ] || null
   );
 }
@@ -146,7 +132,7 @@ function isValidManualPaymentMethod(
 ) {
   return (
     typeof value === "string" &&
-    MANUAL_PAYMENT_METHODS.has(
+    MANUAL_PAYMENT_METHODS.includes(
       value,
     )
   );
@@ -175,8 +161,7 @@ function getNoteValue(
   label,
 ) {
   if (
-    typeof notes !==
-      "string" ||
+    typeof notes !== "string" ||
     !notes
   ) {
     return "";
@@ -186,7 +171,7 @@ function getNoteValue(
     `${label}:`;
 
   const line = notes
-    .split("\n")
+    .split(/\r?\n/)
     .map((item) =>
       item.trim(),
     )
@@ -205,6 +190,31 @@ function getNoteValue(
     : "";
 }
 
+function amountsMatch(
+  left,
+  right,
+) {
+  const leftNumber =
+    Number(left);
+
+  const rightNumber =
+    Number(right);
+
+  if (
+    !Number.isFinite(leftNumber) ||
+    !Number.isFinite(rightNumber)
+  ) {
+    return false;
+  }
+
+  return (
+    Math.abs(
+      leftNumber -
+        rightNumber,
+    ) < 0.001
+  );
+}
+
 function createSupabaseAdmin() {
   return createClient(
     getRequiredEnvironmentVariable(
@@ -217,10 +227,8 @@ function createSupabaseAdmin() {
     ),
     {
       auth: {
-        autoRefreshToken:
-          false,
-        persistSession:
-          false,
+        autoRefreshToken: false,
+        persistSession: false,
       },
     },
   );
@@ -305,9 +313,7 @@ export async function POST(request) {
       );
     }
 
-    if (
-      !providerReference
-    ) {
+    if (!providerReference) {
       return NextResponse.json(
         {
           error:
@@ -376,7 +382,16 @@ export async function POST(request) {
         "counselling_bookings",
       )
       .select(
-        "id,full_name,email,service,preferred_date,payment_status,payment_method,paid_amount",
+        [
+          "id",
+          "full_name",
+          "email",
+          "service",
+          "preferred_date",
+          "payment_status",
+          "payment_method",
+          "paid_amount",
+        ].join(","),
       )
       .eq(
         "id",
@@ -384,9 +399,7 @@ export async function POST(request) {
       )
       .maybeSingle();
 
-    if (
-      bookingError
-    ) {
+    if (bookingError) {
       console.error(
         "COUNSELLING MANUAL BOOKING LOOKUP ERROR:",
         bookingError,
@@ -435,9 +448,7 @@ export async function POST(request) {
         booking.service,
       );
 
-    if (
-      !bookingSessionType
-    ) {
+    if (!bookingSessionType) {
       console.error(
         "COUNSELLING UNKNOWN BOOKING SERVICE:",
         {
@@ -463,17 +474,6 @@ export async function POST(request) {
       requestedSessionType !==
       bookingSessionType
     ) {
-      console.error(
-        "COUNSELLING MANUAL SESSION TYPE MISMATCH:",
-        {
-          bookingId,
-          requestedSessionType,
-          bookingSessionType,
-          bookingService:
-            booking.service,
-        },
-      );
-
       return NextResponse.json(
         {
           error:
@@ -532,31 +532,41 @@ export async function POST(request) {
     }
 
     const {
-      data: existingPayment,
+      data: existingPayments,
       error:
         existingPaymentError,
     } = await supabaseAdmin
       .from("payments")
       .select(
-        "id,customer_email,purpose,item_name,amount,currency,payment_method,status,provider_reference,proof_url,notes",
+        [
+          "id",
+          "customer_email",
+          "purpose",
+          "item_name",
+          "amount",
+          "currency",
+          "payment_method",
+          "status",
+          "provider_reference",
+          "proof_url",
+          "notes",
+        ].join(","),
       )
       .eq(
         "purpose",
         "counselling",
       )
       .eq(
-        "payment_method",
-        paymentMethod,
-      )
-      .eq(
         "provider_reference",
         providerReference,
       )
-      .maybeSingle();
+      .in(
+        "payment_method",
+        MANUAL_PAYMENT_METHODS,
+      )
+      .limit(2);
 
-    if (
-      existingPaymentError
-    ) {
+    if (existingPaymentError) {
       console.error(
         "COUNSELLING MANUAL DUPLICATE LOOKUP ERROR:",
         existingPaymentError,
@@ -573,6 +583,40 @@ export async function POST(request) {
       );
     }
 
+    if (
+      Array.isArray(
+        existingPayments,
+      ) &&
+      existingPayments.length >
+        1
+    ) {
+      console.error(
+        "COUNSELLING DUPLICATE MANUAL REFERENCES:",
+        {
+          providerReference,
+          paymentIds:
+            existingPayments.map(
+              (payment) =>
+                payment.id,
+            ),
+        },
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "This transaction reference is duplicated in the payment records. Please contact support.",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
+    const existingPayment =
+      existingPayments?.[0] ||
+      null;
+
     if (existingPayment) {
       const existingBookingId =
         getNoteValue(
@@ -586,6 +630,9 @@ export async function POST(request) {
           "Session Type",
         );
 
+      const expectedItemName =
+        `Counselling - ${session.title}`;
+
       const sameSubmission =
         existingBookingId ===
           bookingId &&
@@ -594,11 +641,19 @@ export async function POST(request) {
         normalizeEmail(
           existingPayment.customer_email,
         ) ===
-          customerEmail;
+          customerEmail &&
+        existingPayment.payment_method ===
+          paymentMethod &&
+        existingPayment.item_name ===
+          expectedItemName &&
+        existingPayment.currency ===
+          "USD" &&
+        amountsMatch(
+          existingPayment.amount,
+          session.price,
+        );
 
-      if (
-        !sameSubmission
-      ) {
+      if (!sameSubmission) {
         return NextResponse.json(
           {
             error:
@@ -681,8 +736,7 @@ export async function POST(request) {
 
       return NextResponse.json({
         success: true,
-        alreadySubmitted:
-          true,
+        alreadySubmitted: true,
         status:
           "pending_confirmation",
         paymentId:
@@ -691,8 +745,7 @@ export async function POST(request) {
         sessionType,
         amount:
           session.price,
-        currency:
-          "USD",
+        currency: "USD",
       });
     }
 
@@ -738,12 +791,10 @@ export async function POST(request) {
         notes:
           paymentNotes,
       })
-      .select("id")
+      .select("id,status")
       .single();
 
-    if (
-      paymentError
-    ) {
+    if (paymentError) {
       console.error(
         "COUNSELLING MANUAL PAYMENT INSERT ERROR:",
         paymentError,
@@ -815,8 +866,7 @@ export async function POST(request) {
 
     return NextResponse.json(
       {
-        success:
-          true,
+        success: true,
         alreadySubmitted:
           false,
         status:
@@ -827,8 +877,7 @@ export async function POST(request) {
         sessionType,
         amount:
           session.price,
-        currency:
-          "USD",
+        currency: "USD",
       },
       {
         status: 201,
@@ -853,3 +902,4 @@ export async function POST(request) {
     );
   }
 }
+

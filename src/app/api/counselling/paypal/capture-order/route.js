@@ -44,7 +44,29 @@ const COUNSELLING_SESSIONS = {
   },
 };
 
-function getRequiredEnvironmentVariable(value, name) {
+const BOOKING_SERVICE_ALIASES = {
+  individual: "individual",
+  "individual session": "individual",
+  couple: "couple",
+  "couple session": "couple",
+  international_individual:
+    "international_individual",
+  "international individual":
+    "international_individual",
+  "international individual session":
+    "international_individual",
+  international_couple:
+    "international_couple",
+  "international couple":
+    "international_couple",
+  "international couple session":
+    "international_couple",
+};
+
+function getRequiredEnvironmentVariable(
+  value,
+  name,
+) {
   if (!value) {
     throw new Error(
       `Missing environment variable: ${name}`,
@@ -64,6 +86,14 @@ function normalizeEmail(value) {
   return getString(value).toLowerCase();
 }
 
+function normalizeService(value) {
+  return getString(value)
+    .toLowerCase()
+    .replace(/[-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function isValidSessionType(value) {
   return (
     typeof value === "string" &&
@@ -71,6 +101,25 @@ function isValidSessionType(value) {
       COUNSELLING_SESSIONS,
       value,
     )
+  );
+}
+
+function resolveBookingSessionType(service) {
+  const rawService =
+    getString(service);
+
+  if (!rawService) {
+    return null;
+  }
+
+  if (isValidSessionType(rawService)) {
+    return rawService;
+  }
+
+  return (
+    BOOKING_SERVICE_ALIASES[
+      normalizeService(rawService)
+    ] || null
   );
 }
 
@@ -94,7 +143,8 @@ function createSupabaseAdmin() {
 }
 
 async function parseJsonResponse(response) {
-  const text = await response.text();
+  const text =
+    await response.text();
 
   if (!text) {
     return {};
@@ -128,24 +178,27 @@ async function getPayPalAccessToken() {
       `${clientId}:${clientSecret}`,
     ).toString("base64");
 
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v1/oauth2/token`,
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          `Basic ${authorization}`,
-        "Content-Type":
-          "application/x-www-form-urlencoded",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v1/oauth2/token`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Basic ${authorization}`,
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+        body:
+          "grant_type=client_credentials",
+        cache: "no-store",
       },
-      body:
-        "grant_type=client_credentials",
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parseJsonResponse(response);
+    await parseJsonResponse(
+      response,
+    );
 
   if (!response.ok) {
     console.error(
@@ -169,7 +222,10 @@ async function getPayPalAccessToken() {
   return data.access_token;
 }
 
-function getNoteValue(notes, label) {
+function getNoteValue(
+  notes,
+  label,
+) {
   if (
     typeof notes !== "string" ||
     !notes
@@ -180,14 +236,16 @@ function getNoteValue(notes, label) {
   const prefix = `${label}:`;
 
   const line = notes
-    .split("\n")
+    .split(/\r?\n/)
     .map((item) => item.trim())
     .find((item) =>
       item.startsWith(prefix),
     );
 
   return line
-    ? line.slice(prefix.length).trim()
+    ? line
+        .slice(prefix.length)
+        .trim()
     : "";
 }
 
@@ -203,16 +261,24 @@ function parseCustomMetadata(value) {
     const parsed =
       JSON.parse(value);
 
-    return parsed &&
-      typeof parsed === "object"
-      ? parsed
-      : null;
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
+      return null;
+    }
+
+    return parsed;
   } catch {
     return null;
   }
 }
 
-function amountsMatch(left, right) {
+function amountsMatch(
+  left,
+  right,
+) {
   const leftNumber =
     Number(left);
 
@@ -228,7 +294,8 @@ function amountsMatch(left, right) {
 
   return (
     Math.abs(
-      leftNumber - rightNumber,
+      leftNumber -
+        rightNumber,
     ) < 0.001
   );
 }
@@ -241,12 +308,17 @@ function findCompletedCapture(order) {
       ? order.purchase_units
       : [];
 
-  for (const purchaseUnit of purchaseUnits) {
+  for (
+    const purchaseUnit
+    of purchaseUnits
+  ) {
     const captures =
       Array.isArray(
-        purchaseUnit?.payments?.captures,
+        purchaseUnit?.payments
+          ?.captures,
       )
-        ? purchaseUnit.payments.captures
+        ? purchaseUnit.payments
+            .captures
         : [];
 
     const capture =
@@ -268,24 +340,27 @@ async function getPayPalOrder(
   accessToken,
   orderId,
 ) {
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
-      orderId,
-    )}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-        "Content-Type":
-          "application/json",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
+        orderId,
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+          "Content-Type":
+            "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parseJsonResponse(response);
+    await parseJsonResponse(
+      response,
+    );
 
   if (!response.ok) {
     console.error(
@@ -295,6 +370,7 @@ async function getPayPalOrder(
 
     throw new Error(
       data.message ||
+        data.error_description ||
         "Unable to retrieve PayPal order.",
     );
   }
@@ -306,27 +382,33 @@ async function capturePayPalOrder(
   accessToken,
   orderId,
 ) {
-  const response = await fetch(
-    `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
-      orderId,
-    )}/capture`,
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-        "Content-Type":
-          "application/json",
-        Prefer:
-          "return=representation",
+  const response =
+    await fetch(
+      `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(
+        orderId,
+      )}/capture`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+          "Content-Type":
+            "application/json",
+          Prefer:
+            "return=representation",
+          "PayPal-Request-Id":
+            `counselling-capture-${orderId}`,
+        },
+        body:
+          JSON.stringify({}),
+        cache: "no-store",
       },
-      body: "{}",
-      cache: "no-store",
-    },
-  );
+    );
 
   const data =
-    await parseJsonResponse(response);
+    await parseJsonResponse(
+      response,
+    );
 
   if (response.ok) {
     return data;
@@ -344,7 +426,7 @@ async function capturePayPalOrder(
     );
 
   if (
-    retrievedOrder.status ===
+    retrievedOrder?.status ===
     "COMPLETED"
   ) {
     return retrievedOrder;
@@ -352,8 +434,122 @@ async function capturePayPalOrder(
 
   throw new Error(
     data.message ||
+      data.error_description ||
       "PayPal could not capture this counselling payment.",
   );
+}
+
+function verifyStoredPayment({
+  payment,
+  sessionType,
+  session,
+}) {
+  const expectedItemName =
+    `Counselling - ${session.title}`;
+
+  if (
+    payment.purpose !==
+    "counselling"
+  ) {
+    throw new Error(
+      "Stored payment purpose is invalid.",
+    );
+  }
+
+  if (
+    payment.payment_method !==
+    "PayPal / Card"
+  ) {
+    throw new Error(
+      "Stored counselling payment method is invalid.",
+    );
+  }
+
+  if (
+    payment.item_name !==
+    expectedItemName
+  ) {
+    throw new Error(
+      "Stored counselling payment item does not match the session.",
+    );
+  }
+
+  if (
+    payment.currency !== "USD"
+  ) {
+    throw new Error(
+      "Stored counselling payment currency is invalid.",
+    );
+  }
+
+  if (
+    !amountsMatch(
+      payment.amount,
+      session.price,
+    )
+  ) {
+    throw new Error(
+      "Stored counselling payment amount is invalid.",
+    );
+  }
+
+  if (
+    !isValidSessionType(
+      sessionType,
+    )
+  ) {
+    throw new Error(
+      "Stored counselling session type is invalid.",
+    );
+  }
+}
+
+function verifyBooking({
+  booking,
+  payment,
+  bookingId,
+  sessionType,
+}) {
+  if (
+    booking.id !== bookingId
+  ) {
+    throw new Error(
+      "Counselling booking ID verification failed.",
+    );
+  }
+
+  const bookingSessionType =
+    resolveBookingSessionType(
+      booking.service,
+    );
+
+  if (!bookingSessionType) {
+    throw new Error(
+      "The counselling booking service could not be matched to a valid payment option.",
+    );
+  }
+
+  if (
+    bookingSessionType !==
+    sessionType
+  ) {
+    throw new Error(
+      "The counselling booking service does not match the stored payment session.",
+    );
+  }
+
+  if (
+    normalizeEmail(
+      booking.email,
+    ) !==
+    normalizeEmail(
+      payment.customer_email,
+    )
+  ) {
+    throw new Error(
+      "Counselling booking email does not match the payment.",
+    );
+  }
 }
 
 function verifyPayPalOrder({
@@ -374,7 +570,8 @@ function verifyPayPalOrder({
   }
 
   if (
-    order.status !== "COMPLETED"
+    order.status !==
+    "COMPLETED"
   ) {
     throw new Error(
       "PayPal payment is not completed.",
@@ -507,9 +704,13 @@ function verifyPayPalOrder({
   }
 
   const completedCapture =
-    findCompletedCapture(order);
+    findCompletedCapture(
+      order,
+    );
 
-  if (!completedCapture) {
+  if (
+    !completedCapture?.id
+  ) {
     throw new Error(
       "PayPal completed capture was not found.",
     );
@@ -517,7 +718,8 @@ function verifyPayPalOrder({
 
   if (
     completedCapture.amount
-      ?.currency_code !== "USD"
+      ?.currency_code !==
+    "USD"
   ) {
     throw new Error(
       "PayPal captured currency verification failed.",
@@ -539,8 +741,108 @@ function verifyPayPalOrder({
   return {
     session,
     captureId:
-      completedCapture.id || "",
+      completedCapture.id,
   };
+}
+
+async function updateBookingAsPaid({
+  supabaseAdmin,
+  booking,
+  bookingId,
+  orderId,
+  amount,
+}) {
+  const paidAt =
+    booking.paid_at ||
+    new Date().toISOString();
+
+  const {
+    error:
+      bookingUpdateError,
+  } = await supabaseAdmin
+    .from(
+      "counselling_bookings",
+    )
+    .update({
+      payment_status:
+        "paid",
+      payment_method:
+        "PayPal / Card",
+      paypal_order_id:
+        orderId,
+      paid_amount:
+        amount,
+      paid_at:
+        paidAt,
+    })
+    .eq(
+      "id",
+      bookingId,
+    );
+
+  if (
+    bookingUpdateError
+  ) {
+    console.error(
+      "COUNSELLING BOOKING PAID UPDATE ERROR:",
+      bookingUpdateError,
+    );
+
+    throw new Error(
+      "PayPal payment was verified, but the counselling booking could not be updated. Please contact support and do not pay again.",
+    );
+  }
+}
+
+async function finalizePaymentRecord({
+  supabaseAdmin,
+  payment,
+  bookingId,
+  sessionType,
+  checkoutReference,
+  orderId,
+  captureId,
+}) {
+  const notes = [
+    `Booking ID: ${bookingId}`,
+    `Session Type: ${sessionType}`,
+    `Checkout Reference: ${checkoutReference}`,
+    `PayPal Order ID: ${orderId}`,
+    captureId
+      ? `PayPal Capture ID: ${captureId}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const {
+    error:
+      paymentUpdateError,
+  } = await supabaseAdmin
+    .from("payments")
+    .update({
+      status: "paid",
+      provider_reference:
+        orderId,
+      notes,
+    })
+    .eq(
+      "id",
+      payment.id,
+    );
+
+  if (
+    paymentUpdateError
+  ) {
+    console.error(
+      "COUNSELLING PAYMENT PAID UPDATE ERROR:",
+      paymentUpdateError,
+    );
+
+    throw new Error(
+      "PayPal payment was verified and the booking was updated, but the payment record could not be finalized. Please contact support and do not pay again.",
+    );
+  }
 }
 
 async function sendBookingEmail({
@@ -548,29 +850,31 @@ async function sendBookingEmail({
   amount,
 }) {
   try {
-    const response = await fetch(
-      `${SITE_URL}/api/send-booking-email`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
+    const response =
+      await fetch(
+        `${SITE_URL}/api/send-booking-email`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body:
+            JSON.stringify({
+              fullName:
+                booking.full_name,
+              email:
+                booking.email,
+              service:
+                booking.service,
+              preferredDate:
+                booking.preferred_date,
+              amount:
+                amount.toFixed(2),
+            }),
+          cache: "no-store",
         },
-        body: JSON.stringify({
-          fullName:
-            booking.full_name,
-          email:
-            booking.email,
-          service:
-            booking.service,
-          preferredDate:
-            booking.preferred_date,
-          amount:
-            amount.toFixed(2),
-        }),
-        cache: "no-store",
-      },
-    );
+      );
 
     const result =
       await parseJsonResponse(
@@ -603,7 +907,9 @@ export async function POST(request) {
       await request.json();
 
     const orderId =
-      getString(body.orderId);
+      getString(
+        body.orderId,
+      );
 
     if (!orderId) {
       return NextResponse.json(
@@ -626,16 +932,33 @@ export async function POST(request) {
     } = await supabaseAdmin
       .from("payments")
       .select(
-        "id,customer_name,customer_email,purpose,item_name,amount,currency,payment_method,status,provider_reference,notes",
+        [
+          "id",
+          "customer_name",
+          "customer_email",
+          "purpose",
+          "item_name",
+          "amount",
+          "currency",
+          "payment_method",
+          "status",
+          "provider_reference",
+          "notes",
+        ].join(","),
       )
       .eq(
         "purpose",
         "counselling",
       )
       .eq(
+        "payment_method",
+        "PayPal / Card",
+      )
+      .eq(
         "provider_reference",
         orderId,
       )
+      .limit(1)
       .maybeSingle();
 
     if (paymentError) {
@@ -739,31 +1062,19 @@ export async function POST(request) {
         sessionType
       ];
 
-    if (
-      payment.currency !==
-      "USD"
-    ) {
+    try {
+      verifyStoredPayment({
+        payment,
+        sessionType,
+        session,
+      });
+    } catch (error) {
       return NextResponse.json(
         {
           error:
-            "Stored counselling payment currency is invalid.",
-        },
-        {
-          status: 409,
-        },
-      );
-    }
-
-    if (
-      !amountsMatch(
-        payment.amount,
-        session.price,
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Stored counselling payment amount is invalid.",
+            error instanceof Error
+              ? error.message
+              : "Stored counselling payment verification failed.",
         },
         {
           status: 409,
@@ -779,9 +1090,23 @@ export async function POST(request) {
         "counselling_bookings",
       )
       .select(
-        "id,full_name,email,service,preferred_date,payment_status,payment_method,paypal_order_id,paid_amount,paid_at",
+        [
+          "id",
+          "full_name",
+          "email",
+          "service",
+          "preferred_date",
+          "payment_status",
+          "payment_method",
+          "paypal_order_id",
+          "paid_amount",
+          "paid_at",
+        ].join(","),
       )
-      .eq("id", bookingId)
+      .eq(
+        "id",
+        bookingId,
+      )
       .maybeSingle();
 
     if (bookingError) {
@@ -813,18 +1138,45 @@ export async function POST(request) {
       );
     }
 
+    try {
+      verifyBooking({
+        booking,
+        payment,
+        bookingId,
+        sessionType,
+      });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Counselling booking verification failed.",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
+    const bookingAlreadyPaid =
+      booking.payment_status ===
+      "paid";
+
+    const bookingPaidBySameOrder =
+      bookingAlreadyPaid &&
+      getString(
+        booking.paypal_order_id,
+      ) === orderId;
+
     if (
-      normalizeEmail(
-        booking.email,
-      ) !==
-      normalizeEmail(
-        payment.customer_email,
-      )
+      bookingAlreadyPaid &&
+      !bookingPaidBySameOrder
     ) {
       return NextResponse.json(
         {
           error:
-            "Counselling booking email does not match the payment.",
+            "This counselling booking has already been paid through another transaction. The PayPal order was not captured.",
         },
         {
           status: 409,
@@ -838,8 +1190,8 @@ export async function POST(request) {
     let paypalOrder;
 
     if (
-      payment.status ===
-      "paid"
+      payment.status === "paid" ||
+      bookingPaidBySameOrder
     ) {
       paypalOrder =
         await getPayPalOrder(
@@ -869,101 +1221,41 @@ export async function POST(request) {
         payment.customer_email,
     });
 
-    const paidAt =
-      booking.paid_at ||
-      new Date().toISOString();
-
-    const {
-      error:
-        bookingUpdateError,
-    } = await supabaseAdmin
-      .from(
-        "counselling_bookings",
-      )
-      .update({
-        payment_status:
-          "paid",
-        payment_method:
-          "PayPal / Card",
-        paypal_order_id:
-          orderId,
-        paid_amount:
-          verifiedSession.price,
-        paid_at:
-          paidAt,
-      })
-      .eq(
-        "id",
-        bookingId,
-      );
+    const wasAlreadyPaid =
+      payment.status === "paid";
 
     if (
-      bookingUpdateError
+      !bookingPaidBySameOrder
     ) {
-      console.error(
-        "COUNSELLING BOOKING PAID UPDATE ERROR:",
-        bookingUpdateError,
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "PayPal payment was verified, but the counselling booking could not be updated. Please contact support and do not pay again.",
-        },
-        {
-          status: 500,
-        },
-      );
+      await updateBookingAsPaid({
+        supabaseAdmin,
+        booking,
+        bookingId,
+        orderId,
+        amount:
+          verifiedSession.price,
+      });
     }
 
-    const {
-      error:
-        paymentUpdateError,
-    } = await supabaseAdmin
-      .from("payments")
-      .update({
-        status:
-          "paid",
-        notes: [
-          `Booking ID: ${bookingId}`,
-          `Session Type: ${sessionType}`,
-          `Checkout Reference: ${checkoutReference}`,
-          captureId
-            ? `PayPal Capture ID: ${captureId}`
-            : "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      })
-      .eq(
-        "id",
-        payment.id,
-      );
-
     if (
-      paymentUpdateError
+      payment.status !== "paid"
     ) {
-      console.error(
-        "COUNSELLING PAYMENT PAID UPDATE ERROR:",
-        paymentUpdateError,
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "PayPal payment was verified and the booking was updated, but the payment record could not be finalized. Please contact support and do not pay again.",
-        },
-        {
-          status: 500,
-        },
-      );
+      await finalizePaymentRecord({
+        supabaseAdmin,
+        payment,
+        bookingId,
+        sessionType,
+        checkoutReference,
+        orderId,
+        captureId,
+      });
     }
 
     let emailSent = true;
 
     if (
-      payment.status !==
-      "paid"
+      !wasAlreadyPaid &&
+      !bookingPaidBySameOrder
     ) {
       emailSent =
         await sendBookingEmail({
@@ -980,15 +1272,13 @@ export async function POST(request) {
       sessionType,
       amount:
         verifiedSession.price,
-      currency:
-        "USD",
+      currency: "USD",
       orderId,
-      captureId:
-        captureId || null,
+      captureId,
       emailSent,
       alreadyPaid:
-        payment.status ===
-        "paid",
+        wasAlreadyPaid ||
+        bookingPaidBySameOrder,
     });
   } catch (error) {
     console.error(
