@@ -1,5 +1,4 @@
 // src/app/api/stream/token/route.js
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { StreamClient } from "@stream-io/node-sdk";
@@ -117,28 +116,20 @@ export async function POST(request) {
       );
     }
 
-    const {
-      apiKey,
-      client: streamClient,
-    } = createStreamClient();
+    const { apiKey, client: streamClient } = createStreamClient();
 
     const streamUser = {
       id: user.id,
       role: "user",
-      name:
-        profile.full_name ||
-        "Delly's Matchups Member",
+      name: profile.full_name || "Delly's Matchups Member",
+      ...(profile.avatar_url
+        ? {
+            image: profile.avatar_url,
+          }
+        : {}),
     };
 
-    if (profile.avatar_url) {
-      streamUser.image = profile.avatar_url;
-    }
-
-    await streamClient.upsertUsers({
-      users: {
-        [user.id]: streamUser,
-      },
-    });
+    await streamClient.upsertUsers([streamUser]);
 
     const token = streamClient.generateUserToken({
       user_id: user.id,
