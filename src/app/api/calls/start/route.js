@@ -10,7 +10,9 @@ function getRequiredEnvironmentVariable(name) {
   const value = process.env[name];
 
   if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
+    throw new Error(
+      `Missing environment variable: ${name}`,
+    );
   }
 
   return value;
@@ -18,8 +20,12 @@ function getRequiredEnvironmentVariable(name) {
 
 function createSupabaseAdmin() {
   return createClient(
-    getRequiredEnvironmentVariable("NEXT_PUBLIC_SUPABASE_URL"),
-    getRequiredEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY"),
+    getRequiredEnvironmentVariable(
+      "NEXT_PUBLIC_SUPABASE_URL",
+    ),
+    getRequiredEnvironmentVariable(
+      "SUPABASE_SERVICE_ROLE_KEY",
+    ),
     {
       auth: {
         persistSession: false,
@@ -31,60 +37,133 @@ function createSupabaseAdmin() {
 
 function createStreamClient() {
   return new StreamClient(
-    getRequiredEnvironmentVariable("STREAM_API_KEY"),
-    getRequiredEnvironmentVariable("STREAM_API_SECRET"),
+    getRequiredEnvironmentVariable(
+      "STREAM_API_KEY",
+    ),
+    getRequiredEnvironmentVariable(
+      "STREAM_API_SECRET",
+    ),
   );
 }
 
 function getBearerToken(request) {
-  const authorization = request.headers.get("authorization");
+  const authorization =
+    request.headers.get(
+      "authorization",
+    );
 
-  if (!authorization?.startsWith("Bearer ")) {
+  if (
+    !authorization?.startsWith(
+      "Bearer ",
+    )
+  ) {
     return "";
   }
 
-  return authorization.slice(7).trim();
+  return authorization
+    .slice(7)
+    .trim();
 }
 
 function isPaidMembership(value) {
-  return value === "premium" || value === "vip";
+  return (
+    value === "premium" ||
+    value === "vip"
+  );
 }
 
-function getEffectiveMembership(profile) {
+function getEffectiveMembership(
+  profile,
+) {
   const membershipValues = [
     profile?.membership_status,
     profile?.membership_plan,
     profile?.plan,
     profile?.subscription,
   ]
-    .filter((value) => typeof value === "string")
-    .map((value) => value.trim().toLowerCase());
+    .filter(
+      (value) =>
+        typeof value ===
+        "string",
+    )
+    .map((value) =>
+      value
+        .trim()
+        .toLowerCase(),
+    );
 
-  if (membershipValues.includes("vip")) {
+  if (
+    membershipValues.includes(
+      "vip",
+    )
+  ) {
     return "vip";
   }
 
-  if (membershipValues.includes("premium")) {
+  if (
+    membershipValues.includes(
+      "premium",
+    )
+  ) {
     return "premium";
   }
 
   return "free";
 }
 
-function canStartAudioCall(profile) {
+function canStartAudioCall(
+  profile,
+) {
   return isPaidMembership(
-    getEffectiveMembership(profile),
+    getEffectiveMembership(
+      profile,
+    ),
   );
 }
 
-export async function POST(request) {
+async function areMembersBlocked(
+  supabaseAdmin,
+  firstUserId,
+  secondUserId,
+) {
+  const {
+    data,
+    error,
+  } =
+    await supabaseAdmin
+      .from("member_blocks")
+      .select(
+        "blocker_id,blocked_id",
+      )
+      .or(
+        `and(blocker_id.eq.${firstUserId},blocked_id.eq.${secondUserId}),and(blocker_id.eq.${secondUserId},blocked_id.eq.${firstUserId})`,
+      )
+      .limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  return (
+    Array.isArray(data) &&
+    data.length > 0
+  );
+}
+
+export async function POST(
+  request,
+) {
   try {
-    const token = getBearerToken(request);
+    const token =
+      getBearerToken(
+        request,
+      );
 
     if (!token) {
       return NextResponse.json(
         {
-          error: "Missing authorization token.",
+          error:
+            "Missing authorization token.",
         },
         {
           status: 401,
@@ -92,17 +171,28 @@ export async function POST(request) {
       );
     }
 
-    const supabaseAdmin = createSupabaseAdmin();
+    const supabaseAdmin =
+      createSupabaseAdmin();
 
     const {
-      data: { user },
-      error: authError,
-    } = await supabaseAdmin.auth.getUser(token);
+      data: {
+        user,
+      },
+      error:
+        authError,
+    } =
+      await supabaseAdmin.auth.getUser(
+        token,
+      );
 
-    if (authError || !user) {
+    if (
+      authError ||
+      !user
+    ) {
       return NextResponse.json(
         {
-          error: "Unauthorized user.",
+          error:
+            "Unauthorized user.",
         },
         {
           status: 401,
@@ -113,11 +203,13 @@ export async function POST(request) {
     let body;
 
     try {
-      body = await request.json();
+      body =
+        await request.json();
     } catch {
       return NextResponse.json(
         {
-          error: "Invalid request body.",
+          error:
+            "Invalid request body.",
         },
         {
           status: 400,
@@ -126,19 +218,24 @@ export async function POST(request) {
     }
 
     const receiverId =
-      typeof body?.receiverId === "string"
+      typeof body?.receiverId ===
+      "string"
         ? body.receiverId.trim()
         : "";
 
     const callType =
-      typeof body?.callType === "string"
-        ? body.callType.trim().toLowerCase()
+      typeof body?.callType ===
+      "string"
+        ? body.callType
+            .trim()
+            .toLowerCase()
         : "";
 
     if (!receiverId) {
       return NextResponse.json(
         {
-          error: "Receiver ID is required.",
+          error:
+            "Receiver ID is required.",
         },
         {
           status: 400,
@@ -146,7 +243,10 @@ export async function POST(request) {
       );
     }
 
-    if (callType !== "audio") {
+    if (
+      callType !==
+      "audio"
+    ) {
       return NextResponse.json(
         {
           error:
@@ -158,10 +258,14 @@ export async function POST(request) {
       );
     }
 
-    if (receiverId === user.id) {
+    if (
+      receiverId ===
+      user.id
+    ) {
       return NextResponse.json(
         {
-          error: "You cannot call yourself.",
+          error:
+            "You cannot call yourself.",
         },
         {
           status: 400,
@@ -169,33 +273,25 @@ export async function POST(request) {
       );
     }
 
-    const {
-      data: callerProfile,
-      error: callerProfileError,
-    } = await supabaseAdmin
-      .from("profiles")
-      .select(
-        [
-          "id",
-          "full_name",
-          "membership_status",
-          "membership_plan",
-          "plan",
-          "subscription",
-        ].join(","),
-      )
-      .eq("id", user.id)
-      .maybeSingle();
+    let relationshipBlocked;
 
-    if (callerProfileError) {
+    try {
+      relationshipBlocked =
+        await areMembersBlocked(
+          supabaseAdmin,
+          user.id,
+          receiverId,
+        );
+    } catch (blockError) {
       console.error(
-        "CALL START CALLER PROFILE ERROR:",
-        callerProfileError,
+        "CALL START BLOCK CHECK ERROR:",
+        blockError,
       );
 
       return NextResponse.json(
         {
-          error: "Unable to load caller profile.",
+          error:
+            "Unable to verify call availability.",
         },
         {
           status: 500,
@@ -203,10 +299,70 @@ export async function POST(request) {
       );
     }
 
-    if (!callerProfile) {
+    if (
+      relationshipBlocked
+    ) {
       return NextResponse.json(
         {
-          error: "Caller profile not found.",
+          error:
+            "This member is not available for calls.",
+        },
+        {
+          status: 403,
+        },
+      );
+    }
+
+    const {
+      data:
+        callerProfile,
+      error:
+        callerProfileError,
+    } =
+      await supabaseAdmin
+        .from("profiles")
+        .select(
+          [
+            "id",
+            "full_name",
+            "membership_status",
+            "membership_plan",
+            "plan",
+            "subscription",
+          ].join(","),
+        )
+        .eq(
+          "id",
+          user.id,
+        )
+        .maybeSingle();
+
+    if (
+      callerProfileError
+    ) {
+      console.error(
+        "CALL START CALLER PROFILE ERROR:",
+        callerProfileError,
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Unable to load caller profile.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    if (
+      !callerProfile
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Caller profile not found.",
         },
         {
           status: 404,
@@ -214,7 +370,11 @@ export async function POST(request) {
       );
     }
 
-    if (!canStartAudioCall(callerProfile)) {
+    if (
+      !canStartAudioCall(
+        callerProfile,
+      )
+    ) {
       return NextResponse.json(
         {
           error:
@@ -227,15 +387,25 @@ export async function POST(request) {
     }
 
     const {
-      data: receiverProfile,
-      error: receiverProfileError,
-    } = await supabaseAdmin
-      .from("profiles")
-      .select("id, full_name, avatar_url")
-      .eq("id", receiverId)
-      .maybeSingle();
+      data:
+        receiverProfile,
+      error:
+        receiverProfileError,
+    } =
+      await supabaseAdmin
+        .from("profiles")
+        .select(
+          "id, full_name, avatar_url",
+        )
+        .eq(
+          "id",
+          receiverId,
+        )
+        .maybeSingle();
 
-    if (receiverProfileError) {
+    if (
+      receiverProfileError
+    ) {
       console.error(
         "CALL START RECEIVER PROFILE ERROR:",
         receiverProfileError,
@@ -243,7 +413,8 @@ export async function POST(request) {
 
       return NextResponse.json(
         {
-          error: "Unable to load receiver profile.",
+          error:
+            "Unable to load receiver profile.",
         },
         {
           status: 500,
@@ -251,10 +422,13 @@ export async function POST(request) {
       );
     }
 
-    if (!receiverProfile) {
+    if (
+      !receiverProfile
+    ) {
       return NextResponse.json(
         {
-          error: "Receiver profile not found.",
+          error:
+            "Receiver profile not found.",
         },
         {
           status: 404,
@@ -266,21 +440,34 @@ export async function POST(request) {
       `matchup-audio-${crypto.randomUUID()}`;
 
     const {
-      data: callRow,
-      error: callInsertError,
-    } = await supabaseAdmin
-      .from("matchup_calls")
-      .insert({
-        caller_id: user.id,
-        receiver_id: receiverId,
-        call_type: "audio",
-        stream_call_id: streamCallId,
-        status: "initiated",
-      })
-      .select("*")
-      .single();
+      data:
+        callRow,
+      error:
+        callInsertError,
+    } =
+      await supabaseAdmin
+        .from(
+          "matchup_calls",
+        )
+        .insert({
+          caller_id:
+            user.id,
+          receiver_id:
+            receiverId,
+          call_type:
+            "audio",
+          stream_call_id:
+            streamCallId,
+          status:
+            "initiated",
+        })
+        .select("*")
+        .single();
 
-    if (callInsertError || !callRow) {
+    if (
+      callInsertError ||
+      !callRow
+    ) {
       console.error(
         "CALL START INSERT ERROR:",
         callInsertError,
@@ -288,7 +475,8 @@ export async function POST(request) {
 
       return NextResponse.json(
         {
-          error: "Unable to create call.",
+          error:
+            "Unable to create call.",
         },
         {
           status: 500,
@@ -297,7 +485,8 @@ export async function POST(request) {
     }
 
     try {
-      const streamClient = createStreamClient();
+      const streamClient =
+        createStreamClient();
 
       const streamCall =
         streamClient.video.call(
@@ -305,46 +494,63 @@ export async function POST(request) {
           streamCallId,
         );
 
-      await streamCall.getOrCreate({
-        ring: true,
-        video: false,
-        data: {
-          created_by_id: user.id,
-          members: [
-            {
-              user_id: user.id,
+      await streamCall.getOrCreate(
+        {
+          ring: true,
+          video: false,
+          data: {
+            created_by_id:
+              user.id,
+            members: [
+              {
+                user_id:
+                  user.id,
+              },
+              {
+                user_id:
+                  receiverId,
+              },
+            ],
+            custom: {
+              matchup_call_id:
+                callRow.id,
+              call_type:
+                "audio",
+              caller_name:
+                callerProfile.full_name ||
+                "Delly's Matchups Member",
+              receiver_name:
+                receiverProfile.full_name ||
+                "Delly's Matchups Member",
             },
-            {
-              user_id: receiverId,
-            },
-          ],
-          custom: {
-            matchup_call_id:
-              callRow.id,
-            call_type: "audio",
-            caller_name:
-              callerProfile.full_name ||
-              "Delly's Matchups Member",
-            receiver_name:
-              receiverProfile.full_name ||
-              "Delly's Matchups Member",
           },
         },
-      });
-    } catch (streamError) {
+      );
+    } catch (
+      streamError
+    ) {
       console.error(
         "STREAM AUDIO CALL CREATE ERROR:",
         streamError,
       );
 
       const {
-        error: rollbackError,
-      } = await supabaseAdmin
-        .from("matchup_calls")
-        .delete()
-        .eq("id", callRow.id);
+        error:
+          rollbackError,
+      } =
+        await supabaseAdmin
+          .from(
+            "matchup_calls",
+          )
+          .delete()
+          .eq(
+            "id",
+            callRow.id,
+          );
 
-      if (rollbackError) {
+      if (
+        rollbackError
+      ) {
         console.error(
           "CALL START ROLLBACK ERROR:",
           rollbackError,
@@ -362,10 +568,12 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      call: callRow,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        call: callRow,
+      },
+    );
   } catch (error) {
     console.error(
       "CALL START ROUTE ERROR:",
@@ -374,7 +582,8 @@ export async function POST(request) {
 
     return NextResponse.json(
       {
-        error: "Unable to start call.",
+        error:
+          "Unable to start call.",
       },
       {
         status: 500,
