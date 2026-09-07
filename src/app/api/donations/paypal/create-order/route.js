@@ -40,7 +40,7 @@ const APP_CANCEL_URL =
 const DONATION_PURPOSES =
   new Set([
     "Delly Singah Foundation",
-    "Delly's Matchups",
+    "Tips",
     "Other Purpose",
   ]);
 

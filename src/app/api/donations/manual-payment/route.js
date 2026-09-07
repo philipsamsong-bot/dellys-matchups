@@ -24,7 +24,7 @@ const ALLOWED_PAYMENT_METHODS = [
 
 const DONATION_PURPOSES = new Set([
   "Delly Singah Foundation",
-  "Delly's Matchups",
+  "Tips",
   "Other Purpose",
 ]);
 
