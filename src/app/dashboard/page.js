@@ -20,11 +20,40 @@ function getCompletionPercentage(profile) {
     profile.relationship_goal,
   ];
 
-  return Math.round((fields.filter(Boolean).length / fields.length) * 100);
+  return Math.round(
+    (fields.filter(Boolean).length / fields.length) * 100
+  );
+}
+
+function normalizeMembershipValue(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase()
+    : "";
+}
+
+function getMembershipValues(profile) {
+  return [
+    profile?.membership_status,
+    profile?.membership_plan,
+    profile?.plan,
+    profile?.subscription,
+  ]
+    .map(normalizeMembershipValue)
+    .filter(Boolean);
 }
 
 function getPlan(profile) {
-  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
+  const values = getMembershipValues(profile);
+
+  if (values.includes("vip")) {
+    return "vip";
+  }
+
+  if (values.includes("premium")) {
+    return "premium";
+  }
+
+  return "free";
 }
 
 function hasPremiumAccess(profile) {
@@ -42,7 +71,10 @@ function isMarried(profile) {
 
 function getFirstName(profile, user) {
   const fullName =
-    profile?.full_name || user?.user_metadata?.full_name || user?.email || "";
+    profile?.full_name ||
+    user?.user_metadata?.full_name ||
+    user?.email ||
+    "";
 
   return fullName.trim().split(" ")[0];
 }
@@ -95,11 +127,12 @@ export default function DashboardPage() {
         return;
       }
 
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+      const { data: profileData, error: profileError } =
+        await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
       if (profileError || !profileData) {
         window.location.href = "/profile/setup";
@@ -140,7 +173,7 @@ export default function DashboardPage() {
       setLoading(false);
     }
 
-    loadDashboard();
+    void loadDashboard();
   }, []);
 
   async function handleLogout() {
@@ -151,16 +184,18 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#b30018] text-white">
-        <p className="text-xl font-bold">Loading dashboard...</p>
+        <p className="text-xl font-bold">
+          Loading dashboard...
+        </p>
       </main>
     );
   }
 
-  const plan = getPlan(profile);
   const premiumAccess = hasPremiumAccess(profile);
   const vipAccess = isVip(profile);
   const married = isMarried(profile);
-  const completionPercentage = getCompletionPercentage(profile);
+  const completionPercentage =
+    getCompletionPercentage(profile);
 
   return (
     <>
@@ -180,12 +215,15 @@ export default function DashboardPage() {
               </p>
 
               <h1 className="font-display mt-5 text-6xl font-bold leading-none md:text-7xl">
-                {welcomeName ? `Welcome back, ${welcomeName} 👋` : "Welcome Back"}
+                {welcomeName
+                  ? `Welcome back, ${welcomeName} 👋`
+                  : "Welcome Back"}
               </h1>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-white/80">
-                Browse profiles, continue conversations, update your profile,
-                and grow through Delly&apos;s Matchups.
+                Browse profiles, continue conversations,
+                update your profile, and grow through
+                Delly&apos;s Matchups.
               </p>
             </div>
 
@@ -202,10 +240,12 @@ export default function DashboardPage() {
               <p className="font-black uppercase tracking-[0.25em] text-[#7a0010]">
                 Matchups Restricted
               </p>
+
               <p className="mt-3 leading-7">
-                Married users are not eligible to create or use Matchups
-                profiles. You may still access The Academy, counselling, shop,
-                articles, and other Delly&apos;s Matchups resources.
+                Married users are not eligible to create or
+                use Matchups profiles. You may still access
+                The Academy, counselling, shop, articles, and
+                other Delly&apos;s Matchups resources.
               </p>
             </section>
           )}
@@ -215,14 +255,18 @@ export default function DashboardPage() {
               <p className="text-sm font-black uppercase tracking-[0.35em]">
                 Matchups
               </p>
+
               <h2 className="font-display mt-4 text-5xl font-bold">
                 Start browsing compatible profiles.
               </h2>
+
               <p className="mt-5 max-w-3xl text-lg leading-8 text-black/70">
-                Explore members first. Upgrade prompts will appear only when you
-                try to unlock premium actions like full profile viewing,
-                messaging, or seeing who liked you.
+                Explore members first. Upgrade prompts will
+                appear only when you try to unlock premium
+                actions like full profile viewing, messaging,
+                or seeing who liked you.
               </p>
+
               <a
                 href="/browse"
                 className="mt-8 inline-flex rounded-full bg-[#b30018] px-8 py-4 font-black text-white transition hover:scale-105"
@@ -270,8 +314,9 @@ export default function DashboardPage() {
               </h2>
 
               <p className="mt-3 text-white/75">
-                {[profile?.city, profile?.country].filter(Boolean).join(", ") ||
-                  "Location not added"}
+                {[profile?.city, profile?.country]
+                  .filter(Boolean)
+                  .join(", ") || "Location not added"}
               </p>
 
               <div className="mt-6">
@@ -283,10 +328,13 @@ export default function DashboardPage() {
                   <span>Profile Completion</span>
                   <span>{completionPercentage}%</span>
                 </div>
+
                 <div className="h-3 overflow-hidden rounded-full bg-white/20">
                   <div
                     className="h-full rounded-full bg-white transition-all duration-500"
-                    style={{ width: `${completionPercentage}%` }}
+                    style={{
+                      width: `${completionPercentage}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -312,59 +360,119 @@ export default function DashboardPage() {
               </p>
 
               <div className="mt-8 grid gap-6 md:grid-cols-2">
-                <Info label="Age" value={profile?.age || "Not Added"} />
-                <Info label="Gender" value={profile?.gender || "Not Added"} />
-                <Info label="Marital Status" value={profile?.marital_status || "Not Added"} />
-                <Info label="Country" value={profile?.country || "Not Added"} />
-                <Info label="City" value={profile?.city || "Not Added"} />
-                <Info label="Occupation" value={profile?.occupation || "Not Added"} />
-                <Info label="Faith Background" value={profile?.faith_background || "Not Added"} />
-                <Info label="Interests" value={profile?.interests || "Not Added"} />
+                <Info
+                  label="Age"
+                  value={profile?.age || "Not Added"}
+                />
+                <Info
+                  label="Gender"
+                  value={profile?.gender || "Not Added"}
+                />
+                <Info
+                  label="Marital Status"
+                  value={
+                    profile?.marital_status ||
+                    "Not Added"
+                  }
+                />
+                <Info
+                  label="Country"
+                  value={
+                    profile?.country || "Not Added"
+                  }
+                />
+                <Info
+                  label="City"
+                  value={profile?.city || "Not Added"}
+                />
+                <Info
+                  label="Occupation"
+                  value={
+                    profile?.occupation || "Not Added"
+                  }
+                />
+                <Info
+                  label="Faith Background"
+                  value={
+                    profile?.faith_background ||
+                    "Not Added"
+                  }
+                />
+                <Info
+                  label="Interests"
+                  value={
+                    profile?.interests || "Not Added"
+                  }
+                />
               </div>
 
-              <ProfileText title="Bio" value={profile?.bio || "No bio added yet."} />
+              <ProfileText
+                title="Bio"
+                value={
+                  profile?.bio || "No bio added yet."
+                }
+              />
+
               <ProfileText
                 title="Relationship Goal"
-                value={profile?.relationship_goal || "No relationship goal added."}
+                value={
+                  profile?.relationship_goal ||
+                  "No relationship goal added."
+                }
               />
             </motion.div>
           </section>
 
-          {!married && suggestedProfiles.length > 0 && (
-            <section className="mt-14">
-              <SectionTitle eyebrow="Suggested Profiles" title="People You May Like" />
+          {!married &&
+            suggestedProfiles.length > 0 && (
+              <section className="mt-14">
+                <SectionTitle
+                  eyebrow="Suggested Profiles"
+                  title="People You May Like"
+                />
 
-              <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-                {suggestedProfiles.map((item) => (
-                  <a
-                    key={item.id}
-                    href={`/profile/${item.id}`}
-                    className="overflow-hidden rounded-[2rem] bg-white/10 shadow-2xl transition hover:scale-[1.02] hover:bg-white hover:text-[#b30018]"
-                  >
-                    <img
-                      src={item.avatar_url || "/placeholder-profile.webp"}
-                      alt={item.full_name || "Profile"}
-                      className="h-72 w-full object-cover object-top"
-                    />
-                    <div className="p-6">
-                      <h3 className="font-display text-3xl font-bold">
-                        {item.full_name || "Member"}
-                      </h3>
-                      <p className="mt-2 text-sm opacity-75">
-                        {[item.city, item.country].filter(Boolean).join(", ") ||
-                          "Location not added"}
-                      </p>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            </section>
-          )}
+                <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                  {suggestedProfiles.map((item) => (
+                    <a
+                      key={item.id}
+                      href={`/profile/${item.id}`}
+                      className="overflow-hidden rounded-[2rem] bg-white/10 shadow-2xl transition hover:scale-[1.02] hover:bg-white hover:text-[#b30018]"
+                    >
+                      <img
+                        src={
+                          item.avatar_url ||
+                          "/placeholder-profile.webp"
+                        }
+                        alt={
+                          item.full_name || "Profile"
+                        }
+                        className="h-72 w-full object-cover object-top"
+                      />
+
+                      <div className="p-6">
+                        <h3 className="font-display text-3xl font-bold">
+                          {item.full_name || "Member"}
+                        </h3>
+
+                        <p className="mt-2 text-sm opacity-75">
+                          {[item.city, item.country]
+                            .filter(Boolean)
+                            .join(", ") ||
+                            "Location not added"}
+                        </p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
 
           <section className="mt-14 grid gap-6 md:grid-cols-2">
             <DashboardStat
               title="Likes"
-              value={premiumAccess ? likesCount : "Locked"}
+              value={
+                premiumAccess ? likesCount : "Locked"
+              }
               text={
                 premiumAccess
                   ? "People interested in your profile."
@@ -375,7 +483,11 @@ export default function DashboardPage() {
 
             <DashboardStat
               title="Messages"
-              value={premiumAccess ? messagesCount : "Locked"}
+              value={
+                premiumAccess
+                  ? messagesCount
+                  : "Locked"
+              }
               text={
                 premiumAccess
                   ? "Unread conversations waiting for you."
@@ -390,14 +502,17 @@ export default function DashboardPage() {
               <p className="text-sm font-black uppercase tracking-[0.45em] text-yellow-300">
                 Academy Access
               </p>
+
               <h2 className="font-display mt-4 text-5xl font-bold">
                 My Academy 🎓
               </h2>
+
               <p className="mt-5 max-w-3xl text-lg leading-8 text-white/75">
-                You have {academyCount} unlocked academy course
-                {academyCount > 1 ? "s" : ""}. Continue learning from your
-                student area.
+                You have {academyCount} unlocked academy
+                course{academyCount > 1 ? "s" : ""}.
+                Continue learning from your student area.
               </p>
+
               <a
                 href="/dashboard/my-academy"
                 className="mt-8 inline-flex rounded-full bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 px-8 py-4 font-black text-black transition hover:scale-105"
@@ -409,25 +524,63 @@ export default function DashboardPage() {
 
           {!married && (
             <section className="mt-14">
-              <SectionTitle eyebrow="Quick Actions" title="Continue Your Journey" />
+              <SectionTitle
+                eyebrow="Quick Actions"
+                title="Continue Your Journey"
+              />
 
               <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-                <QuickAction href="/browse" title="Browse Matchups" />
-                <QuickAction href="/likes" title="Who Liked Me" locked={!premiumAccess} />
-                <QuickAction href="/messages" title="Messages" locked={!premiumAccess} />
-                <QuickAction href="/profile/setup" title="Edit Profile" />
+                <QuickAction
+                  href="/browse"
+                  title="Browse Matchups"
+                />
+
+                <QuickAction
+                  href="/likes"
+                  title="Who Liked Me"
+                  locked={!premiumAccess}
+                />
+
+                <QuickAction
+                  href="/messages"
+                  title="Messages"
+                  locked={!premiumAccess}
+                />
+
+                <QuickAction
+                  href="/profile/setup"
+                  title="Edit Profile"
+                />
               </div>
             </section>
           )}
 
           <section className="mt-14">
-            <SectionTitle eyebrow="Resources" title="Grow Beyond Matchups" />
+            <SectionTitle
+              eyebrow="Resources"
+              title="Grow Beyond Matchups"
+            />
 
             <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-              <QuickAction href="/about/academy" title="The Academy" />
-              <QuickAction href="/counselling" title="Counselling" />
-              <QuickAction href="/shop/books" title="Books" />
-              <QuickAction href="/articles" title="Articles" />
+              <QuickAction
+                href="/about/academy"
+                title="The Academy"
+              />
+
+              <QuickAction
+                href="/counselling"
+                title="Counselling"
+              />
+
+              <QuickAction
+                href="/shop/books"
+                title="Books"
+              />
+
+              <QuickAction
+                href="/articles"
+                title="Articles"
+              />
             </div>
           </section>
 
@@ -436,19 +589,48 @@ export default function DashboardPage() {
               <p className="text-sm font-black uppercase tracking-[0.35em] text-[#b30018]">
                 Admin Tools
               </p>
+
               <h2 className="font-display mt-4 text-5xl font-bold">
                 Manage Platform
               </h2>
+
               <div className="mt-8 flex flex-wrap gap-5">
-                <AdminLink href="/admin/articles" title="Articles Admin" />
-                <AdminLink href="/admin/exceptional-cases" title="Exceptional Cases" />
-                <AdminLink href="/admin/counselling-bookings" title="Counselling Admin" />
-                <AdminLink href="/admin/shop-orders" title="Shop Orders" />
-                <AdminLink href="/admin/contact-messages" title="Contact Messages" />
-                <AdminLink href="/admin/gallery" title="Gallery" />
-                <AdminLink href="/admin/testimonials" title="Testimonials" />
-                <AdminLink href="/admin/users" title="Users" />
-                <AdminLink href="/admin/payments" title="Payments" />
+                <AdminLink
+                  href="/admin/articles"
+                  title="Articles Admin"
+                />
+                <AdminLink
+                  href="/admin/exceptional-cases"
+                  title="Exceptional Cases"
+                />
+                <AdminLink
+                  href="/admin/counselling-bookings"
+                  title="Counselling Admin"
+                />
+                <AdminLink
+                  href="/admin/shop-orders"
+                  title="Shop Orders"
+                />
+                <AdminLink
+                  href="/admin/contact-messages"
+                  title="Contact Messages"
+                />
+                <AdminLink
+                  href="/admin/gallery"
+                  title="Gallery"
+                />
+                <AdminLink
+                  href="/admin/testimonials"
+                  title="Testimonials"
+                />
+                <AdminLink
+                  href="/admin/users"
+                  title="Users"
+                />
+                <AdminLink
+                  href="/admin/payments"
+                  title="Payments"
+                />
               </div>
             </section>
           )}
@@ -464,7 +646,10 @@ function Info({ label, value }) {
       <p className="text-sm uppercase tracking-[0.25em] text-red-100">
         {label}
       </p>
-      <p className="mt-2 text-xl font-bold">{value}</p>
+
+      <p className="mt-2 text-xl font-bold">
+        {value}
+      </p>
     </div>
   );
 }
@@ -475,20 +660,36 @@ function ProfileText({ title, value }) {
       <p className="text-sm uppercase tracking-[0.25em] text-red-100">
         {title}
       </p>
-      <p className="mt-3 text-lg leading-8 text-white/75">{value}</p>
+
+      <p className="mt-3 text-lg leading-8 text-white/75">
+        {value}
+      </p>
     </div>
   );
 }
 
-function DashboardStat({ title, value, text, isText = false }) {
+function DashboardStat({
+  title,
+  value,
+  text,
+  isText = false,
+}) {
   return (
     <div className="rounded-[2.5rem] bg-[#c1121f] p-8 shadow-2xl">
       <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
         {title}
       </p>
-      <h2 className={`mt-5 font-black ${isText ? "text-4xl uppercase" : "text-6xl"}`}>
+
+      <h2
+        className={`mt-5 font-black ${
+          isText
+            ? "text-4xl uppercase"
+            : "text-6xl"
+        }`}
+      >
         {value}
       </h2>
+
       <p className="mt-5 text-white/75">{text}</p>
     </div>
   );
@@ -500,12 +701,19 @@ function SectionTitle({ eyebrow, title }) {
       <p className="text-sm font-black uppercase tracking-[0.45em] text-red-100">
         {eyebrow}
       </p>
-      <h2 className="font-display mt-4 text-5xl font-bold">{title}</h2>
+
+      <h2 className="font-display mt-4 text-5xl font-bold">
+        {title}
+      </h2>
     </div>
   );
 }
 
-function QuickAction({ href, title, locked = false }) {
+function QuickAction({
+  href,
+  title,
+  locked = false,
+}) {
   const lockedTitle =
     title === "Who Liked Me"
       ? "Who Liked Me • Upgrade To Find Out"

@@ -4,13 +4,23 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import DashboardChrome from "@/app/components/DashboardChrome";
 
-function getPlan(profile) {
-  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
+function normalizeMembershipValue(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase()
+    : "";
 }
 
 function hasPremiumAccess(profile) {
-  const plan = getPlan(profile);
-  return plan === "premium" || plan === "vip";
+  const membershipValues = [
+    profile?.plan,
+    profile?.membership_plan,
+    profile?.membership_status,
+    profile?.subscription,
+  ].map(normalizeMembershipValue);
+
+  return membershipValues.some(
+    (value) => value === "premium" || value === "vip"
+  );
 }
 
 export default function MessagesPage() {
@@ -29,13 +39,20 @@ export default function MessagesPage() {
         return;
       }
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
 
+      if (profileError) {
+        alert(profileError.message);
+        setLoading(false);
+        return;
+      }
+
       const premiumAccess = hasPremiumAccess(profile);
+
       setHasFullAccess(premiumAccess);
 
       if (!premiumAccess) {
@@ -59,14 +76,18 @@ export default function MessagesPage() {
 
       for (const message of messages || []) {
         const otherUserId =
-          message.sender_id === user.id ? message.receiver_id : message.sender_id;
+          message.sender_id === user.id
+            ? message.receiver_id
+            : message.sender_id;
 
         if (!conversationMap.has(otherUserId)) {
           conversationMap.set(otherUserId, {
             userId: otherUserId,
             lastMessage: message.content,
             createdAt: message.created_at,
-            unread: message.receiver_id === user.id && message.is_read === false,
+            unread:
+              message.receiver_id === user.id &&
+              message.is_read === false,
           });
         }
       }
@@ -92,14 +113,14 @@ export default function MessagesPage() {
 
       const finalConversations = userIds.map((id) => ({
         ...conversationMap.get(id),
-        profile: profiles.find((profile) => profile.id === id),
+        profile: profiles.find((profileItem) => profileItem.id === id),
       }));
 
       setConversations(finalConversations);
       setLoading(false);
     }
 
-    loadMessages();
+    void loadMessages();
   }, []);
 
   function formatDate(date) {
@@ -173,7 +194,8 @@ export default function MessagesPage() {
               </h2>
 
               <p className="mx-auto mt-5 max-w-2xl text-white/75">
-                Browse matchups and connect with members to begin a conversation.
+                Browse matchups and connect with members to begin a
+                conversation.
               </p>
 
               <a
@@ -196,7 +218,9 @@ export default function MessagesPage() {
                       conversation.profile?.avatar_url ||
                       "/placeholder-profile.webp"
                     }
-                    alt={conversation.profile?.full_name || "Member"}
+                    alt={
+                      conversation.profile?.full_name || "Member"
+                    }
                     className="h-20 w-20 rounded-full object-cover object-top"
                   />
 

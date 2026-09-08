@@ -5,8 +5,35 @@ import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import DashboardChrome from "@/app/components/DashboardChrome";
 
+function normalizeMembershipValue(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase()
+    : "";
+}
+
+function getMembershipValues(profile) {
+  return [
+    profile?.membership_status,
+    profile?.membership_plan,
+    profile?.plan,
+    profile?.subscription,
+  ]
+    .map(normalizeMembershipValue)
+    .filter(Boolean);
+}
+
 function getPlan(profile) {
-  return profile?.plan || profile?.membership_plan || profile?.subscription || "free";
+  const values = getMembershipValues(profile);
+
+  if (values.includes("vip")) {
+    return "vip";
+  }
+
+  if (values.includes("premium")) {
+    return "premium";
+  }
+
+  return "free";
 }
 
 function hasPremiumAccess(profile) {
@@ -34,11 +61,23 @@ export default function LikesPage() {
         return;
       }
 
-      const { data: profile } = await supabase
+      const {
+        data: profile,
+        error: profileError,
+      } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
+
+      if (profileError || !profile) {
+        alert(
+          profileError?.message ||
+            "Unable to load your membership profile."
+        );
+        setLoading(false);
+        return;
+      }
 
       setUserProfile(profile);
 
@@ -58,7 +97,13 @@ export default function LikesPage() {
         return;
       }
 
-      const likerIds = (likes || []).map((like) => like.user_id);
+      const likerIds = [
+        ...new Set(
+          (likes || [])
+            .map((like) => like.user_id)
+            .filter(Boolean)
+        ),
+      ];
 
       if (likerIds.length === 0) {
         setLikedByProfiles([]);
@@ -66,31 +111,50 @@ export default function LikesPage() {
         return;
       }
 
-      const { data: profiles, error: profilesError } = await supabase
+      const {
+        data: profiles,
+        error: profilesError,
+      } = await supabase
         .from("profiles")
         .select("*")
         .in("id", likerIds);
 
       if (profilesError) {
         alert(profilesError.message);
+        setLikedByProfiles([]);
       } else {
-        setLikedByProfiles(profiles || []);
+        const profileMap = new Map(
+          (profiles || []).map((item) => [
+            item.id,
+            item,
+          ])
+        );
+
+        const orderedProfiles = likerIds
+          .map((id) => profileMap.get(id))
+          .filter(Boolean);
+
+        setLikedByProfiles(orderedProfiles);
       }
 
       setLoading(false);
     }
 
-    loadLikesPage();
+    void loadLikesPage();
   }, []);
 
-  const hasFullAccess = hasPremiumAccess(userProfile);
+  const hasFullAccess =
+    hasPremiumAccess(userProfile);
 
   if (loading) {
     return (
       <>
         <DashboardChrome />
+
         <main className="flex min-h-screen items-center justify-center bg-[#b30018] text-white">
-          <p className="text-xl font-bold">Loading likes...</p>
+          <p className="text-xl font-bold">
+            Loading likes...
+          </p>
         </main>
       </>
     );
@@ -112,8 +176,8 @@ export default function LikesPage() {
             </h1>
 
             <p className="mt-6 text-lg leading-8 text-white/75">
-              Discover members who have shown interest in your Delly&apos;s
-              Matchups profile.
+              Discover members who have shown interest in
+              your Delly&apos;s Matchups profile.
             </p>
           </div>
 
@@ -128,8 +192,9 @@ export default function LikesPage() {
               </h2>
 
               <p className="mt-6 max-w-3xl text-lg leading-8 text-white/75">
-                You can browse profiles freely. Upgrade when you are ready to
-                see who liked you and start meaningful conversations.
+                You can browse profiles freely. Upgrade
+                when you are ready to see who liked you
+                and start meaningful conversations.
               </p>
 
               <div className="mt-10 flex flex-col gap-4 sm:flex-row">
@@ -155,8 +220,8 @@ export default function LikesPage() {
               </h2>
 
               <p className="mx-auto mt-5 max-w-2xl text-white/75">
-                Keep your profile polished and continue browsing to increase
-                visibility.
+                Keep your profile polished and continue
+                browsing to increase visibility.
               </p>
 
               <a
@@ -168,72 +233,99 @@ export default function LikesPage() {
             </section>
           ) : (
             <div className="mt-14 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-              {likedByProfiles.map((profile, index) => {
-                const vipProfile = isVip(profile);
+              {likedByProfiles.map(
+                (profile, index) => {
+                  const vipProfile =
+                    isVip(profile);
 
-                return (
-                  <motion.article
-                    key={profile.id}
-                    initial={{ opacity: 0, y: 40 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`overflow-hidden rounded-[2.5rem] shadow-2xl transition hover:-translate-y-2 ${
-                      vipProfile ? "bg-yellow-400/15" : "bg-[#c1121f]"
-                    }`}
-                  >
-                    <a href={`/profile/${profile.id}`} className="block">
-                      <div className="relative">
-                        <img
-                          src={profile.avatar_url || "/placeholder-profile.webp"}
-                          alt={profile.full_name || "Member"}
-                          className="h-[420px] w-full object-cover object-top"
-                        />
+                  return (
+                    <motion.article
+                      key={profile.id}
+                      initial={{
+                        opacity: 0,
+                        y: 40,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                      }}
+                      transition={{
+                        delay: index * 0.05,
+                      }}
+                      className={`overflow-hidden rounded-[2.5rem] shadow-2xl transition hover:-translate-y-2 ${
+                        vipProfile
+                          ? "bg-yellow-400/15"
+                          : "bg-[#c1121f]"
+                      }`}
+                    >
+                      <a
+                        href={`/profile/${profile.id}`}
+                        className="block"
+                      >
+                        <div className="relative">
+                          <img
+                            src={
+                              profile.avatar_url ||
+                              "/placeholder-profile.webp"
+                            }
+                            alt={
+                              profile.full_name ||
+                              "Member"
+                            }
+                            className="h-[420px] w-full object-cover object-top"
+                          />
 
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
-                        {vipProfile && (
-                          <span className="absolute left-5 top-5 rounded-full bg-yellow-400 px-4 py-2 text-sm font-black text-black">
-                            👑 VIP
-                          </span>
-                        )}
+                          {vipProfile && (
+                            <span className="absolute left-5 top-5 rounded-full bg-yellow-400 px-4 py-2 text-sm font-black text-black">
+                              👑 VIP
+                            </span>
+                          )}
 
-                        <div className="absolute bottom-6 left-6">
-                          <h2 className="font-display text-4xl font-bold">
-                            {profile.full_name || "Unnamed Member"}
-                          </h2>
+                          <div className="absolute bottom-6 left-6">
+                            <h2 className="font-display text-4xl font-bold">
+                              {profile.full_name ||
+                                "Unnamed Member"}
+                            </h2>
 
-                          <p className="mt-2 text-white/75">
-                            {profile.age || "Age not added"} •{" "}
-                            {profile.city || "City not added"}
-                          </p>
+                            <p className="mt-2 text-white/75">
+                              {profile.age ||
+                                "Age not added"}{" "}
+                              •{" "}
+                              {profile.city ||
+                                "City not added"}
+                            </p>
+                          </div>
+                        </div>
+                      </a>
+
+                      <div className="p-8">
+                        <p className="line-clamp-4 text-lg leading-8 text-white/75">
+                          {profile.bio ||
+                            "No bio added yet."}
+                        </p>
+
+                        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                          <a
+                            href={`/profile/${profile.id}`}
+                            className="rounded-full border border-white/20 bg-white/10 px-8 py-4 text-center font-black text-white transition hover:bg-white/20"
+                          >
+                            View Profile
+                          </a>
+
+                          <a
+                            href={`/chat/${profile.id}`}
+                            className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
+                          >
+                            Message
+                          </a>
                         </div>
                       </div>
-                    </a>
-
-                    <div className="p-8">
-                      <p className="line-clamp-4 text-lg leading-8 text-white/75">
-                        {profile.bio || "No bio added yet."}
-                      </p>
-
-                      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                        <a
-                          href={`/profile/${profile.id}`}
-                          className="rounded-full border border-white/20 bg-white/10 px-8 py-4 text-center font-black text-white transition hover:bg-white/20"
-                        >
-                          View Profile
-                        </a>
-
-                        <a
-                          href={`/chat/${profile.id}`}
-                          className="rounded-full bg-white px-8 py-4 text-center font-black text-[#b30018] transition hover:scale-105"
-                        >
-                          Message
-                        </a>
-                      </div>
-                    </div>
-                  </motion.article>
-                );
-              })}
+                    </motion.article>
+                  );
+                }
+              )}
             </div>
           )}
         </div>

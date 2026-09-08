@@ -8,29 +8,45 @@ import DashboardChrome from "@/app/components/DashboardChrome";
 
 const emojis = ["😊", "❤️", "😂", "🙏", "🔥", "😍"];
 
-function getMembership(profile) {
-  return (
-    profile?.membership_status ||
-    profile?.membership_plan ||
-    profile?.plan ||
-    profile?.subscription ||
-    "free"
+function normalizeMembershipValue(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase()
+    : "";
+}
+
+function getMembershipValues(profile) {
+  return [
+    profile?.membership_status,
+    profile?.membership_plan,
+    profile?.plan,
+    profile?.subscription,
+  ]
+    .map(normalizeMembershipValue)
+    .filter(Boolean);
+}
+
+function hasPremiumAccess(profile) {
+  return getMembershipValues(profile).some(
+    (value) => value === "premium" || value === "vip"
+  );
+}
+
+function hasVipAccess(profile) {
+  return getMembershipValues(profile).some(
+    (value) => value === "vip"
   );
 }
 
 function canSendMessages(profile) {
-  const membership = getMembership(profile);
-  return membership === "premium" || membership === "vip";
+  return hasPremiumAccess(profile);
 }
 
 function canStartAudioCall(profile) {
-  const membership = getMembership(profile);
-  return membership === "premium" || membership === "vip";
+  return hasPremiumAccess(profile);
 }
 
 function canStartVideoCall(profile) {
-  const membership = getMembership(profile);
-  return membership === "vip";
+  return hasVipAccess(profile);
 }
 
 export default function ChatPage() {
@@ -77,24 +93,51 @@ export default function ChatPage() {
 
       setCurrentUser(user);
 
-      const { data: myProfile } = await supabase
+      const {
+        data: myProfile,
+        error: myProfileError,
+      } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
+
+      if (myProfileError || !myProfile) {
+        alert(
+          myProfileError?.message ||
+            "Unable to load your membership profile."
+        );
+        setLoading(false);
+        return;
+      }
 
       if (!canSendMessages(myProfile)) {
         window.location.href = "/matchups/checkout";
         return;
       }
 
-      const { data: otherProfile } = await supabase
+      const {
+        data: otherProfile,
+        error: otherProfileError,
+      } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .single();
 
-      const { data: chatMessages } = await supabase
+      if (otherProfileError || !otherProfile) {
+        alert(
+          otherProfileError?.message ||
+            "Unable to load this member."
+        );
+        setLoading(false);
+        return;
+      }
+
+      const {
+        data: chatMessages,
+        error: chatMessagesError,
+      } = await supabase
         .from("messages")
         .select("*")
         .or(
@@ -102,23 +145,49 @@ export default function ChatPage() {
         )
         .order("created_at", { ascending: true });
 
-      await supabase
+      if (chatMessagesError) {
+        alert(chatMessagesError.message);
+        setLoading(false);
+        return;
+      }
+
+      const { error: readError } = await supabase
         .from("messages")
         .update({ is_read: true })
         .eq("receiver_id", user.id)
         .eq("sender_id", userId)
         .eq("is_read", false);
 
-      const { data: conversationMessages } = await supabase
+      if (readError) {
+        console.warn(
+          "Unable to mark messages as read:",
+          readError.message
+        );
+      }
+
+      const {
+        data: conversationMessages,
+        error: conversationMessagesError,
+      } = await supabase
         .from("messages")
         .select("*")
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .or(
+          `sender_id.eq.${user.id},receiver_id.eq.${user.id}`
+        )
         .order("created_at", { ascending: false });
+
+      if (conversationMessagesError) {
+        alert(conversationMessagesError.message);
+        setLoading(false);
+        return;
+      }
 
       const conversationUserIds = [
         ...new Set(
           (conversationMessages || []).map((msg) =>
-            msg.sender_id === user.id ? msg.receiver_id : msg.sender_id
+            msg.sender_id === user.id
+              ? msg.receiver_id
+              : msg.sender_id
           )
         ),
       ];
@@ -126,10 +195,19 @@ export default function ChatPage() {
       let conversationProfiles = [];
 
       if (conversationUserIds.length > 0) {
-        const { data: profiles } = await supabase
+        const {
+          data: profiles,
+          error: profilesError,
+        } = await supabase
           .from("profiles")
           .select("*")
           .in("id", conversationUserIds);
+
+        if (profilesError) {
+          alert(profilesError.message);
+          setLoading(false);
+          return;
+        }
 
         conversationProfiles = profiles || [];
       }
@@ -141,11 +219,13 @@ export default function ChatPage() {
       setLoading(false);
     }
 
-    loadChat();
+    void loadChat();
   }, [userId]);
 
   useEffect(() => {
-    if (!currentUser || !userId) return;
+    if (!currentUser || !userId) {
+      return;
+    }
 
     const channel = supabase
       .channel(`messages-${currentUser.id}-${userId}`)
@@ -165,31 +245,48 @@ export default function ChatPage() {
             (newMessage.sender_id === userId &&
               newMessage.receiver_id === currentUser.id);
 
-          if (!belongsToChat) return;
+          if (!belongsToChat) {
+            return;
+          }
 
           setMessages((current) => {
-            const alreadyExists = current.some((msg) => msg.id === newMessage.id);
-            return alreadyExists ? current : [...current, newMessage];
+            const alreadyExists = current.some(
+              (msg) => msg.id === newMessage.id
+            );
+
+            return alreadyExists
+              ? current
+              : [...current, newMessage];
           });
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [currentUser, userId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
   }, [messages]);
 
   async function sendMessage(event) {
     event.preventDefault();
 
-    if (!message.trim() || sending) return;
+    if (
+      !message.trim() ||
+      sending ||
+      !currentUser ||
+      !hasMessagingAccess
+    ) {
+      return;
+    }
 
     const text = message.trim();
+
     setMessage("");
     setSending(true);
 
@@ -213,8 +310,13 @@ export default function ChatPage() {
     }
 
     setMessages((current) => {
-      const alreadyExists = current.some((msg) => msg.id === data.id);
-      return alreadyExists ? current : [...current, data];
+      const alreadyExists = current.some(
+        (msg) => msg.id === data.id
+      );
+
+      return alreadyExists
+        ? current
+        : [...current, data];
     });
   }
 
@@ -229,44 +331,66 @@ export default function ChatPage() {
     }
 
     if (callType === "audio" && !hasAudioAccess) {
-      window.location.href = "/matchups/checkout?plan=premium";
+      window.location.href =
+        "/matchups/checkout?plan=premium";
       return;
     }
 
     if (callType === "video" && !hasVideoAccess) {
-      window.location.href = "/matchups/checkout?plan=vip";
+      window.location.href =
+        "/matchups/checkout?plan=vip";
       return;
     }
 
     setStartingCallType(callType);
 
-    const response = await fetch("/api/calls/start", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        receiverId: userId,
-        callType,
-      }),
-    });
+    try {
+      const response = await fetch("/api/calls/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          receiverId: userId,
+          callType,
+        }),
+      });
 
-    const payload = await response.json();
-    setStartingCallType(null);
+      const payload = await response.json();
 
-    if (!response.ok) {
-      const parts = [payload.error || `Unable to start ${callType} call.`];
+      if (!response.ok) {
+        const parts = [
+          payload.error ||
+            `Unable to start ${callType} call.`,
+        ];
 
-      if (payload.details) parts.push(payload.details);
-      if (payload.hint) parts.push(`Hint: ${payload.hint}`);
-      if (payload.code) parts.push(`Code: ${payload.code}`);
+        if (payload.details) {
+          parts.push(payload.details);
+        }
 
-      alert(parts.join("\n\n"));
-      return;
+        if (payload.hint) {
+          parts.push(`Hint: ${payload.hint}`);
+        }
+
+        if (payload.code) {
+          parts.push(`Code: ${payload.code}`);
+        }
+
+        alert(parts.join("\n\n"));
+        return;
+      }
+
+      router.push(`/calls/${payload.call.id}`);
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : `Unable to start ${callType} call.`
+      );
+    } finally {
+      setStartingCallType(null);
     }
-
-    router.push(`/calls/${payload.call.id}`);
   }
 
   function formatTime(date) {
@@ -280,8 +404,11 @@ export default function ChatPage() {
     return (
       <>
         <DashboardChrome />
+
         <main className="flex min-h-screen items-center justify-center bg-[#b30018] text-white">
-          <p className="text-xl font-bold">Loading chat...</p>
+          <p className="text-xl font-bold">
+            Loading chat...
+          </p>
         </main>
       </>
     );
@@ -290,6 +417,7 @@ export default function ChatPage() {
   return (
     <>
       <DashboardChrome />
+
       <main className="min-h-screen bg-[#b30018] pt-28 text-white">
         <div className="grid min-h-[calc(100vh-7rem)] grid-cols-1 lg:grid-cols-[300px_1fr] xl:grid-cols-[300px_1fr_320px]">
           <aside className="hidden border-r border-white/10 bg-[#7a0010]/60 lg:block">
@@ -297,7 +425,10 @@ export default function ChatPage() {
               <p className="text-sm font-black uppercase tracking-[0.3em] text-red-100">
                 Messages
               </p>
-              <h2 className="mt-3 font-serif text-4xl font-black">Chats</h2>
+
+              <h2 className="mt-3 font-serif text-4xl font-black">
+                Chats
+              </h2>
             </div>
 
             <div className="space-y-3 p-4">
@@ -307,7 +438,8 @@ export default function ChatPage() {
                 </div>
               ) : (
                 conversations.map((profile) => {
-                  const isActive = profile.id === userId;
+                  const isActive =
+                    profile.id === userId;
 
                   return (
                     <a
@@ -320,20 +452,31 @@ export default function ChatPage() {
                       }`}
                     >
                       <img
-                        src={profile.avatar_url || "/placeholder-profile.webp"}
-                        alt={profile.full_name || "Member"}
+                        src={
+                          profile.avatar_url ||
+                          "/placeholder-profile.webp"
+                        }
+                        alt={
+                          profile.full_name || "Member"
+                        }
                         className="h-14 w-14 rounded-full object-cover object-top"
                       />
+
                       <div className="min-w-0 flex-1">
                         <h3 className="truncate font-bold">
-                          {profile.full_name || "Member"}
+                          {profile.full_name ||
+                            "Member"}
                         </h3>
+
                         <p
                           className={`truncate text-sm ${
-                            isActive ? "text-[#b30018]/70" : "text-white/60"
+                            isActive
+                              ? "text-[#b30018]/70"
+                              : "text-white/60"
                           }`}
                         >
-                          {profile.city || "Delly's Matchups"}
+                          {profile.city ||
+                            "Delly's Matchups"}
                         </p>
                       </div>
                     </a>
@@ -350,16 +493,26 @@ export default function ChatPage() {
                 className="flex items-center gap-4"
               >
                 <img
-                  src={receiverProfile?.avatar_url || "/placeholder-profile.webp"}
-                  alt={receiverProfile?.full_name || "Member"}
+                  src={
+                    receiverProfile?.avatar_url ||
+                    "/placeholder-profile.webp"
+                  }
+                  alt={
+                    receiverProfile?.full_name ||
+                    "Member"
+                  }
                   className="h-14 w-14 rounded-full object-cover object-top"
                 />
+
                 <div>
                   <h1 className="font-serif text-2xl font-black">
-                    {receiverProfile?.full_name || "Member"}
+                    {receiverProfile?.full_name ||
+                      "Member"}
                   </h1>
+
                   <p className="text-sm text-white/60">
-                    {receiverProfile?.city || "Delly's Matchups member"}
+                    {receiverProfile?.city ||
+                      "Delly's Matchups member"}
                   </p>
                 </div>
               </a>
@@ -368,20 +521,30 @@ export default function ChatPage() {
                 <button
                   type="button"
                   onClick={() => startCall("audio")}
-                  disabled={startingCallType !== null}
+                  disabled={
+                    startingCallType !== null
+                  }
                   className="rounded-full border border-white/20 px-5 py-3 font-black text-white transition hover:bg-white hover:text-[#b30018] disabled:opacity-60"
                 >
-                  {startingCallType === "audio" ? "Starting Audio..." : "Audio Call"}
+                  {startingCallType === "audio"
+                    ? "Starting Audio..."
+                    : "Audio Call"}
                 </button>
 
                 {hasVideoAccess ? (
                   <button
                     type="button"
-                    onClick={() => startCall("video")}
-                    disabled={startingCallType !== null}
+                    onClick={() =>
+                      startCall("video")
+                    }
+                    disabled={
+                      startingCallType !== null
+                    }
                     className="rounded-full bg-white px-5 py-3 font-black text-[#b30018] transition hover:scale-105 disabled:opacity-60"
                   >
-                    {startingCallType === "video" ? "Starting Video..." : "Video Call"}
+                    {startingCallType === "video"
+                      ? "Starting Video..."
+                      : "Video Call"}
                   </button>
                 ) : (
                   <a
@@ -405,21 +568,31 @@ export default function ChatPage() {
               {messages.length === 0 ? (
                 <div className="flex h-full items-center justify-center">
                   <div className="rounded-[2rem] border border-white/10 bg-white/10 p-10 text-center">
-                    <p className="text-xl text-white/80">No messages yet.</p>
+                    <p className="text-xl text-white/80">
+                      No messages yet.
+                    </p>
+
                     <p className="mt-3 text-white/50">
-                      Start the conversation respectfully.
+                      Start the conversation
+                      respectfully.
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-5">
                   {messages.map((chat) => {
-                    const isMine = chat.sender_id === currentUser.id;
+                    const isMine =
+                      chat.sender_id ===
+                      currentUser.id;
 
                     return (
                       <div
                         key={chat.id}
-                        className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                        className={`flex ${
+                          isMine
+                            ? "justify-end"
+                            : "justify-start"
+                        }`}
                       >
                         <div>
                           <div
@@ -429,19 +602,27 @@ export default function ChatPage() {
                                 : "bg-[#7a0010]/70 text-white"
                             }`}
                           >
-                            <p className="leading-relaxed">{chat.content}</p>
+                            <p className="leading-relaxed">
+                              {chat.content}
+                            </p>
                           </div>
+
                           <p
                             className={`mt-1 text-xs text-white/45 ${
-                              isMine ? "text-right" : "text-left"
+                              isMine
+                                ? "text-right"
+                                : "text-left"
                             }`}
                           >
-                            {formatTime(chat.created_at)}
+                            {formatTime(
+                              chat.created_at
+                            )}
                           </p>
                         </div>
                       </div>
                     );
                   })}
+
                   <div ref={bottomRef} />
                 </div>
               )}
@@ -457,7 +638,12 @@ export default function ChatPage() {
                     <button
                       key={emoji}
                       type="button"
-                      onClick={() => setMessage((current) => current + emoji)}
+                      onClick={() =>
+                        setMessage(
+                          (current) =>
+                            current + emoji
+                        )
+                      }
                       className="rounded-full bg-white/10 px-3 py-2 text-lg transition hover:bg-white hover:text-[#b30018]"
                     >
                       {emoji}
@@ -468,16 +654,23 @@ export default function ChatPage() {
                 <div className="flex items-center gap-3">
                   <input
                     value={message}
-                    onChange={(event) => setMessage(event.target.value)}
+                    onChange={(event) =>
+                      setMessage(
+                        event.target.value
+                      )
+                    }
                     placeholder="Write a thoughtful message..."
                     className="flex-1 rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/50"
                   />
+
                   <button
                     type="submit"
                     disabled={sending}
                     className="rounded-2xl bg-white px-8 py-4 font-black text-[#b30018] transition hover:scale-105 disabled:opacity-60"
                   >
-                    {sending ? "Sending..." : "Send"}
+                    {sending
+                      ? "Sending..."
+                      : "Send"}
                   </button>
                 </div>
               </form>
@@ -490,43 +683,71 @@ export default function ChatPage() {
               className="block rounded-[2rem] border border-white/10 bg-white/10 p-5 transition hover:bg-white/15"
             >
               <img
-                src={receiverProfile?.avatar_url || "/placeholder-profile.webp"}
-                alt={receiverProfile?.full_name || "Member"}
+                src={
+                  receiverProfile?.avatar_url ||
+                  "/placeholder-profile.webp"
+                }
+                alt={
+                  receiverProfile?.full_name ||
+                  "Member"
+                }
                 className="h-72 w-full rounded-[1.5rem] object-cover object-top"
               />
+
               <h2 className="mt-5 font-serif text-3xl font-black">
-                {receiverProfile?.full_name || "Member"}
+                {receiverProfile?.full_name ||
+                  "Member"}
               </h2>
+
               <p className="mt-1 text-white/70">
-                {receiverProfile?.age || "Age not added"} •{" "}
-                {receiverProfile?.city || "City not added"}
+                {receiverProfile?.age ||
+                  "Age not added"}{" "}
+                •{" "}
+                {receiverProfile?.city ||
+                  "City not added"}
               </p>
+
               <p className="mt-4 text-sm leading-7 text-white/75">
-                {receiverProfile?.bio || "No bio added yet."}
+                {receiverProfile?.bio ||
+                  "No bio added yet."}
               </p>
+
               <p className="mt-4 text-sm text-red-100">
-                {receiverProfile?.interests || "No interests added."}
+                {receiverProfile?.interests ||
+                  "No interests added."}
               </p>
             </a>
 
             <div className="mt-6 grid gap-3">
               <button
                 type="button"
-                onClick={() => startCall("audio")}
-                disabled={startingCallType !== null}
+                onClick={() =>
+                  startCall("audio")
+                }
+                disabled={
+                  startingCallType !== null
+                }
                 className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018] disabled:opacity-60"
               >
-                {startingCallType === "audio" ? "Starting Audio..." : "Audio Call"}
+                {startingCallType === "audio"
+                  ? "Starting Audio..."
+                  : "Audio Call"}
               </button>
 
               {hasVideoAccess ? (
                 <button
                   type="button"
-                  onClick={() => startCall("video")}
-                  disabled={startingCallType !== null}
+                  onClick={() =>
+                    startCall("video")
+                  }
+                  disabled={
+                    startingCallType !== null
+                  }
                   className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018] disabled:opacity-60"
                 >
-                  {startingCallType === "video" ? "Starting Video..." : "Video Call"}
+                  {startingCallType === "video"
+                    ? "Starting Video..."
+                    : "Video Call"}
                 </button>
               ) : (
                 <a
@@ -539,7 +760,11 @@ export default function ChatPage() {
 
               <button
                 type="button"
-                onClick={() => alert("Report feature coming soon.")}
+                onClick={() =>
+                  alert(
+                    "Report feature coming soon."
+                  )
+                }
                 className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018]"
               >
                 Report
@@ -547,7 +772,11 @@ export default function ChatPage() {
 
               <button
                 type="button"
-                onClick={() => alert("Block feature coming soon.")}
+                onClick={() =>
+                  alert(
+                    "Block feature coming soon."
+                  )
+                }
                 className="rounded-2xl border border-white/15 py-3 font-bold text-white/80 transition hover:bg-white hover:text-[#b30018]"
               >
                 Block
