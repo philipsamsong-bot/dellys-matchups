@@ -3,7 +3,7 @@
 export const metadata = {
     title: "Cancellation & Refund Policy | Delly's Matchups",
     description:
-      "Cancellation and Refund Policy for Delly's Matchups counselling, memberships, Academy, shop purchases and related services.",
+      "Cancellation and refund terms for Delly's Matchups memberships, matchmaking, counselling, mentorship, Academy courses and shop purchases.",
   };
   
   const SUPPORT_EMAIL = "support@dellysmatchups.org";
@@ -21,7 +21,7 @@ export const metadata = {
             Cancellation &amp; Refund Policy
           </h1>
   
-          <div className="mt-8 space-y-6 text-white/75">
+          <div className="mt-8 space-y-6 leading-8 text-white/75">
             <p>
               <strong>Effective Date:</strong> 12 September 2026
             </p>
@@ -30,312 +30,326 @@ export const metadata = {
               <strong>Last Updated:</strong> 12 September 2026
             </p>
   
-            <p className="leading-8">
-              This Cancellation &amp; Refund Policy explains the rules that
-              apply when cancelling, rescheduling or requesting a refund for
-              services or products provided by Delly&apos;s Matchups Ltd
-              (&quot;Delly&apos;s Matchups&quot;, &quot;DMs&quot;,
-              &quot;we&quot;, &quot;our&quot; or &quot;us&quot;).
+            <p>
+              Delly&apos;s Matchups Ltd (&quot;Delly&apos;s Matchups&quot;,
+              &quot;we&quot;, &quot;our&quot; or &quot;us&quot;) provides both
+              free and paid services through our website and mobile application.
             </p>
   
-            <p className="leading-8">
-              Different rules may apply depending on whether you have purchased
-              a counselling session, membership, Academy programme, digital
-              content or physical product.
+            <p>
+              A free account is required to access and navigate the
+              Delly&apos;s Matchups platform. Free members may access selected
+              features and content, including articles, blogs and other areas
+              made available to free account holders.
             </p>
   
-            <p className="leading-8">
-              Nothing in this policy is intended to exclude or restrict any
-              rights that cannot legally be excluded under applicable consumer
-              law.
+            <p>
+              Additional services require payment. These may include paid
+              memberships, matchmaking, counselling, mentorship, Delly&apos;s
+              Matchups Academy courses and programmes, and products purchased
+              through our shop.
+            </p>
+  
+            <p>
+              This policy explains how cancellations, rescheduling and refunds
+              are handled for those paid services and products.
+            </p>
+  
+            <p>
+              Nothing in this policy excludes or limits any statutory consumer
+              rights that cannot legally be excluded or limited.
             </p>
           </div>
   
           <div className="mt-16 space-y-14">
-            <PolicySection title="1. General Principles">
+            <PolicySection title="1. Paid Memberships and Subscriptions">
               <p>
-                We aim to provide clear and fair cancellation and refund terms
-                for the products and services offered through Delly&apos;s
-                Matchups.
+                Delly&apos;s Matchups may offer Premium, VIP or other paid
+                membership and subscription plans.
               </p>
   
               <p>
-                Where a payment reserves a specific appointment, place,
-                programme or period of access, that payment may become
-                non-refundable once the booking or service has been confirmed,
-                subject to this policy and applicable consumer law.
+                Once a paid membership period has started and the applicable
+                benefits or paid features have been made available, the payment
+                is generally non-refundable for that period, except where a
+                refund is required by applicable law.
               </p>
   
               <p>
-                Refund eligibility depends on the type of product or service,
-                whether the service has begun or been provided, and the reason
-                for cancellation.
-              </p>
-            </PolicySection>
-  
-            <PolicySection title="2. Counselling Bookings">
-              <p>
-                Payment secures your counselling appointment and is generally
-                non-refundable once the booking has been confirmed.
+                You may cancel a recurring subscription to prevent future
+                renewal charges. Cancelling does not normally reverse payment
+                for a billing period that has already started.
               </p>
   
               <p>
-                A refund will normally be provided where Delly&apos;s Matchups
-                is unable to deliver the booked counselling session and an
-                appropriate replacement session cannot be agreed.
+                Where applicable, your paid benefits may remain available until
+                the end of the period you have already paid for.
               </p>
   
               <p>
-                Clients should, where possible, provide at least 24 hours&apos;
-                notice if they need to cancel or reschedule an appointment.
-              </p>
-  
-              <p>
-                Providing notice does not automatically create an entitlement to
-                a cash refund. Where appropriate, Delly&apos;s Matchups may
-                instead offer a reasonable opportunity to reschedule the
-                appointment.
+                If a subscription is purchased through an app store or another
+                third-party billing provider, that provider&apos;s applicable
+                billing and refund procedures may also apply.
               </p>
             </PolicySection>
   
-            <PolicySection title="3. Late Cancellations and No-Shows">
+            <PolicySection title="2. Matchmaking Services">
               <p>
-                Repeated cancellations, failure to attend a booked session, or
-                last-minute changes may result in the payment for that
-                appointment being forfeited.
+                Matchmaking is a paid service and may involve profile review,
+                assessment, screening, administrative work, searches for
+                potentially compatible individuals, communication with
+                prospective matches and arranging introductions.
               </p>
   
               <p>
-                Where payment is forfeited, a new payment may be required before
-                another counselling appointment can be booked.
+                If you ask to cancel before matchmaking work has commenced, we
+                will assess the request according to the circumstances and your
+                applicable consumer rights.
               </p>
   
               <p>
-                We may consider exceptional circumstances individually where it
-                is reasonable to do so.
-              </p>
-            </PolicySection>
-  
-            <PolicySection title="4. Rescheduling by Delly’s Matchups">
-              <p>
-                Delly&apos;s Matchups may need to reschedule a counselling
-                session because of an emergency, illness, technical problem or
-                another circumstance outside our reasonable control.
+                Once Delly&apos;s Matchups has begun reviewing, screening,
+                assessing, searching for potential matches, contacting
+                prospective matches or otherwise carrying out matchmaking work
+                for you, the service is considered to have commenced.
               </p>
   
               <p>
-                Where this happens, we will make reasonable efforts to offer an
-                alternative appointment.
+                Amounts relating to services already supplied or work already
+                carried out are ordinarily non-refundable, except where
+                applicable law requires otherwise.
               </p>
   
               <p>
-                If Delly&apos;s Matchups is unable to provide the booked service
-                and a suitable replacement appointment cannot be agreed, the
-                affected payment may be refunded.
-              </p>
-            </PolicySection>
-  
-            <PolicySection title="5. Abusive, Threatening or Unsafe Behaviour">
-              <p>
-                Delly&apos;s Matchups reserves the right to refuse, terminate or
-                cancel a counselling session where a client behaves in a
-                disrespectful, abusive, threatening, harassing or unsafe manner.
+                No refund will ordinarily be provided simply because:
               </p>
   
-              <p>
-                Where a session is terminated or cancelled because of such
-                behaviour, the payment may be non-refundable.
-              </p>
+              <ul className="list-disc space-y-2 pl-6">
+                <li>you do not wish to pursue the person introduced;</li>
+                <li>the other person does not wish to pursue you;</li>
+                <li>communication between you does not progress;</li>
+                <li>either person loses interest;</li>
+                <li>a relationship subsequently ends; or</li>
+                <li>
+                  the introduction does not result in dating, engagement or
+                  marriage.
+                </li>
+              </ul>
   
               <p>
-                We may also restrict or refuse future bookings where reasonably
-                necessary to protect staff, counsellors, mentors, users or other
-                persons.
+                Delly&apos;s Matchups provides a matchmaking service. We do not
+                guarantee that an introduction will result in a relationship,
+                engagement or marriage.
               </p>
             </PolicySection>
   
-            <PolicySection title="6. Memberships and Subscriptions">
+            <PolicySection title="3. Counselling Bookings">
               <p>
-                Where Delly&apos;s Matchups offers a recurring membership or
-                subscription, cancellation normally prevents future renewals.
+                Counselling appointments provided through Delly&apos;s Matchups
+                are paid services.
               </p>
   
               <p>
-                Unless otherwise stated at the time of purchase, cancelling a
-                membership does not normally create an automatic refund for a
-                billing period that has already begun.
+                Clients should provide at least 24 hours&apos; notice where
+                possible if they need to cancel or reschedule an appointment.
               </p>
   
               <p>
-                Where technically available and permitted by the applicable
-                purchase terms, membership benefits may continue until the end
-                of the period that has already been paid for.
+                Where sufficient notice is provided, we may offer a reasonable
+                opportunity to reschedule the appointment. Providing notice does
+                not automatically create an entitlement to a cash refund.
               </p>
   
               <p>
-                Refunds may be considered where Delly&apos;s Matchups has failed
-                to provide the purchased membership service, where a payment has
-                been taken incorrectly, or where a refund is otherwise required
-                by applicable law.
+                A counselling payment may ordinarily be treated as used where
+                the session has already taken place, the session has commenced,
+                the client fails to attend, or a late cancellation means the
+                reserved professional time cannot reasonably be reallocated.
               </p>
   
               <p>
-                Where a membership or subscription is purchased through an app
-                store or another third-party billing provider, cancellation and
-                refund requests may also be subject to that provider&apos;s
-                billing and refund procedures.
-              </p>
-            </PolicySection>
-  
-            <PolicySection title="7. Academy Programmes and Courses">
-              <p>
-                Cancellation rights for Delly&apos;s Matchups Academy may depend
-                on whether the programme has started and whether access to
-                digital materials, lessons or other content has already been
-                provided.
-              </p>
-  
-              <p>
-                If Delly&apos;s Matchups cancels a paid programme or is unable
-                to provide the purchased service, we may offer a replacement,
-                alternative date, account credit or refund as appropriate.
-              </p>
-  
-              <p>
-                Where a customer requests immediate access to digital content or
-                services, statutory cancellation rights may be affected once the
-                supply of that content or service begins, where permitted by
-                applicable law and where the legally required acknowledgement or
-                consent has been obtained.
-              </p>
-  
-              <p>
-                Any programme-specific cancellation terms displayed before
-                purchase should be read together with this policy.
+                If Delly&apos;s Matchups is unable to provide a booked
+                counselling session, we will normally attempt to arrange a
+                suitable replacement. If we cannot reasonably provide the
+                service, an appropriate refund or other remedy may be offered.
               </p>
             </PolicySection>
   
-            <PolicySection title="8. Digital Content">
+            <PolicySection title="4. Mentorship Services">
               <p>
-                Certain Delly&apos;s Matchups products or services may include
-                digital content, online materials, recordings, downloads or
-                immediate digital access.
+                Mentorship sessions, programmes and packages are paid services.
               </p>
   
               <p>
-                Where digital content is supplied immediately at the
-                customer&apos;s request, cancellation or refund rights may be
-                limited after access or supply has begun, to the extent permitted
-                by applicable law.
+                Clients should give reasonable notice if they need to cancel or
+                reschedule a future mentorship session.
               </p>
   
               <p>
-                This does not affect rights relating to digital content that is
+                Once a mentorship session or programme has commenced, amounts
+                relating to preparation, professional time, sessions, programme
+                access or support already supplied are ordinarily
+                non-refundable.
+              </p>
+  
+              <p>
+                A missed appointment or late cancellation may be treated as a
+                used session where professional time has already been reserved
+                and cannot reasonably be reallocated.
+              </p>
+            </PolicySection>
+  
+            <PolicySection title="5. Delly’s Matchups Academy">
+              <p>
+                Users may read information about Academy courses, modules and
+                programmes before deciding whether to enrol.
+              </p>
+  
+              <p>
+                Reading course descriptions does not provide access to the paid
+                course itself. Enrolment and access to paid lessons, modules,
+                programmes or other premium Academy content require payment
+                unless expressly stated otherwise.
+              </p>
+  
+              <p>
+                Where a course or programme has already commenced, amounts
+                relating to content, tuition, sessions or services already
+                supplied are ordinarily non-refundable, except where applicable
+                law requires otherwise.
+              </p>
+  
+              <p>
+                Choosing not to continue or complete a course after access or
+                delivery has begun does not by itself create an entitlement to a
+                refund.
+              </p>
+            </PolicySection>
+  
+            <PolicySection title="6. Digital Content and Immediate Access">
+              <p>
+                Some Academy courses or other paid services may include digital
+                lessons, videos, recordings, downloads, documents or other
+                online content.
+              </p>
+  
+              <p>
+                Where you request immediate access to qualifying digital content
+                before the end of an applicable statutory cancellation period,
+                we may ask you to expressly agree to immediate supply and
+                acknowledge any effect this has on your cancellation rights.
+              </p>
+  
+              <p>
+                Once digital content has been supplied following any consent and
+                acknowledgement required by law, cancellation rights may be
+                limited to the extent permitted by applicable law.
+              </p>
+  
+              <p>
+                This does not affect statutory rights where digital content is
                 faulty, materially misdescribed or not supplied as agreed.
+              </p>
+            </PolicySection>
+  
+            <PolicySection title="7. No-Shows and Failure to Participate">
+              <p>
+                Paid services may reserve appointment time, professional time or
+                a limited programme place specifically for you.
+              </p>
+  
+              <p>
+                Failure to attend a scheduled appointment, repeated failure to
+                respond, failure to provide information reasonably required to
+                deliver the service, or abandonment of a programme after it has
+                commenced does not ordinarily create an entitlement to a refund
+                for work or services already provided.
+              </p>
+  
+              <p>
+                We may consider genuine exceptional circumstances on a
+                case-by-case basis.
+              </p>
+            </PolicySection>
+  
+            <PolicySection title="8. Misrepresentation, Abuse and Breach of Terms">
+              <p>
+                Delly&apos;s Matchups may suspend, restrict or terminate an
+                account or service where a user materially breaches our Terms
+                &amp; Conditions.
+              </p>
+  
+              <p>This may include circumstances involving:</p>
+  
+              <ul className="list-disc space-y-2 pl-6">
+                <li>false or deliberately misleading information;</li>
+                <li>misrepresentation of marital or relationship status;</li>
+                <li>fraud, scams or financial solicitation;</li>
+                <li>abusive, threatening or harassing behaviour;</li>
+                <li>prohibited or inappropriate content; or</li>
+                <li>serious misuse of the Delly&apos;s Matchups platform.</li>
+              </ul>
+  
+              <p>
+                Where termination results from a serious breach by the user,
+                amounts relating to services already supplied, professional time
+                already used or work already performed are ordinarily
+                non-refundable, subject to applicable law.
               </p>
             </PolicySection>
   
             <PolicySection title="9. Physical Shop Purchases">
               <p>
-                Different cancellation and return rules apply to physical goods
-                purchased through the Delly&apos;s Matchups shop.
+                Physical products purchased through the Delly&apos;s Matchups
+                shop are subject to applicable consumer cancellation, return and
+                refund rights.
               </p>
   
               <p>
-                Where applicable under UK consumer law, consumers purchasing
-                goods online may have a right to cancel an eligible order within
-                14 days after receiving the goods.
+                Where a statutory cancellation right applies to an eligible
+                online purchase, the applicable cancellation and return period
+                will be honoured.
               </p>
   
               <p>
-                After notifying us of a valid cancellation, the goods should be
-                returned within the applicable return period and should be kept
-                in reasonable condition while in your possession.
+                Returned goods should be kept in reasonable condition. Where
+                permitted by law, a refund may be reduced if the value of the
+                goods has been diminished by handling beyond what was reasonably
+                necessary to inspect them.
               </p>
   
               <p>
-                We may make a deduction from a refund where permitted by law if
-                the value of returned goods has been reduced because they have
-                been handled beyond what is reasonably necessary to inspect
-                them.
+                Some goods may be excluded from change-of-mind cancellation
+                rights where a lawful exemption applies, including certain
+                personalised or custom-made items.
               </p>
   
               <p>
-                Certain products may be excluded from cancellation rights where
-                an exclusion is permitted by law, including certain personalised
-                products or other exempt goods.
-              </p>
-            </PolicySection>
-  
-            <PolicySection title="10. Faulty, Damaged or Incorrect Goods">
-              <p>
-                If an item arrives faulty, damaged, materially misdescribed or
-                different from the item ordered, contact us as soon as reasonably
-                possible.
-              </p>
-  
-              <p>
-                We may ask for relevant information or photographs so that we
-                can investigate the issue.
-              </p>
-  
-              <p>
-                Where required, we may provide an appropriate repair,
-                replacement, refund or other remedy in accordance with
-                applicable consumer law.
-              </p>
-  
-              <p>
-                Your statutory rights in relation to faulty or misdescribed
-                goods are not affected by this policy.
+                If goods are faulty, damaged, materially misdescribed or
+                incorrect, contact us promptly so that we can investigate and
+                provide the appropriate remedy.
               </p>
             </PolicySection>
   
-            <PolicySection title="11. Return Delivery Costs">
+            <PolicySection title="10. Cancellation by Delly’s Matchups">
               <p>
-                Where a customer changes their mind about an eligible physical
-                product, the customer may be responsible for the reasonable cost
-                of returning the product unless Delly&apos;s Matchups states
-                otherwise.
+                Where Delly&apos;s Matchups is unable to provide a paid service
+                for reasons attributable to us, we will assess the circumstances
+                and provide an appropriate remedy.
               </p>
   
               <p>
-                Where goods are faulty, damaged, incorrect or otherwise require
-                a remedy for which Delly&apos;s Matchups is responsible, return
-                costs will be handled in accordance with applicable law.
-              </p>
-            </PolicySection>
-  
-            <PolicySection title="12. Payment Methods and Refund Processing">
-              <p>
-                Where a refund is approved, we will normally attempt to return
-                the money using the original payment method where reasonably
-                possible.
-              </p>
-  
-              <p>
-                Payments processed through PayPal, card processors, app stores
-                or other third-party providers may also be subject to the
-                provider&apos;s processing procedures and timescales.
-              </p>
-  
-              <p>
-                For approved refunds relating to manual payments, we may request
-                reasonable payment details needed to return the funds securely.
-              </p>
-  
-              <p>
-                A refund may take additional time to appear after it has been
-                issued because banks and payment providers control their own
-                processing times.
+                Depending on the circumstances, this may include rescheduling,
+                replacement service, account credit, an extension of access, a
+                partial refund or a full refund.
               </p>
             </PolicySection>
   
-            <PolicySection title="13. Duplicate or Incorrect Payments">
+            <PolicySection title="11. Duplicate or Incorrect Payments">
               <p>
-                If you believe you have been charged twice, charged the wrong
-                amount or charged for a purchase you did not intend to make,
-                contact us promptly so that we can investigate.
+                If you believe you were charged twice, charged an incorrect
+                amount or charged for a purchase you did not authorise, contact
+                us promptly so that we can investigate.
               </p>
   
               <p>
@@ -344,63 +358,59 @@ export const metadata = {
               </p>
             </PolicySection>
   
-            <PolicySection title="14. Promotional Offers and Discounts">
+            <PolicySection title="12. Refund Processing">
               <p>
-                Refunds relating to discounted purchases, promotional offers or
-                vouchers will normally be based on the amount actually paid
-                rather than the undiscounted value of the product or service.
+                Where a refund is approved, we will normally return it using the
+                original payment method where reasonably possible.
               </p>
   
               <p>
-                Additional promotional terms may apply where they are clearly
-                disclosed before purchase.
-              </p>
-            </PolicySection>
-  
-            <PolicySection title="15. Exceptional Circumstances">
-              <p>
-                Delly&apos;s Matchups may consider exceptional circumstances on
-                a case-by-case basis.
+                Payments handled through PayPal, app stores, card processors or
+                other third-party providers may also be subject to those
+                providers&apos; processing procedures and timescales.
               </p>
   
               <p>
-                Agreeing to make an exception in one case does not create an
-                obligation to make the same exception in another case.
+                Banks and payment providers may require additional processing
+                time after a refund has been issued by Delly&apos;s Matchups.
               </p>
             </PolicySection>
   
-            <PolicySection title="16. Chargebacks and Payment Disputes">
+            <PolicySection title="13. Statutory Consumer Rights">
               <p>
-                If you believe a payment is incorrect, we encourage you to
-                contact us first so that we have an opportunity to investigate
-                and resolve the issue.
+                Nothing in this policy removes or reduces statutory consumer
+                rights that cannot legally be excluded.
               </p>
   
               <p>
-                Fraudulent, abusive or knowingly false payment disputes may
-                result in restrictions being placed on an account where
-                reasonably necessary to protect Delly&apos;s Matchups and its
-                users.
+                Where applicable law gives you a cancellation right for an
+                online purchase, that right will continue to apply.
+              </p>
+  
+              <p>
+                Where you expressly request that a paid service begins during an
+                applicable statutory cancellation period, work may begin
+                following that request.
+              </p>
+  
+              <p>
+                If you subsequently exercise a lawful cancellation right after
+                performance has begun, amounts relating to services already
+                supplied may be taken into account where permitted by applicable
+                law.
+              </p>
+  
+              <p>
+                If any provision of this policy conflicts with a statutory right
+                that cannot legally be excluded, the statutory right will take
+                priority.
               </p>
             </PolicySection>
   
-            <PolicySection title="17. Statutory Consumer Rights">
-              <p>
-                This policy does not remove or reduce any statutory rights you
-                may have under applicable consumer protection law.
-              </p>
-  
-              <p>
-                Where a provision of this policy conflicts with a legal right
-                that cannot be excluded or limited, the applicable legal right
-                will take priority.
-              </p>
-            </PolicySection>
-  
-            <PolicySection title="18. How to Request a Cancellation or Refund">
+            <PolicySection title="14. How to Request a Cancellation or Refund">
               <p>
                 To request a cancellation, rescheduling, return or refund,
-                contact:
+                contact Delly&apos;s Matchups using the details below.
               </p>
   
               <div className="rounded-3xl border border-white/10 bg-black/20 p-6">
@@ -424,27 +434,34 @@ export const metadata = {
               </div>
   
               <p>
-                Please include enough information for us to identify the
-                relevant booking, order, membership or transaction.
+                Please provide enough information for us to identify the
+                relevant account, booking, membership, programme, order or
+                transaction.
               </p>
   
               <p>
-                Where applicable, this may include your name, account email,
-                booking or order reference and a brief explanation of the
+                This may include your name, account email, booking or order
+                reference, payment reference and a short explanation of your
                 request.
+              </p>
+  
+              <p>
+                Submitting a request does not automatically mean that a refund
+                will be approved. Requests will be assessed according to the
+                product or service purchased, what has already been supplied and
+                any applicable legal requirements.
               </p>
             </PolicySection>
   
-            <PolicySection title="19. Changes to This Policy">
+            <PolicySection title="15. Changes to This Policy">
               <p>
-                We may update this Cancellation &amp; Refund Policy from time to
-                time to reflect changes to our products, services, payment
-                methods or legal requirements.
+                We may update this Cancellation &amp; Refund Policy when our
+                services, products, payment methods or legal requirements change.
               </p>
   
               <p>
-                Where material changes are made, the Last Updated date above
-                will be revised.
+                Where material changes are made, the Last Updated date at the top
+                of this page will be revised.
               </p>
             </PolicySection>
           </div>
@@ -457,10 +474,7 @@ export const metadata = {
     return (
       <section>
         <h2 className="text-3xl font-black">{title}</h2>
-  
-        <div className="mt-5 space-y-5 leading-8 text-white/75">
-          {children}
-        </div>
+        <div className="mt-5 space-y-5 leading-8 text-white/75">{children}</div>
       </section>
     );
   }
