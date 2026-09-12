@@ -1,3 +1,5 @@
+// src/app/components/SiteChrome.js
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -80,10 +82,10 @@ export function SiteNav() {
   useEffect(() => {
     async function getUser() {
       const {
-        data: { user },
+        data: { user: currentUser },
       } = await supabase.auth.getUser();
 
-      setUser(user);
+      setUser(currentUser);
     }
 
     getUser();
@@ -112,7 +114,10 @@ export function SiteNav() {
               onMouseEnter={() => setOpenMenu(group.label)}
               onMouseLeave={() => setOpenMenu(null)}
             >
-              <button type="button" className="transition hover:text-red-100">
+              <button
+                type="button"
+                className="transition hover:text-red-100"
+              >
                 {group.label} ▾
               </button>
 
@@ -147,7 +152,8 @@ export function SiteNav() {
           onClick={() => setMobileOpen((current) => !current)}
           className="text-3xl text-white lg:hidden"
           type="button"
-          aria-label="Open menu"
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
         >
           {mobileOpen ? "×" : "☰"}
         </button>
@@ -219,6 +225,7 @@ export function SiteNav() {
               <a
                 href="/dashboard"
                 className="rounded-full bg-white px-6 py-3 text-center font-bold text-[#b30018]"
+                onClick={() => setMobileOpen(false)}
               >
                 Dashboard
               </a>
@@ -227,6 +234,7 @@ export function SiteNav() {
                 <a
                   href="/auth/login"
                   className="rounded-full border border-white/20 px-6 py-3 text-center font-bold"
+                  onClick={() => setMobileOpen(false)}
                 >
                   Sign In
                 </a>
@@ -234,6 +242,7 @@ export function SiteNav() {
                 <a
                   href="/auth/signup"
                   className="rounded-full bg-white px-6 py-3 text-center font-bold text-[#b30018]"
+                  onClick={() => setMobileOpen(false)}
                 >
                   Join Free
                 </a>
@@ -247,20 +256,55 @@ export function SiteNav() {
 }
 
 export function SiteFooter() {
+  async function handleNewsletterSubmit(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const email = form.email.value.trim().toLowerCase();
+
+    if (!email) {
+      alert("Please enter your email address.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("newsletter_subscribers")
+      .insert([{ email }]);
+
+    if (error) {
+      if (
+        error.code === "23505" ||
+        error.message.includes("newsletter_subscribers_email_key")
+      ) {
+        alert("You are already subscribed to our newsletter.");
+        return;
+      }
+
+      alert("Unable to subscribe. Please try again.");
+      return;
+    }
+
+    alert("Successfully subscribed to the Delly's Matchups newsletter.");
+    form.reset();
+  }
+
   return (
     <footer className="border-t border-white/10 bg-[#080304] px-6 py-16 text-white">
       <div className="mx-auto max-w-7xl">
         <div className="mb-12 grid gap-5 md:grid-cols-4">
-          {["Prompt Delivery", "No Returns", "Secure Payment", "24/7 Support"].map(
-            (item) => (
-              <div
-                key={item}
-                className="rounded-xl bg-white/10 px-6 py-4 text-center text-sm font-black uppercase tracking-wide"
-              >
-                {item}
-              </div>
-            )
-          )}
+          {[
+            "Prompt Delivery",
+            "Clear Returns Policy",
+            "Secure Payment",
+            "Customer Support",
+          ].map((item) => (
+            <div
+              key={item}
+              className="rounded-xl bg-white/10 px-6 py-4 text-center text-sm font-black uppercase tracking-wide"
+            >
+              {item}
+            </div>
+          ))}
         </div>
 
         <div className="mb-16 rounded-2xl bg-[#b30018] p-6 md:flex md:items-center md:justify-between">
@@ -269,28 +313,7 @@ export function SiteFooter() {
           </h2>
 
           <form
-            onSubmit={async (event) => {
-              event.preventDefault();
-
-              const email = event.currentTarget.email.value.trim().toLowerCase();
-
-              const { error } = await supabase
-                .from("newsletter_subscribers")
-                .insert([{ email }]);
-
-              if (error) {
-                if (error.message.includes("newsletter_subscribers_email_key")) {
-                  alert("You are already subscribed to our newsletter.");
-                  return;
-                }
-
-                alert("Unable to subscribe. Please try again.");
-                return;
-              }
-
-              alert("Successfully subscribed to the Delly's Matchups newsletter.");
-              event.currentTarget.reset();
-            }}
+            onSubmit={handleNewsletterSubmit}
             className="mt-5 flex flex-col gap-3 md:mt-0 md:flex-row"
           >
             <input
@@ -310,7 +333,7 @@ export function SiteFooter() {
           </form>
         </div>
 
-        <div className="grid gap-12 lg:grid-cols-4">
+        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-5">
           <div>
             <img
               src="/dellys-logo.webp"
@@ -331,15 +354,28 @@ export function SiteFooter() {
               <a className="block hover:text-white" href="/">
                 Home
               </a>
-              <a className="block hover:text-white" href="/about/platform">
+
+              <a
+                className="block hover:text-white"
+                href="/about/platform"
+              >
                 The Platform
               </a>
-              <a className="block hover:text-white" href="/about/founder">
+
+              <a
+                className="block hover:text-white"
+                href="/about/founder"
+              >
                 The Founder
               </a>
-              <a className="block hover:text-white" href="/about/academy">
+
+              <a
+                className="block hover:text-white"
+                href="/about/academy"
+              >
                 The Academy
               </a>
+
               <a
                 className="block hover:text-white"
                 href="/academy/checkout?course=full-academy"
@@ -359,12 +395,21 @@ export function SiteFooter() {
               >
                 Premarital Counselling
               </a>
-              <a className="block hover:text-white" href="/counselling/marital">
+
+              <a
+                className="block hover:text-white"
+                href="/counselling/marital"
+              >
                 Marital Counselling
               </a>
-              <a className="block hover:text-white" href="/counselling/healing">
+
+              <a
+                className="block hover:text-white"
+                href="/counselling/healing"
+              >
                 Emotional Healing
               </a>
+
               <a className="block hover:text-white" href="/matchups">
                 Matchups
               </a>
@@ -372,7 +417,50 @@ export function SiteFooter() {
           </div>
 
           <div>
-            <h3 className="text-xl font-black">Company Information</h3>
+            <h3 className="text-xl font-black">Legal &amp; Support</h3>
+
+            <div className="mt-6 space-y-4 text-white/70">
+              <a
+                className="block hover:text-white"
+                href="/privacy"
+              >
+                Privacy Policy
+              </a>
+
+              <a
+                className="block hover:text-white"
+                href="/terms"
+              >
+                Terms &amp; Conditions
+              </a>
+
+              <a
+                className="block hover:text-white"
+                href="/cancellation-refund-policy"
+              >
+                Cancellation &amp; Refund Policy
+              </a>
+
+              <a
+                className="block hover:text-white"
+                href="mailto:support@dellysmatchups.org"
+              >
+                support@dellysmatchups.org
+              </a>
+
+              <a
+                className="block hover:text-white"
+                href="mailto:info@dellysmatchups.org"
+              >
+                Privacy &amp; Legal Contact
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-black">
+              Company Information
+            </h3>
 
             <div className="mt-6 space-y-3 text-white/70">
               <p>DELLY&apos;S MATCHUPS LTD</p>
