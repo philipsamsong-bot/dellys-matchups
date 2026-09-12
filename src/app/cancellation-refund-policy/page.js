@@ -474,7 +474,7 @@ export const metadata = {
     return (
       <section>
         <h2 className="text-3xl font-black">{title}</h2>
-        <div className="mt-5 space-y-5 leading-8 text-white/75">{children}</div>
+        <div className="mt-5 space-y-5 leading-8 text-white/90">{children}</div>
       </section>
     );
   }
